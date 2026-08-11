@@ -1,0 +1,223 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #0f1720;
+  color: #f2f4f7;
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+}
+
+.connection-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #333;
+}
+
+.connection-badge.online {
+  background: #16532d;
+  color: #7ee2a8;
+}
+
+.connection-badge.offline {
+  background: #5a2a2a;
+  color: #f2a5a5;
+}
+
+.lobby-card,
+.room-card {
+  background: #1b2531;
+  border: 1px solid #2b394a;
+  border-radius: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.lobby-card h1 {
+  margin-top: 0;
+  font-size: 22px;
+  text-align: center;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.mode-toggle button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #2b394a;
+  background: transparent;
+  color: #aebac9;
+  cursor: pointer;
+}
+
+.mode-toggle button.active {
+  background: #f97316;
+  border-color: #f97316;
+  color: #1b2531;
+  font-weight: 600;
+}
+
+form label {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #aebac9;
+}
+
+form input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #2b394a;
+  background: #0f1720;
+  color: #f2f4f7;
+  font-size: 15px;
+}
+
+.primary-btn,
+.secondary-btn,
+.leave-btn {
+  cursor: pointer;
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 10px 16px;
+}
+
+.primary-btn {
+  width: 100%;
+  background: #f97316;
+  border: none;
+  color: #1b2531;
+  font-size: 15px;
+  margin-top: 4px;
+}
+
+.primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  background: transparent;
+  border: 1px solid #2b394a;
+  color: #f2f4f7;
+}
+
+.leave-btn {
+  margin-top: 20px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid #5a2a2a;
+  color: #f2a5a5;
+}
+
+.error-text {
+  color: #f2a5a5;
+  font-size: 13px;
+  margin: -6px 0 14px;
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.room-header h2 {
+  margin: 0;
+  font-size: 13px;
+  color: #aebac9;
+  font-weight: 500;
+}
+
+.room-code {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  margin: 4px 0 0;
+  color: #f97316;
+}
+
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #0f1720;
+  border: 1px solid #2b394a;
+}
+
+.player-list li.you {
+  border-color: #f97316;
+}
+
+.player-list li.empty-slot {
+  color: #5f6b7a;
+  font-style: italic;
+  justify-content: center;
+}
+
+.player-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.host-badge,
+.you-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #2b394a;
+  color: #aebac9;
+}
+
+.player-budget {
+  font-variant-numeric: tabular-nums;
+  color: #aebac9;
+  font-size: 13px;
+}
+
+.hint-text {
+  font-size: 13px;
+  color: #aebac9;
+  margin: 16px 0 0;
+}
