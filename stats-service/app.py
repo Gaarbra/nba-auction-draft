@@ -12,7 +12,10 @@ from nba_api.stats.endpoints import (
 
 app = Flask(__name__)
 
-PORT = int(os.environ.get("STATS_SERVICE_PORT", 5001))
+# PORT is the convention most PaaS hosts (Render included) inject
+# automatically; STATS_SERVICE_PORT is kept as a fallback for local dev
+# habits from before that mattered.
+PORT = int(os.environ.get("PORT", os.environ.get("STATS_SERVICE_PORT", 5001)))
 CACHE_TTL_SECONDS = 60 * 60
 BIO_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # position/draft year never change
 POOL_CACHE_TTL_SECONDS = 60 * 60
@@ -73,6 +76,20 @@ def dedupe_traded_seasons(df):
         tot_rows = group[group["TEAM_ABBREVIATION"] == "TOT"]
         rows.append(tot_rows.iloc[0] if len(tot_rows) else group.iloc[0])
     return rows
+
+
+def last_real_team(df):
+    """The team to display as "their team" — the last actual roster they
+    were on, chronologically. This is deliberately NOT the same as the last
+    row of dedupe_traded_seasons(): if a player's final season was itself a
+    trade year, that row is the synthetic 'TOT' aggregate, not a real team,
+    and showing "TOT" as someone's team is meaningless. Filtering TOT out
+    and taking the last remaining row gives the team they actually finished
+    with (df's row order is already chronological from playercareerstats)."""
+    real_rows = df[df["TEAM_ABBREVIATION"] != "TOT"]
+    if len(real_rows):
+        return real_rows.iloc[-1]["TEAM_ABBREVIATION"]
+    return None
 
 
 def fetch_player_bio(player_id):
@@ -164,7 +181,7 @@ def fetch_stats_for_player(player_id):
                 "ftaPerGame": per_game(total_fta),
                 "tovPerGame": per_game(total_tov),
                 "minutesPerGame": per_game(total_min),
-                "team": season_rows[-1]["TEAM_ABBREVIATION"],
+                "team": last_real_team(df),
                 "position": bio["position"],
                 "draftYear": bio["draftYear"],
             }
@@ -298,4 +315,11 @@ def get_full_stats():
 
 
 if __name__ == "__main__":
-    app.run(port=PORT)
+    # host="0.0.0.0" so this is reachable from outside the container/machine
+    # it runs on (Flask's dev-server default of 127.0.0.1 only accepts local
+    # connections) — needed for both Docker-style deploys and the Node
+    # server calling in from a separate host on a cloud platform. In
+    # production this file isn't actually the entry point at all — gunicorn
+    # runs it directly (see render.yaml) since Flask's built-in server isn't
+    # meant to take real traffic.
+    app.run(host="0.0.0.0", port=PORT)

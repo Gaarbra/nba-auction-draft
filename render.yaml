@@ -1,0 +1,58 @@
+services:
+  # Python/Flask stats microservice. Not meant to be hit directly by the
+  # browser — only the Node server calls it — but Render's free web
+  # services are publicly reachable by default (there's no private-only
+  # free tier), so it's still worth treating its URL as something you don't
+  # advertise, even without a browser-facing use for it.
+  - type: web
+    name: nba-draft-stats-service
+    runtime: python
+    plan: free
+    rootDir: stats-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 2 --timeout 120 --bind 0.0.0.0:$PORT app:app
+
+  # Node/Express/Socket.IO backend — the only service the frontend talks to.
+  - type: web
+    name: nba-draft-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Fill these in from the Render dashboard after the first deploy, once
+      # you can see the actual URLs Render assigned the other two services
+      # (Settings tab on each service). sync: false just means "don't try to
+      # auto-fill this, prompt for it" — Render will ask when you apply the
+      # blueprint, and you can edit it any time under this service's
+      # Environment tab afterwards.
+      - key: STATS_SERVICE_URL
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      # Optional — set this to any random string if you want to lock down
+      # POST /api/players/sync (see README's Security section). Leave unset
+      # and it stays open, same as local dev.
+      - key: ADMIN_TOKEN
+        sync: false
+
+  # React static build.
+  - type: web
+    name: nba-draft-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # Baked into the build at build time (Vite env vars aren't readable at
+      # runtime) — set this to the server service's URL, same caveat as
+      # above.
+      - key: VITE_SERVER_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

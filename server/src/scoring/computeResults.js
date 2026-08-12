@@ -52,20 +52,26 @@ export async function computeDraftResults(room) {
   const rankedTeams = rankTeams(teamsInput);
   const matchups = pairwiseMatchups(rankedTeams);
 
-  const teams = rankedTeams.map((team) => ({
-    id: team.id,
-    playerName: room.players.find((p) => p.id === team.id)?.name ?? "Unknown",
-    rank: team.rank,
-    finalScore: team.finalScore,
-    sumUsagePct: team.breakdown.sumUsagePct,
-    synergyMultiplier: team.breakdown.synergyMultiplier,
-    roster: displayByTeam[team.id].map((slotInfo, i) => ({
-      ...slotInfo,
-      op: team.breakdown.playerScores[i].op,
-      dir: team.breakdown.playerScores[i].dir,
-      total: team.breakdown.playerScores[i].total,
-    })),
-  }));
+  const teams = rankedTeams.map((team) => {
+    const player = room.players.find((p) => p.id === team.id);
+    const filledSlots = displayByTeam[team.id].filter((slot) => slot.fullName).length;
+    return {
+      id: team.id,
+      playerName: player?.name ?? "Unknown",
+      forfeited: Boolean(player?.forfeited),
+      filledSlots,
+      rank: team.rank,
+      finalScore: team.finalScore,
+      sumUsagePct: team.breakdown.sumUsagePct,
+      synergyMultiplier: team.breakdown.synergyMultiplier,
+      roster: displayByTeam[team.id].map((slotInfo, i) => ({
+        ...slotInfo,
+        op: team.breakdown.playerScores[i].op,
+        dir: team.breakdown.playerScores[i].dir,
+        total: team.breakdown.playerScores[i].total,
+      })),
+    };
+  });
 
   return { teams, matchups, computedAt: Date.now() };
 }

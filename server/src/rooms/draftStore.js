@@ -184,6 +184,11 @@ export function getOpenSlotsForPlayer(room, playerId) {
   return getOpenSlots(room.draft.rosters[playerId]);
 }
 
+// Used both for a voluntary mid-draft leave and for a disconnect that timed
+// out its reconnect grace period. Deliberately never touches room.players or
+// draft.rosters — the caller (roomStore) decides whether to keep the player
+// entry around, and their roster (however incomplete) needs to survive so
+// computeResults can still rank the team they'd built so far.
 export function removePlayerFromDraft(room, playerId) {
   const draft = room.draft;
   if (!draft) return;
@@ -195,6 +200,20 @@ export function removePlayerFromDraft(room, playerId) {
       draft.nomination = null;
     } else {
       draft.nomination.passed = draft.nomination.passed.filter((id) => id !== playerId);
+
+      // The player leaving might have been the last still-active holdout —
+      // recompute the same "has everyone but the high bidder passed" check
+      // passOnNomination uses, so bidding doesn't stall waiting on someone
+      // who's gone.
+      const nomination = draft.nomination;
+      const stillActive = draft.turnOrder.filter((id) => {
+        if (id === nomination.currentBidder) return false;
+        if (isRosterFull(draft.rosters[id])) return false;
+        return !nomination.passed.includes(id);
+      });
+      if (stillActive.length === 0) {
+        nomination.phase = "assigning";
+      }
     }
   }
 

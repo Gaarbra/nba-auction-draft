@@ -1,12 +1,29 @@
-import { createRoom, addPlayerToRoom, removePlayerFromSocket, startDraft, getRoom } from "../rooms/roomStore.js";
+import {
+  createRoom,
+  addPlayerToRoom,
+  startDraft,
+  getRoom,
+  finalizePlayerExit,
+  beginDisconnectGrace,
+  reconnectPlayer,
+  RECONNECT_GRACE_MS,
+} from "../rooms/roomStore.js";
 import { nominatePlayer, placeBid, passOnNomination, assignPosition, swapRosterPositions } from "../rooms/draftStore.js";
 import { getPlayers } from "../services/playerCache.js";
 import { filterPlayersByEra } from "../services/era.js";
 import { fetchPlayerStats } from "../services/statsClient.js";
 import { computeDraftResults } from "../scoring/computeResults.js";
+import { createKeyedRateLimiter, createSocketEventLimiter } from "../middleware/rateLimit.js";
 
 const MAX_STATS_DRAW_ATTEMPTS = 6;
 const MIN_ROLL_MS = 1400;
+const MAX_NAME_LENGTH = 30;
+
+// Shared across every connection (module scope) — caps how many rooms a
+// single IP can spin up, since an unbounded flood of rooms is the one
+// server-memory-exhaustion vector a per-socket limiter alone can't catch
+// (a script could just open a fresh socket per room).
+const roomCreateLimiter = createKeyedRateLimiter({ windowMs: 10 * 60_000, max: 15 });
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,7 +66,16 @@ function toPublicRoom(room) {
     allowPositionSwaps: room.allowPositionSwaps || false,
     resultsStatus: room.resultsStatus || null,
     results: room.results || null,
-    players: room.players.map((p) => ({ id: p.id, name: p.name, budget: p.budget, isHost: p.isHost })),
+    reconnectGraceMs: RECONNECT_GRACE_MS,
+    players: room.players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      budget: p.budget,
+      isHost: p.isHost,
+      connected: p.connected,
+      forfeited: p.forfeited,
+      disconnectedAt: p.disconnectedAt,
+    })),
   };
 
   if (!room.draft) return base;
@@ -66,15 +92,46 @@ function toPublicRoom(room) {
   };
 }
 
+/** Kicks off the (slow, one-time) end-of-draft scoring pass if the draft just completed and hasn't been scored yet. */
+function maybeComputeResults(io, room, roomCode) {
+  if (room.status !== "complete" || room.results || room.resultsStatus === "computing") return;
+
+  room.resultsStatus = "computing";
+  io.to(roomCode).emit("room:update", toPublicRoom(room));
+
+  computeDraftResults(room)
+    .then((results) => {
+      room.results = results;
+      room.resultsStatus = "ready";
+      io.to(roomCode).emit("room:update", toPublicRoom(room));
+    })
+    .catch((err) => {
+      console.error(`[computeDraftResults] failed for room ${roomCode}:`, err);
+      room.resultsStatus = "failed";
+      io.to(roomCode).emit("room:update", toPublicRoom(room));
+    });
+}
+
 export function registerRoomHandlers(io, socket) {
-  socket.on("room:create", ({ name }, callback) => {
-    const playerName = (name || "").trim();
-    if (!playerName) {
+  // Cheap per-connection throttle against a spammy/scripted client hammering
+  // any of these events — each socket gets its own independent counter.
+  const allowEvent = createSocketEventLimiter(10_000, 40);
+
+  socket.on("room:create", ({ name } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    if (typeof name !== "string" || !name.trim()) {
       return callback?.({ error: "NAME_REQUIRED" });
+    }
+    if (name.trim().length > MAX_NAME_LENGTH) {
+      return callback?.({ error: "NAME_TOO_LONG" });
+    }
+    const clientIp = socket.handshake.address;
+    if (clientIp && !roomCreateLimiter(clientIp)) {
+      return callback?.({ error: "RATE_LIMITED" });
     }
 
     const room = createRoom();
-    const result = addPlayerToRoom(room.code, { id: socket.id, name: playerName });
+    const result = addPlayerToRoom(room.code, { name, socketId: socket.id });
 
     if (result.error) {
       return callback?.({ error: result.error });
@@ -82,21 +139,23 @@ export function registerRoomHandlers(io, socket) {
 
     socket.join(room.code);
     socket.data.roomCode = room.code;
-    socket.data.playerName = playerName;
+    socket.data.playerId = result.player.id;
 
-    callback?.({ room: toPublicRoom(result.room) });
+    callback?.({ room: toPublicRoom(result.room), playerId: result.player.id });
     io.to(room.code).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("room:join", ({ code, name }, callback) => {
-    const playerName = (name || "").trim();
+  socket.on("room:join", ({ code, name } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = (code || "").trim().toUpperCase();
-
-    if (!playerName || !roomCode) {
+    if (typeof name !== "string" || !name.trim() || !roomCode) {
       return callback?.({ error: "NAME_AND_CODE_REQUIRED" });
     }
+    if (name.trim().length > MAX_NAME_LENGTH) {
+      return callback?.({ error: "NAME_TOO_LONG" });
+    }
 
-    const result = addPlayerToRoom(roomCode, { id: socket.id, name: playerName });
+    const result = addPlayerToRoom(roomCode, { name, socketId: socket.id });
 
     if (result.error) {
       return callback?.({ error: result.error });
@@ -104,19 +163,48 @@ export function registerRoomHandlers(io, socket) {
 
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
-    socket.data.playerName = playerName;
+    socket.data.playerId = result.player.id;
 
-    callback?.({ room: toPublicRoom(result.room) });
+    callback?.({ room: toPublicRoom(result.room), playerId: result.player.id });
+    io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+  });
+
+  socket.on("room:rejoin", ({ code, playerId } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = (code || "").trim().toUpperCase();
+    if (!roomCode || typeof playerId !== "string" || !playerId) {
+      return callback?.({ error: "RECONNECT_FAILED" });
+    }
+
+    const result = reconnectPlayer(roomCode, playerId, socket.id);
+    if (result.error) {
+      return callback?.({ error: "RECONNECT_FAILED" });
+    }
+
+    if (result.previousSocketId) {
+      // Same identity just came back on a different socket while the old
+      // one was still marked live — most likely a duplicate tab. Boot the
+      // old connection so it shows an honest "disconnected" state instead
+      // of silently going stale while this one takes over.
+      io.sockets.sockets.get(result.previousSocketId)?.disconnect(true);
+    }
+
+    socket.join(roomCode);
+    socket.data.roomCode = roomCode;
+    socket.data.playerId = playerId;
+
+    callback?.({ room: toPublicRoom(result.room), playerId });
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
   socket.on("room:start", ({ era, allowPositionSwaps } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = socket.data.roomCode;
     if (!roomCode) {
       return callback?.({ error: "NOT_IN_ROOM" });
     }
 
-    const result = startDraft(roomCode, socket.id, era, allowPositionSwaps);
+    const result = startDraft(roomCode, socket.data.playerId, era, allowPositionSwaps);
     if (result.error) {
       return callback?.({ error: result.error });
     }
@@ -126,8 +214,10 @@ export function registerRoomHandlers(io, socket) {
   });
 
   socket.on("draft:nominate", async (payload, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = socket.data.roomCode;
-    if (!roomCode) return callback?.({ error: "NOT_IN_ROOM" });
+    const playerId = socket.data.playerId;
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
     if (!room) return callback?.({ error: "ROOM_NOT_FOUND" });
@@ -137,7 +227,7 @@ export function registerRoomHandlers(io, socket) {
     // animation for everyone else in the room.
     if (room.status !== "drafting") return callback?.({ error: "NOT_DRAFTING" });
     if (room.draft?.nomination) return callback?.({ error: "NOMINATION_IN_PROGRESS" });
-    if (room.draft?.currentNominatorId !== socket.id) return callback?.({ error: "NOT_YOUR_TURN" });
+    if (room.draft?.currentNominatorId !== playerId) return callback?.({ error: "NOT_YOUR_TURN" });
 
     // Broadcast to the whole room — including the requester — before doing
     // any of the slow work, so every client's rolling animation starts at
@@ -162,7 +252,7 @@ export function registerRoomHandlers(io, socket) {
       sleep(MIN_ROLL_MS),
     ]);
 
-    const result = nominatePlayer(room, socket.id, { ...chosenPlayer, stats, nbaPlayerId });
+    const result = nominatePlayer(room, playerId, { ...chosenPlayer, stats, nbaPlayerId });
     if (result.error) {
       io.to(roomCode).emit("draft:rolling-cancelled");
       return callback?.({ error: result.error });
@@ -172,14 +262,16 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("draft:bid", ({ amount }, callback) => {
+  socket.on("draft:bid", ({ amount } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = socket.data.roomCode;
-    if (!roomCode) return callback?.({ error: "NOT_IN_ROOM" });
+    const playerId = socket.data.playerId;
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
     if (!room) return callback?.({ error: "ROOM_NOT_FOUND" });
 
-    const result = placeBid(room, socket.id, amount);
+    const result = placeBid(room, playerId, amount);
     if (result.error) return callback?.({ error: result.error });
 
     callback?.({ room: toPublicRoom(result.room) });
@@ -187,59 +279,48 @@ export function registerRoomHandlers(io, socket) {
   });
 
   socket.on("draft:pass", (payload, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = socket.data.roomCode;
-    if (!roomCode) return callback?.({ error: "NOT_IN_ROOM" });
+    const playerId = socket.data.playerId;
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
     if (!room) return callback?.({ error: "ROOM_NOT_FOUND" });
 
-    const result = passOnNomination(room, socket.id);
+    const result = passOnNomination(room, playerId);
     if (result.error) return callback?.({ error: result.error });
 
     callback?.({ room: toPublicRoom(result.room) });
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("draft:assign", ({ position }, callback) => {
+  socket.on("draft:assign", ({ position } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = socket.data.roomCode;
-    if (!roomCode) return callback?.({ error: "NOT_IN_ROOM" });
+    const playerId = socket.data.playerId;
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
     if (!room) return callback?.({ error: "ROOM_NOT_FOUND" });
 
-    const result = assignPosition(room, socket.id, position);
+    const result = assignPosition(room, playerId, position);
     if (result.error) return callback?.({ error: result.error });
-
-    if (result.room.status === "complete" && !result.room.results) {
-      result.room.resultsStatus = "computing";
-    }
 
     callback?.({ room: toPublicRoom(result.room) });
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
-
-    if (result.room.status === "complete" && result.room.resultsStatus === "computing") {
-      computeDraftResults(result.room)
-        .then((results) => {
-          result.room.results = results;
-          result.room.resultsStatus = "ready";
-          io.to(roomCode).emit("room:update", toPublicRoom(result.room));
-        })
-        .catch((err) => {
-          console.error(`[computeDraftResults] failed for room ${roomCode}:`, err);
-          result.room.resultsStatus = "failed";
-          io.to(roomCode).emit("room:update", toPublicRoom(result.room));
-        });
-    }
+    maybeComputeResults(io, result.room, roomCode);
   });
 
   socket.on("draft:swap-positions", ({ slotA, slotB } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = socket.data.roomCode;
-    if (!roomCode) return callback?.({ error: "NOT_IN_ROOM" });
+    const playerId = socket.data.playerId;
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
     if (!room) return callback?.({ error: "ROOM_NOT_FOUND" });
 
-    const result = swapRosterPositions(room, socket.id, slotA, slotB);
+    const result = swapRosterPositions(room, playerId, slotA, slotB);
     if (result.error) return callback?.({ error: result.error });
 
     callback?.({ room: toPublicRoom(result.room) });
@@ -247,22 +328,38 @@ export function registerRoomHandlers(io, socket) {
   });
 
   socket.on("room:leave", () => {
-    handleDisconnect(io, socket);
+    const roomCode = socket.data.roomCode;
+    const playerId = socket.data.playerId;
+    socket.data.roomCode = undefined;
+    socket.data.playerId = undefined;
+    if (!roomCode || !playerId) return;
+
+    const room = getRoom(roomCode);
+    if (!room) return;
+
+    const result = finalizePlayerExit(room, playerId);
+    if (result.room) {
+      io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+      maybeComputeResults(io, result.room, roomCode);
+    }
   });
 
   socket.on("disconnect", () => {
-    handleDisconnect(io, socket);
+    const roomCode = socket.data.roomCode;
+    const playerId = socket.data.playerId;
+    if (!roomCode || !playerId) return;
+
+    const room = getRoom(roomCode);
+    if (!room) return;
+
+    beginDisconnectGrace(room, playerId, socket.id, () => {
+      const result = finalizePlayerExit(room, playerId);
+      if (result.room) {
+        io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+        maybeComputeResults(io, result.room, roomCode);
+      }
+    });
+
+    io.to(roomCode).emit("room:update", toPublicRoom(room));
   });
-}
-
-function handleDisconnect(io, socket) {
-  const roomCode = socket.data.roomCode;
-  if (!roomCode) return;
-
-  const result = removePlayerFromSocket(socket.id);
-  socket.data.roomCode = undefined;
-
-  if (result?.room) {
-    io.to(result.roomCode).emit("room:update", toPublicRoom(result.room));
-  }
 }

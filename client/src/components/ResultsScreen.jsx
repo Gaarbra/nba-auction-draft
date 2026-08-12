@@ -63,12 +63,14 @@ export default function ResultsScreen({ room, currentPlayerId, onLeaveRoom }) {
               <span className="results-team-name">
                 {team.playerName}
                 {team.id === currentPlayerId && <span className="you-badge">You</span>}
+                {team.forfeited && <span className="status-badge forfeited">Left the draft</span>}
               </span>
               <span className="results-final-score">{formatScore(team.finalScore)}</span>
             </div>
 
             <p className="hint-text">
               Sum USG%: {formatPct(team.sumUsagePct)} · Synergy ×{team.synergyMultiplier.toFixed(2)}
+              {team.forfeited && ` · Scored on ${team.filledSlots}/5 slots filled before they left`}
             </p>
 
             <div className="results-roster">

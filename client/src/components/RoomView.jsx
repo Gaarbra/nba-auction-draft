@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import CoinRow from "./CoinRow.jsx";
+import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
 
 const MAX_PLAYERS = 4;
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -35,9 +36,17 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
       .catch(() => setEras([]));
   }, [isHost]);
 
+  const [codeCopied, setCodeCopied] = useState(false);
+
   function copyInviteLink() {
     const url = `${window.location.origin}${window.location.pathname}?room=${room.code}`;
     navigator.clipboard?.writeText(url);
+  }
+
+  function copyRoomCode() {
+    navigator.clipboard?.writeText(room.code);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 1500);
   }
 
   return (
@@ -45,7 +54,10 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
       <div className="room-header">
         <div>
           <h2>Room Code</h2>
-          <p className="room-code">{room.code}</p>
+          <button type="button" onClick={copyRoomCode} className="room-code-btn" title="Copy code">
+            <span className="room-code">{room.code}</span>
+            <span className="room-code-copy-hint">{codeCopied ? "Copied!" : "Click to copy"}</span>
+          </button>
         </div>
         <button type="button" onClick={copyInviteLink} className="secondary-btn">
           Copy Invite Link
@@ -62,6 +74,7 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
               {p.name}
               {p.isHost && <span className="host-badge">Host</span>}
               {p.id === currentPlayerId && <span className="you-badge">You</span>}
+              <PlayerStatusBadge player={p} reconnectGraceMs={room.reconnectGraceMs} />
             </span>
             <CoinRow budget={p.budget} />
           </li>

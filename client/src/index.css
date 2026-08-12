@@ -243,6 +243,33 @@ form input {
   text-shadow: 0 0 24px rgba(255, 122, 26, 0.35);
 }
 
+.room-code-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.room-code-btn .room-code {
+  transition: color 0.15s ease;
+}
+
+.room-code-btn:hover .room-code {
+  color: var(--text);
+}
+
+.room-code-copy-hint {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
 .player-list {
   list-style: none;
   padding: 0;
@@ -485,6 +512,12 @@ form input {
   margin: 12px 0 20px;
 }
 
+.nominated-player-card {
+  border-radius: 6px;
+  padding: 4px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--team-primary, transparent) 22%, transparent), transparent 60%);
+}
+
 .nominated-player-header {
   display: flex;
   gap: 16px;
@@ -496,7 +529,8 @@ form input {
   height: 76px;
   object-fit: cover;
   border-radius: 4px;
-  border: 1px solid var(--line-bright);
+  border: 2px solid var(--team-primary, var(--line-bright));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--team-secondary, var(--line-bright)) 55%, transparent);
   background: var(--bg-panel);
   flex-shrink: 0;
 }
@@ -622,10 +656,15 @@ form input {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 12px;
+  transition: opacity 0.2s ease;
 }
 
 .roster-card.you {
   border-color: var(--accent);
+}
+
+.roster-card.forfeited {
+  opacity: 0.55;
 }
 
 .roster-card-header {
@@ -654,12 +693,18 @@ form input {
   background: var(--bg-panel);
   border: 1px dashed var(--line);
   cursor: default;
-  overflow: hidden;
+  /* Unlike its predecessor, this can't clip to its own bounds — the hover
+     tooltip needs to escape past the card's edge. Visual clipping of the
+     headshot itself now happens on .roster-slot-media instead. */
+  overflow: visible;
 }
 
 .roster-slot.filled {
   border-style: solid;
-  border-color: var(--line-bright);
+  border-width: 2px;
+  border-color: var(--team-primary, var(--line-bright));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--team-primary, var(--line-bright)) 30%, var(--bg-panel)), var(--bg-panel) 65%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--team-secondary, var(--line-bright)) 55%, transparent) inset;
 }
 
 .roster-slot.interactive {
@@ -675,15 +720,24 @@ form input {
   box-shadow: 0 0 0 2px var(--accent) inset;
 }
 
-.roster-slot-headshot {
+.roster-slot-media {
   position: absolute;
   inset: 0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.roster-slot-headshot {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
 .roster-slot-empty-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -724,6 +778,93 @@ form input {
   padding: 1px 4px;
   border-radius: 3px;
   z-index: 1;
+}
+
+.slot-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 130px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--team-primary, var(--line-bright));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 5;
+  text-align: left;
+}
+
+.slot-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--team-primary, var(--line-bright));
+}
+
+.roster-slot.filled:hover .slot-tooltip,
+.roster-slot.filled:focus-visible .slot-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.slot-tooltip-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.slot-tooltip-meta {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--team-secondary, var(--text-dim));
+  white-space: nowrap;
+}
+
+.status-badge {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.status-badge.reconnecting {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid var(--lose);
+  color: #ff9d9d;
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+
+.status-badge.forfeited {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line-bright);
+  color: var(--text-faint);
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .coin-row {

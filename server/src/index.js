@@ -6,17 +6,44 @@ import { Server } from "socket.io";
 import { registerRoomHandlers } from "./sockets/roomHandlers.js";
 import { getPlayers, getCacheInfo } from "./services/playerCache.js";
 import { filterPlayersByEra, summarizeEras } from "./services/era.js";
+import { httpRateLimit } from "./middleware/rateLimit.js";
 
 const PORT = process.env.PORT || 4000;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+// Set this in production to keep /api/players/sync (an expensive, real
+// nba_api-hitting call) from being publicly triggerable by anyone who finds
+// the URL. Left unset, it stays open for local dev convenience.
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
 
 const app = express();
+
+// Running behind a hosting platform's reverse proxy (Render, Railway, etc.)
+// — without this, req.ip is the proxy's address, which would make the
+// per-IP rate limits below useless (everyone shares one bucket).
+if (IS_PRODUCTION) app.set("trust proxy", 1);
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
 app.use(cors({ origin: CLIENT_ORIGIN }));
 app.use(express.json());
+
+/** Logs the real error server-side always; only echoes it to the client outside production, where a generic message is safer than leaking internals. */
+function handleApiError(err, req, res) {
+  console.error(`[${req.method} ${req.path}] failed:`, err);
+  res.status(500).json({ error: IS_PRODUCTION ? "Something went wrong." : err.message });
+}
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
+
+app.use("/api/", httpRateLimit({ windowMs: 60_000, max: 60, message: "Too many requests — try again shortly." }));
 
 app.get("/api/players", async (req, res) => {
   try {
@@ -34,7 +61,7 @@ app.get("/api/players", async (req, res) => {
 
     res.json({ players: limited, count: limited.length, totalCount });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleApiError(err, req, res);
   }
 });
 
@@ -43,7 +70,7 @@ app.get("/api/players/eras", async (req, res) => {
     const players = await getPlayers();
     res.json({ eras: summarizeEras(players) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleApiError(err, req, res);
   }
 });
 
@@ -52,11 +79,14 @@ app.get("/api/players/cache-info", async (req, res) => {
 });
 
 app.post("/api/players/sync", async (req, res) => {
+  if (ADMIN_TOKEN && req.get("x-admin-token") !== ADMIN_TOKEN) {
+    return res.status(404).end();
+  }
   try {
     const players = await getPlayers({ forceRefresh: true });
     res.json({ players, count: players.length });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleApiError(err, req, res);
   }
 });
 

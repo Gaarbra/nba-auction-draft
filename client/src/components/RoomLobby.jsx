@@ -1,5 +1,16 @@
 import { useState } from "react";
 
+// Matches the room-code alphabet the server generates from (roomStore.js) —
+// no I/O/0/1, to avoid characters that look alike. Sanitizing pasted text
+// against this same set means a code copied out of a text message (with
+// stray whitespace, a trailing newline, or smart-quote-mangled casing)
+// still lands as a valid, matching code instead of silently failing to join.
+const CODE_ALPHABET = /[^ABCDEFGHJKLMNPQRSTUVWXYZ23456789]/g;
+
+function sanitizeCode(raw) {
+  return raw.toUpperCase().replace(CODE_ALPHABET, "").slice(0, 5);
+}
+
 export default function RoomLobby({ onCreateRoom, onJoinRoom, error, isSubmitting }) {
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -54,9 +65,16 @@ export default function RoomLobby({ onCreateRoom, onJoinRoom, error, isSubmittin
             <input
               type="text"
               value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              onChange={(e) => setJoinCode(sanitizeCode(e.target.value))}
+              onPaste={(e) => {
+                e.preventDefault();
+                setJoinCode(sanitizeCode(e.clipboardData.getData("text")));
+              }}
               placeholder="e.g. AB12C"
               maxLength={5}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
               required
             />
           </label>

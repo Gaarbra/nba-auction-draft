@@ -3,6 +3,8 @@ import NominationForm from "./NominationForm.jsx";
 import RosterGrid from "./RosterGrid.jsx";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import ResultsScreen from "./ResultsScreen.jsx";
+import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
+import { getTeamColors } from "../teamColors.js";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -26,6 +28,7 @@ const ERROR_MESSAGES = {
   INVALID_POSITION: "That's not a valid position.",
   SLOT_TAKEN: "That slot is already filled.",
   PLAYER_NOT_FOUND: "That player couldn't be found.",
+  RATE_LIMITED: "Slow down a bit — try again in a few seconds.",
 };
 
 function friendlyError(code) {
@@ -205,7 +208,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
 
       {!isRolling && nomination && (
         <div className="active-nomination">
-          <div className="nominated-player-card">
+          <div
+            className="nominated-player-card"
+            style={(() => {
+              const colors = getTeamColors(nomination.player.team?.abbreviation);
+              return { "--team-primary": colors.primary, "--team-secondary": colors.secondary };
+            })()}
+          >
             <div className="nominated-player-header">
               <PlayerHeadshot
                 nbaPlayerId={nomination.player.nbaPlayerId}
@@ -239,7 +248,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                     </span>
                   </p>
                 )}
-                <p className="nominated-by">Nominated by {playerName(nomination.nominatedBy)}</p>
+                <p className="nominated-by">
+                  Nominated by {playerName(nomination.nominatedBy)}
+                  {(() => {
+                    const p = room.players.find((pl) => pl.id === nomination.nominatedBy);
+                    return p ? <PlayerStatusBadge player={p} reconnectGraceMs={room.reconnectGraceMs} /> : null;
+                  })()}
+                </p>
               </div>
             </div>
           </div>

@@ -162,6 +162,38 @@ test("teamScore: missing usagePct is treated as 0 contribution, not a crash", ()
   assert.strictEqual(result.synergyMultiplier, 1.1);
 });
 
+// A player who disconnects and forfeits mid-draft still gets ranked on
+// whatever roster they'd filled — computeResults.js pads their unfilled
+// slots with an all-zero stat line rather than omitting them, so teamScore
+// needs to score those slots as a clean zero, not blow up on partial data.
+const emptySlotStatLine = { pts: 0, fga: 0, fta: 0, ast: 0, tov: 0, stl: null, blk: null, gamesPlayed: 0, usagePct: 0 };
+
+test("teamScore: a zeroed-out empty-slot stat line contributes nothing", () => {
+  const result = playerScore(emptySlotStatLine);
+  assert.strictEqual(result.op, 0);
+  assert.strictEqual(result.dir, 0);
+  assert.strictEqual(result.total, 0);
+});
+
+test("teamScore: a partial (forfeited) roster scores only its filled slots, doesn't crash", () => {
+  const roster = [...mockRoster().slice(0, 2), emptySlotStatLine, emptySlotStatLine, emptySlotStatLine];
+  const result = teamScore(roster);
+
+  const expectedSumTotal = mockRoster()
+    .slice(0, 2)
+    .reduce((sum, p) => sum + offenseScore(p) + defensiveImpactRating(p), 0);
+  const expectedUsage = mockRoster()
+    .slice(0, 2)
+    .reduce((sum, p) => sum + p.usagePct, 0);
+
+  assert.strictEqual(result.sumUsagePct, expectedUsage);
+  // Floating-point summation order differs slightly (teamScore reduces over
+  // all 5 slots including the zeroed ones; the expected value here only sums
+  // the 2 real players), so compare within a tight epsilon rather than
+  // requiring bit-identical results.
+  assert.ok(Math.abs(result.finalScore - expectedSumTotal * synergyMultiplier(expectedUsage)) < 1e-9);
+});
+
 // --- winProbability ----------------------------------------------------------------
 
 test("winProbability: equal scores split 50/50", () => {

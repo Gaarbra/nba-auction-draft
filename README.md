@@ -8,7 +8,7 @@ Multiplayer NBA auction draft web app. Up to 4 players join a room, take turns n
 - **Stats service**: Python/Flask + `nba_api` — `stats-service/`
 
 ## Status
-Room creation/joining with live presence (1-4 players, including solo), the host-triggered draft start, and the full nomination/bidding/roster-assignment loop are all working. The entire player pool and every stat come from official NBA data via `nba_api` — no third-party player database involved. Nominated players show real headshots and career per-game stats. Assigning a player to a position that doesn't match their listed position prompts a confirmation; the host can allow free position swaps mid-draft, with a tile-based roster board (headshots, hover tooltips) supporting it. The whole UI is styled as a dark, high-contrast scoreboard, with each player's budget shown as a row of 20 coin icons. Once every roster is full, a results screen ranks all teams by a computed score, with a documented estimate standing in for the handful of stats (USG%, pre-1974 defense) that don't exist anywhere in an official, freely-accessible source.
+Room creation/joining with live presence (1-4 players, including solo), the host-triggered draft start, and the full nomination/bidding/roster-assignment loop are all working. The entire player pool and every stat come from official NBA data via `nba_api` — no third-party player database involved. Nominated players show real headshots and career per-game stats. Assigning a player to a position that doesn't match their listed position prompts a confirmation; the host can allow free position swaps mid-draft, with a tile-based roster board (headshots, team-colored tiles, hover tooltips) supporting it. The whole UI is styled as a dark, high-contrast scoreboard, with each player's budget shown as a row of 20 coin icons. A dropped connection gets a 60-second grace window to reconnect before the draft moves on without that player (see "Reconnecting" below). Once every roster is full, a results screen ranks all teams by a computed score, with a documented estimate standing in for the handful of stats (USG%, pre-1974 defense) that don't exist anywhere in an official, freely-accessible source.
 
 ## Getting started
 
@@ -63,6 +63,14 @@ python -m pip install -r stats-service/requirements.txt
 
 This is an unofficial API with no uptime guarantee — if stats.nba.com changes or blocks something, this is the piece that breaks.
 
+### Reconnecting
+
+Each player gets a stable identity (a server-issued id, persisted to the browser's `localStorage`) that's independent of the underlying socket connection. If your connection drops — wifi blip, phone lock, accidental tab close — reopening the app auto-rejoins your seat, budget, and roster exactly as you left them. If a player is gone for more than 60 seconds mid-draft, the room stops waiting on them: their roster (however many slots they'd filled) is locked in for end-of-draft scoring, they're skipped for future turns, and the draft continues for everyone else. The results screen marks a player who left this way so their score isn't mistaken for a full 5-player roster.
+
+### Security
+
+This is built for casual play with friends via a shared room code, not public discovery — there's no account system. Baseline hardening for running it on the open internet: per-connection and per-IP rate limiting on room creation and every draft action, server-side name/input validation independent of the client, generic (non-leaking) error responses in production, standard security response headers, and an optional admin-token gate on the one endpoint that forces a full player-data resync.
+
 ### Draft flow
 
 Before starting, the host picks a player pool for the room (a career-start decade, "Active Now", or "All Eras"). Turn order is randomized once at draft start (so the host doesn't automatically go first), then proceeds in that order round-robin. On their turn, a player just clicks "Reveal Random Player" — the server draws a random undrafted player from the room's pool and checks `stats-service` for that player before committing; if that player has no findable stats, it draws again (up to 6 attempts) so the draft is heavily biased toward always landing on someone with real career stats to show. That resolution happens before the pick is broadcast, so the frontend plays a "rolling" animation (cycling real names sampled from the room's pool, minimum ~1.4s) while it's in flight, landing on the confirmed player only once stats are resolved. Starting bid is fixed at 1 coin — no searching or picking which player comes up. Other players can raise the bid (any amount above the current bid, up to their budget) or pass; once everyone but the high bidder has passed, that player picks an open roster slot for their new player. Picking a slot that would leave too little budget for the remaining open slots shows a confirmation warning, but doesn't block the pick — it's on the player to decide. Solo rooms skip bidding entirely: reveal and immediately assign. The draft is marked complete once every player's roster is full (5/5).
@@ -109,6 +117,20 @@ For the two real gaps:
 Both are flagged (`usagePctEstimated`) so the results screen can mark them — look for the `*` next to a DIR value.
 
 The results screen also ranks all teams by Final Team Score and shows a simple win-probability estimate for every pairwise matchup, via a logistic curve on the score delta (tuned so a ~50-point gap reads as roughly a 73/27 split — a documented heuristic, not fitted to real outcome data).
+
+## Deploying (Render)
+
+`render.yaml` at the repo root is a Render Blueprint that deploys all three pieces — the static frontend, the Node backend, and the Python stats service — as separate free-tier services from this one repo.
+
+1. Push this repo to GitHub (if it isn't already).
+2. In the Render dashboard: **New > Blueprint**, connect the repo. Render reads `render.yaml` and proposes the three services (`nba-draft-client`, `nba-draft-server`, `nba-draft-stats-service`).
+3. Apply the blueprint. First deploy will fail to fully connect the services — that's expected, see next step.
+4. Once all three have deployed once, each has a URL under its own **Settings** tab (`https://nba-draft-client.onrender.com`, etc). Go to each service's **Environment** tab and fill in the placeholder vars `render.yaml` left blank:
+   - `nba-draft-server`: `STATS_SERVICE_URL` = the stats service's URL, `CLIENT_ORIGIN` = the client's URL
+   - `nba-draft-client`: `VITE_SERVER_URL` = the server's URL (this one's baked in at build time, so saving it triggers a rebuild, not just a restart)
+5. Give friends the client's URL — that's the one people actually open.
+
+Free-tier services spin down after 15 minutes idle and take ~30-50s to wake back up on the next request — expect a slow first load if nobody's used the room in a while. There's no persistent disk needed (the player-pool cache and every room live in memory and rebuild themselves), so the free tier's lack of storage isn't a problem here.
 
 ## Project structure
 
