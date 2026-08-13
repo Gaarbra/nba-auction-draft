@@ -1,6 +1,6 @@
-# nba-auction-draft
+# Hoop Bids
 
-Multiplayer NBA auction draft web app. Up to 4 players join a room, take turns nominating and bidding on NBA players with a fixed coin budget, and fill out a 5-slot roster (PG/SG/SF/PF/C).
+A multiplayer NBA auction draft web app. Up to 4 players join a room, take turns nominating and bidding on NBA players with a fixed coin budget, and fill out a 5-slot roster (PG/SG/SF/PF/C).
 
 ## Stack
 - **Frontend**: React (Vite) — `client/`
@@ -123,11 +123,11 @@ The results screen also ranks all teams by Final Team Score and shows a simple w
 `render.yaml` at the repo root is a Render Blueprint that deploys all three pieces — the static frontend, the Node backend, and the Python stats service — as separate free-tier services from this one repo.
 
 1. Push this repo to GitHub (if it isn't already).
-2. In the Render dashboard: **New > Blueprint**, connect the repo. Render reads `render.yaml` and proposes the three services (`nba-draft-client`, `nba-draft-server`, `nba-draft-stats-service`).
+2. In the Render dashboard: **New > Blueprint**, connect the repo. Render reads `render.yaml` and proposes the three services (`hoop-bids-client`, `hoop-bids-server`, `hoop-bids-stats-service`).
 3. Apply the blueprint. First deploy will fail to fully connect the services — that's expected, see next step.
-4. Once all three have deployed once, each has a URL under its own **Settings** tab (`https://nba-draft-client.onrender.com`, etc). Go to each service's **Environment** tab and fill in the placeholder vars `render.yaml` left blank:
-   - `nba-draft-server`: `STATS_SERVICE_URL` = the stats service's URL, `CLIENT_ORIGIN` = the client's URL
-   - `nba-draft-client`: `VITE_SERVER_URL` = the server's URL (this one's baked in at build time, so saving it triggers a rebuild, not just a restart)
+4. Once all three have deployed once, each has a URL under its own **Settings** tab (`https://hoop-bids-client.onrender.com`, etc). Go to each service's **Environment** tab and fill in the placeholder vars `render.yaml` left blank:
+   - `hoop-bids-server`: `STATS_SERVICE_URL` = the stats service's URL, `CLIENT_ORIGIN` = the client's URL
+   - `hoop-bids-client`: `VITE_SERVER_URL` = the server's URL (this one's baked in at build time, so saving it triggers a rebuild, not just a restart)
 5. Give friends the client's URL — that's the one people actually open.
 
 Free-tier services spin down after 15 minutes idle and take ~30-50s to wake back up on the next request — expect a slow first load if nobody's used the room in a while. There's no persistent disk needed (the player-pool cache and every room live in memory and rebuild themselves), so the free tier's lack of storage isn't a problem here.

@@ -27,7 +27,7 @@ export default function RoomLobby({ onCreateRoom, onJoinRoom, error, isSubmittin
 
   return (
     <div className="lobby-card">
-      <h1>NBA Auction Draft</h1>
+      <h1>Hoop Bids</h1>
 
       <div className="mode-toggle">
         <button
