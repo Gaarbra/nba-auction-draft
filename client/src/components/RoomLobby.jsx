@@ -11,17 +11,38 @@ function sanitizeCode(raw) {
   return raw.toUpperCase().replace(CODE_ALPHABET, "").slice(0, 5);
 }
 
-export default function RoomLobby({ onCreateRoom, onJoinRoom, error, isSubmitting }) {
+const MAX_LOCAL_PLAYERS = 4;
+const MIN_LOCAL_PLAYERS = 2;
+
+export default function RoomLobby({ onCreateRoom, onJoinRoom, onCreateLocalRoom, error, isSubmitting }) {
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [mode, setMode] = useState("create");
+  const [localNames, setLocalNames] = useState(["", ""]);
+
+  function updateLocalName(index, value) {
+    setLocalNames((prev) => prev.map((n, i) => (i === index ? value : n)));
+  }
+
+  function addLocalNameField() {
+    setLocalNames((prev) => (prev.length < MAX_LOCAL_PLAYERS ? [...prev, ""] : prev));
+  }
+
+  function removeLocalNameField(index) {
+    setLocalNames((prev) => (prev.length > MIN_LOCAL_PLAYERS ? prev.filter((_, i) => i !== index) : prev));
+  }
+
+  const validLocalNames = localNames.map((n) => n.trim()).filter(Boolean);
+  const localNamesReady = validLocalNames.length >= MIN_LOCAL_PLAYERS;
 
   function handleSubmit(e) {
     e.preventDefault();
     if (mode === "create") {
       onCreateRoom(name);
-    } else {
+    } else if (mode === "join") {
       onJoinRoom(joinCode, name);
+    } else if (localNamesReady) {
+      onCreateLocalRoom(validLocalNames);
     }
   }
 
@@ -44,20 +65,29 @@ export default function RoomLobby({ onCreateRoom, onJoinRoom, error, isSubmittin
         >
           Join Room
         </button>
+        <button
+          type="button"
+          className={mode === "local" ? "active" : ""}
+          onClick={() => setMode("local")}
+        >
+          Local Play
+        </button>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <label>
-          Your Name
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Gabriel"
-            maxLength={20}
-            required
-          />
-        </label>
+        {mode !== "local" && (
+          <label>
+            Your Name
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Gabriel"
+              maxLength={20}
+              required
+            />
+          </label>
+        )}
 
         {mode === "join" && (
           <label>
@@ -80,10 +110,48 @@ export default function RoomLobby({ onCreateRoom, onJoinRoom, error, isSubmittin
           </label>
         )}
 
+        {mode === "local" && (
+          <div className="local-players-field">
+            <p className="hint-text local-players-hint">
+              Everyone plays from this device, passing it around each turn. Add 2-4 names.
+            </p>
+            {localNames.map((value, index) => (
+              <div key={index} className="local-name-row">
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) => updateLocalName(index, e.target.value)}
+                  placeholder={`Player ${index + 1}`}
+                  maxLength={20}
+                />
+                {localNames.length > MIN_LOCAL_PLAYERS && (
+                  <button
+                    type="button"
+                    className="local-name-remove"
+                    onClick={() => removeLocalNameField(index)}
+                    aria-label={`Remove player ${index + 1}`}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            {localNames.length < MAX_LOCAL_PLAYERS && (
+              <button type="button" className="secondary-btn add-local-player-btn" onClick={addLocalNameField}>
+                + Add Player
+              </button>
+            )}
+          </div>
+        )}
+
         {error && <p className="error-text">{error}</p>}
 
-        <button type="submit" className="primary-btn" disabled={isSubmitting}>
-          {mode === "create" ? "Create Room" : "Join Room"}
+        <button
+          type="submit"
+          className="primary-btn"
+          disabled={isSubmitting || (mode === "local" && !localNamesReady)}
+        >
+          {mode === "create" ? "Create Room" : mode === "join" ? "Join Room" : "Start Local Game"}
         </button>
       </form>
     </div>

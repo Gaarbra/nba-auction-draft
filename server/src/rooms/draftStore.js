@@ -76,7 +76,16 @@ export function nominatePlayer(room, playerId, player) {
   // outbid anyone if someone else wants the player too.
   const bid = Math.min(STARTING_BID, nominator.budget);
 
-  const isSoloRoom = draft.turnOrder.length === 1;
+  // Skip straight to "assigning" not just for a literal one-player room, but
+  // whenever no one else in the room is even able to bid (everyone else has
+  // already filled their roster). Otherwise the nomination sits in "bidding"
+  // forever: a roster-full opponent gets no Pass button (see DraftBoard's
+  // "spectating" state), so passOnNomination never runs and stillActive
+  // never gets recomputed down to zero. This is the scenario a broke player
+  // hits most often, since they're typically the last one to finish drafting.
+  const hasActiveOpponent = draft.turnOrder.some(
+    (id) => id !== playerId && !isRosterFull(draft.rosters[id])
+  );
 
   draft.nomination = {
     player,
@@ -84,7 +93,7 @@ export function nominatePlayer(room, playerId, player) {
     currentBid: bid,
     currentBidder: playerId,
     passed: [],
-    phase: isSoloRoom ? "assigning" : "bidding",
+    phase: hasActiveOpponent ? "bidding" : "assigning",
   };
 
   return { room };

@@ -1,4 +1,7 @@
+import json
 import os
+import random
+import threading
 import time
 
 from flask import Flask, jsonify, request
@@ -8,22 +11,51 @@ from nba_api.stats.endpoints import (
     leaguedashplayerstats,
     commonallplayers,
     commonplayerinfo,
+    alltimeleadersgrids,
 )
 
+import db
+
 app = Flask(__name__)
+
+# Module level, not inside `if __name__ == "__main__"`, so this also runs
+# under gunicorn in production (which imports this module directly and
+# never hits that guard) — see render.yaml. Idempotent (CREATE TABLE IF NOT
+# EXISTS) and a no-op if DATABASE_URL isn't set, so it's safe to call from
+# every worker process without coordination.
+db.init_schema()
 
 # PORT is the convention most PaaS hosts (Render included) inject
 # automatically; STATS_SERVICE_PORT is kept as a fallback for local dev
 # habits from before that mattered.
 PORT = int(os.environ.get("PORT", os.environ.get("STATS_SERVICE_PORT", 5001)))
-CACHE_TTL_SECONDS = 60 * 60
+# A player's career stats barely move day to day — even an active player's
+# per-game averages only shift fractionally after one more game — so this
+# can be long. Long TTLs plus disk persistence (see STATS_CACHE_FILE below)
+# are what make the warm-up job's work actually stick between restarts,
+# instead of every dev restart starting back at a cold, empty cache.
+CACHE_TTL_SECONDS = 24 * 60 * 60
 BIO_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # position/draft year never change
 POOL_CACHE_TTL_SECONDS = 60 * 60
+NOTABLE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # all-time leaderboards barely move week to week
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+STATS_CACHE_FILE = os.path.join(DATA_DIR, "statsCache.json")
+USAGE_CACHE_FILE = os.path.join(DATA_DIR, "usageCache.json")
 
 _cache = {}
 _usage_cache = {}
 _bio_cache = {}
 _pool_cache = {"players": None, "fetchedAt": 0}
+_notable_cache = {"ids": None, "fetchedAt": 0}
+_warmup_status = {"running": False, "processed": 0, "total": 0, "warmed": 0, "startedAt": None, "finishedAt": None}
+
+# How deep into each career-totals leaderboard to pull ids from, and which
+# categories count toward "notable" — the counting stats that track with
+# being a genuine standout, not shooting-percentage or empty-stat leaders
+# (a guy with 3 career FTA and 100% FT% would otherwise qualify).
+NOTABLE_TOPX = 500
+NOTABLE_CATEGORIES = ["PTSLeaders", "REBLeaders", "ASTLeaders", "STLLeaders", "BLKLeaders"]
 
 # stats.nba.com only computes Advanced-measure stats (which USG_PCT comes
 # from) from this season onward. Earlier seasons genuinely have no official
@@ -92,6 +124,21 @@ def last_real_team(df):
     return None
 
 
+def team_history(df):
+    """Career games played per real team, most-played first. Built from the
+    raw (non-deduped) rows on purpose — a traded season's per-team rows are
+    exactly what's needed to split GP by team, unlike the TOT-collapsed rows
+    dedupe_traded_seasons() produces for career per-game totals."""
+    real_rows = df[df["TEAM_ABBREVIATION"] != "TOT"]
+    if real_rows.empty:
+        return []
+    totals = real_rows.groupby("TEAM_ABBREVIATION")["GP"].sum()
+    return [
+        {"abbreviation": team, "gamesPlayed": int(gp)}
+        for team, gp in totals.sort_values(ascending=False).items()
+    ]
+
+
 def fetch_player_bio(player_id):
     """Position and draft year, from commonplayerinfo. Note: this endpoint's
     own TEAM_NAME/TEAM_ABBREVIATION fields are NOT used for "current team" —
@@ -118,6 +165,76 @@ def fetch_player_bio(player_id):
 
     _bio_cache[player_id] = {"bio": bio, "fetchedAt": time.time()}
     return bio
+
+
+def load_stats_cache_from_disk():
+    """Loads the per-player stats cache saved by a previous run (see
+    save_stats_cache_to_disk) so a dev restart doesn't throw away every
+    warmed player and start back at zero. JSON object keys are always
+    strings, so player ids need converting back to int on the way in."""
+    global _cache
+    try:
+        with open(STATS_CACHE_FILE, "r") as f:
+            raw = json.load(f)
+        _cache = {int(k): v for k, v in raw.items()}
+        print(f"[stats cache] loaded {len(_cache)} players from disk")
+    except FileNotFoundError:
+        _cache = {}
+    except (ValueError, OSError) as e:
+        print(f"[stats cache] failed to load from disk, starting empty: {e}")
+        _cache = {}
+
+
+def save_stats_cache_to_disk():
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(STATS_CACHE_FILE, "w") as f:
+            json.dump(_cache, f)
+    except OSError as e:
+        print(f"[stats cache] failed to save to disk: {e}")
+
+
+def _is_stats_fresh(player_id):
+    cached = _cache.get(player_id)
+    return bool(cached) and (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS
+
+
+def _usage_cache_key(player_id, season):
+    # _usage_cache is keyed by (player_id, season) tuples in memory, but
+    # JSON object keys must be strings — this is the shared string form
+    # used on both sides of the disk round trip.
+    return f"{player_id}:{season}"
+
+
+def load_usage_cache_from_disk():
+    """One real USG% lookup pulls that whole season's league-wide table, so
+    this is unusually high-leverage to persist — warming it for even one
+    player from a season makes every other player from that same season
+    free for the rest of the cache's life, across restarts included."""
+    global _usage_cache
+    try:
+        with open(USAGE_CACHE_FILE, "r") as f:
+            raw = json.load(f)
+        _usage_cache = {}
+        for key, entry in raw.items():
+            player_id_str, season = key.split(":", 1)
+            _usage_cache[(int(player_id_str), season)] = entry
+        print(f"[usage cache] loaded {len(_usage_cache)} (player, season) entries from disk")
+    except FileNotFoundError:
+        _usage_cache = {}
+    except (ValueError, OSError) as e:
+        print(f"[usage cache] failed to load from disk, starting empty: {e}")
+        _usage_cache = {}
+
+
+def save_usage_cache_to_disk():
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        serializable = {_usage_cache_key(pid, season): entry for (pid, season), entry in _usage_cache.items()}
+        with open(USAGE_CACHE_FILE, "w") as f:
+            json.dump(serializable, f)
+    except OSError as e:
+        print(f"[usage cache] failed to save to disk: {e}")
 
 
 def fetch_stats_for_player(player_id):
@@ -167,6 +284,8 @@ def fetch_stats_for_player(player_id):
                 print(f"[bio lookup failed] player_id={player_id} ({e.__class__.__name__}: {e})")
                 bio = {"position": None, "draftYear": None}
 
+            history = team_history(df)
+
             stats = {
                 "firstSeason": season_rows[0]["SEASON_ID"],
                 "lastSeason": season_rows[-1]["SEASON_ID"],
@@ -181,19 +300,51 @@ def fetch_stats_for_player(player_id):
                 "ftaPerGame": per_game(total_fta),
                 "tovPerGame": per_game(total_tov),
                 "minutesPerGame": per_game(total_min),
+                # "team" stays the last real team they suited up for (kept for
+                # backward compat); "mostPlayedTeam" is the one Node picks for
+                # color/branding on a retired player (see roomHandlers.js) —
+                # an active player's last team already IS their current one,
+                # so this split only matters once someone's career is over.
                 "team": last_real_team(df),
+                "mostPlayedTeam": history[0]["abbreviation"] if history else None,
+                "teamHistory": history,
                 "position": bio["position"],
                 "draftYear": bio["draftYear"],
             }
 
     _cache[player_id] = {"stats": stats, "fetchedAt": time.time()}
+    save_stats_cache_to_disk()
+
+    if stats:
+        try:
+            identity = players.find_player_by_id(player_id)
+            first_year = int(stats["firstSeason"].split("-")[0]) if stats.get("firstSeason") else None
+            last_year = int(stats["lastSeason"].split("-")[0]) + 1 if stats.get("lastSeason") else None
+            db.upsert_player_and_stats(
+                player_id,
+                identity["full_name"] if identity else str(player_id),
+                bool(identity["is_active"]) if identity else False,
+                first_year,
+                last_year,
+                stats,
+            )
+        except Exception as e:
+            print(f"[db] persist skipped for player_id={player_id}: {e.__class__.__name__}: {e}")
+
     return stats
 
 
 def fetch_usage_pct(player_id, season):
     """Real USG_PCT for one season, from stats.nba.com's Advanced boxscore
     dashboard. Only meaningful for `season >= EARLIEST_USG_SEASON`; the
-    endpoint returns nothing usable before that regardless of player."""
+    endpoint returns nothing usable before that regardless of player.
+
+    The underlying endpoint returns the WHOLE season's league-wide table in
+    one call, not just this player's row — so a cache miss caches every
+    player found in that response, not only the one that was asked for.
+    That's what makes this genuinely cheap after the first hit: scoring a
+    room where several drafted players share a season only pays for one
+    live fetch of that season, not one per player."""
     cache_key = (player_id, season)
     cached = _usage_cache.get(cache_key)
     if cached and (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS:
@@ -206,11 +357,23 @@ def fetch_usage_pct(player_id, season):
         timeout=20,
     )
     df = resp.get_data_frames()[0]
-    row = df[df["PLAYER_ID"] == player_id]
-    value = round(float(row.iloc[0]["USG_PCT"]) * 100, 1) if len(row) else None
 
-    _usage_cache[cache_key] = {"value": value, "fetchedAt": time.time()}
-    return value
+    fetched_at = time.time()
+    for _, row in df.iterrows():
+        pct = round(float(row["USG_PCT"]) * 100, 1)
+        _usage_cache[(int(row["PLAYER_ID"]), season)] = {"value": pct, "fetchedAt": fetched_at}
+    save_usage_cache_to_disk()
+
+    cached = _usage_cache.get(cache_key)
+    if cached:
+        # Just the one requested player, not every row in the season table —
+        # most of that table is players who were never drafted in this app
+        # and have no players/player_stats row to update anyway.
+        try:
+            db.update_usage_pct(player_id, cached["value"])
+        except Exception as e:
+            print(f"[db] usage_pct persist skipped for player_id={player_id}: {e.__class__.__name__}: {e}")
+    return cached["value"] if cached else None
 
 
 def fetch_players_pool():
@@ -243,9 +406,126 @@ def fetch_players_pool():
     return pool
 
 
+def fetch_notable_player_ids():
+    """A data-driven 'notable players' pool — everyone who cracks the top
+    NOTABLE_TOPX of career PER-GAME points, rebounds, assists, steals, or
+    blocks — sourced straight from stats.nba.com's own all-time leaderboards
+    in a single call, not a hand-picked list.
+
+    Deliberately per-game, not career totals: totals reward longevity above
+    all else (a mediocre player who compiled counting stats over 15
+    forgettable seasons can out-total someone who was actually great for 8),
+    which is why this used to occasionally surface journeymen instead of
+    genuine stars/starters. Per-game rate stats track much closer to "was
+    this person actually good" — stats.nba.com's own per-game leaderboards
+    already apply a real eligibility/minutes qualifier server-side (they're
+    correctly topped by Jordan/Wilt at PPG, not some one-game fluke), so
+    this doesn't need its own games-played filtering on top.
+
+    Meant to be layered with the room/draft system's random single-draw
+    nomination sampling (see drawPlayerWithStats in roomHandlers.js):
+    narrowing the drawn candidates down to this pool first makes it far more
+    likely a genuinely strong player gets nominated on easier difficulties,
+    especially against a big pool like "All Eras" where a random draw would
+    otherwise almost always miss the players anyone actually recognizes."""
+    cached = _notable_cache["ids"]
+    if cached is not None and (time.time() - _notable_cache["fetchedAt"]) < NOTABLE_CACHE_TTL_SECONDS:
+        return cached
+
+    grids = alltimeleadersgrids.AllTimeLeadersGrids(topx=NOTABLE_TOPX, per_mode_simple="PerGame", timeout=30)
+    raw = grids.nba_response.get_dict()
+
+    ids = set()
+    for result_set in raw["resultSets"]:
+        if result_set["name"] not in NOTABLE_CATEGORIES:
+            continue
+        headers = result_set["headers"]
+        id_index = headers.index("PLAYER_ID")
+        for row in result_set["rowSet"]:
+            ids.add(int(row[id_index]))
+
+    ids = list(ids)
+    _notable_cache["ids"] = ids
+    _notable_cache["fetchedAt"] = time.time()
+    return ids
+
+
+# Pacing for the background warm-up job below. stats.nba.com's rate limiting
+# tracks request *rate*, not total volume — a burst of parallel/rapid calls
+# trips it (and the throttled state can then linger for a good while), but
+# slow, steady, one-at-a-time traffic doesn't. So this deliberately never
+# fetches more than one player at a time, paces itself with jittered delays
+# between requests, and backs off hard on repeated failures instead of
+# plowing through and digging the hole deeper.
+WARMUP_DELAY_RANGE = (1.0, 1.6)
+WARMUP_FAILURE_THRESHOLD = 3
+WARMUP_COOLDOWN_SECONDS = 45
+WARMUP_SAVE_EVERY = 25
+
+
+def warm_notable_pool():
+    """Background job (run in its own thread, not on the request path):
+    sequentially pre-fetches career stats for every notable player who isn't
+    already freshly cached, so that once it's finished, ~90%+ of nominations
+    on Easy/Normal resolve from a warm in-memory+on-disk cache instead of a
+    live stats.nba.com round trip. Safe to call on every startup — anyone
+    already fresh (including from a previous run's disk cache) is skipped,
+    so a re-run only has to fetch what's missing or stale."""
+    try:
+        ids = fetch_notable_player_ids()
+    except Exception as e:
+        print(f"[warmup] couldn't fetch notable player ids, skipping warm-up: {e}")
+        return
+
+    todo = [pid for pid in ids if not _is_stats_fresh(pid)]
+    _warmup_status.update(running=True, processed=0, total=len(todo), warmed=0, startedAt=time.time(), finishedAt=None)
+
+    if not todo:
+        print("[warmup] notable pool already warm, nothing to do")
+        _warmup_status.update(running=False, finishedAt=time.time())
+        return
+
+    print(f"[warmup] starting — {len(todo)}/{len(ids)} notable players need fresh stats")
+    consecutive_failures = 0
+    warmed = 0
+
+    for i, player_id in enumerate(todo):
+        try:
+            stats = fetch_stats_for_player(player_id)
+            consecutive_failures = 0
+            if stats is not None:
+                warmed += 1
+        except Exception as e:
+            consecutive_failures += 1
+            print(f"[warmup] fetch failed for player_id={player_id} ({consecutive_failures} in a row): {e}")
+
+        _warmup_status.update(processed=i + 1, warmed=warmed)
+
+        if (i + 1) % WARMUP_SAVE_EVERY == 0:
+            print(f"[warmup] progress: {i + 1}/{len(todo)} processed, {warmed} warmed")
+
+        if consecutive_failures >= WARMUP_FAILURE_THRESHOLD:
+            print(f"[warmup] {consecutive_failures} failures in a row — cooling down for {WARMUP_COOLDOWN_SECONDS}s")
+            time.sleep(WARMUP_COOLDOWN_SECONDS)
+            consecutive_failures = 0
+
+        time.sleep(random.uniform(*WARMUP_DELAY_RANGE))
+
+    print(f"[warmup] done — warmed {warmed}/{len(todo)} players")
+    _warmup_status.update(running=False, finishedAt=time.time())
+
+
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.get("/warmup-status")
+def warmup_status():
+    """Diagnostic view into the background warm-up job — how far through
+    the notable pool it's gotten, and how many players are actually cached
+    right now. Not used by the app itself, just for checking progress."""
+    return jsonify({**_warmup_status, "cachedPlayers": len(_cache)})
 
 
 @app.get("/players")
@@ -257,6 +537,17 @@ def get_players_pool():
         return jsonify({"error": "PLAYERS_POOL_FETCH_FAILED"}), 502
 
     return jsonify({"players": pool, "count": len(pool)})
+
+
+@app.get("/notable-players")
+def get_notable_players():
+    try:
+        ids = fetch_notable_player_ids()
+    except Exception as e:
+        print(f"[notable players fetch failed] ({e.__class__.__name__}: {e})")
+        return jsonify({"error": "NOTABLE_PLAYERS_FETCH_FAILED"}), 502
+
+    return jsonify({"playerIds": ids, "count": len(ids)})
 
 
 @app.get("/stats")
@@ -315,6 +606,21 @@ def get_full_stats():
 
 
 if __name__ == "__main__":
+    load_stats_cache_from_disk()
+    load_usage_cache_from_disk()
+
+    # Runs the notable-pool warm-up once, in the background, only under
+    # local dev (`python app.py`) — deliberately NOT at module level, since
+    # production runs this file under gunicorn with multiple worker
+    # processes (see render.yaml's --workers 2), and each worker importing
+    # this module would otherwise kick off its own independent warm-up,
+    # multiplying the request rate right back into the kind of burst that
+    # trips stats.nba.com's rate limiting in the first place. Production
+    # still benefits from the disk cache (each worker persists what it
+    # fetches and reloads it on restart) — it just doesn't proactively
+    # bulk-warm the notable pool the way local dev does here.
+    threading.Thread(target=warm_notable_pool, daemon=True).start()
+
     # host="0.0.0.0" so this is reachable from outside the container/machine
     # it runs on (Flask's dev-server default of 127.0.0.1 only accepts local
     # connections) — needed for both Docker-style deploys and the Node
@@ -322,4 +628,9 @@ if __name__ == "__main__":
     # production this file isn't actually the entry point at all — gunicorn
     # runs it directly (see render.yaml) since Flask's built-in server isn't
     # meant to take real traffic.
-    app.run(host="0.0.0.0", port=PORT)
+    #
+    # threaded=True so a live request (e.g. a real nomination, or a
+    # /warmup-status check) can be served immediately instead of queuing
+    # behind whatever the warm-up background thread happens to be doing —
+    # Werkzeug's dev server handles only one request at a time by default.
+    app.run(host="0.0.0.0", port=PORT, threaded=True)

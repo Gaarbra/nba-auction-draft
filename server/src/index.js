@@ -7,6 +7,9 @@ import { registerRoomHandlers } from "./sockets/roomHandlers.js";
 import { getPlayers, getCacheInfo } from "./services/playerCache.js";
 import { filterPlayersByEra, summarizeEras } from "./services/era.js";
 import { httpRateLimit } from "./middleware/rateLimit.js";
+import { initSchema } from "./services/db.js";
+
+initSchema(); // no-op if DATABASE_URL isn't set — see db.js
 
 const PORT = process.env.PORT || 4000;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";

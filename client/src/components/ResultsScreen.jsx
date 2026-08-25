@@ -1,6 +1,18 @@
+import { useState } from "react";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
+import PlayerNameLink from "./PlayerNameLink.jsx";
 
 const RANK_LABELS = { 1: "1ST", 2: "2ND", 3: "3RD", 4: "4TH" };
+
+const ERROR_MESSAGES = {
+  NOT_HOST: "Only the host can return everyone to the lobby.",
+  DRAFT_NOT_COMPLETE: "The draft isn't finished yet.",
+  RATE_LIMITED: "Slow down a bit — try again in a few seconds.",
+};
+
+function friendlyError(code) {
+  return ERROR_MESSAGES[code] || "Something went wrong.";
+}
 
 function formatPct(value) {
   return `${value.toFixed(1)}%`;
@@ -10,7 +22,68 @@ function formatScore(value) {
   return value.toFixed(1);
 }
 
-export default function ResultsScreen({ room, currentPlayerId, onLeaveRoom }) {
+/** "Return to Lobby" (host-only, immediate) and "Rematch" (anyone can propose, needs everyone still around to confirm before it redeals). */
+function PostGameActions({ room, currentPlayerId, socket, onLeaveRoom }) {
+  const [actionError, setActionError] = useState("");
+
+  const currentPlayer = room.players.find((p) => p.id === currentPlayerId);
+  const isHost = Boolean(currentPlayer?.isHost);
+  const rematchVotes = room.rematchVotes || [];
+  const activePlayers = room.players.filter((p) => p.connected && !p.forfeited);
+  const iVoted = rematchVotes.includes(currentPlayerId);
+
+  function handleReturnToLobby() {
+    setActionError("");
+    socket.emit("room:return-to-lobby", { playerId: currentPlayerId }, (res) => {
+      if (res?.error) setActionError(friendlyError(res.error));
+    });
+  }
+
+  function handleToggleRematch() {
+    setActionError("");
+    socket.emit("room:vote-rematch", { playerId: currentPlayerId, confirmed: !iVoted }, (res) => {
+      if (res?.error) setActionError(friendlyError(res.error));
+    });
+  }
+
+  return (
+    <div className="post-game-actions">
+      <div className="rematch-panel">
+        <h3 className="results-section-title">Rematch</h3>
+        <p className="hint-text">Everyone still here needs to confirm before a new draft starts.</p>
+        <ul className="rematch-vote-list">
+          {activePlayers.map((p) => (
+            <li key={p.id} className={rematchVotes.includes(p.id) ? "confirmed" : ""}>
+              <span className="rematch-vote-check" aria-hidden="true">
+                {rematchVotes.includes(p.id) ? "✓" : "…"}
+              </span>
+              {p.name}
+              {p.id === currentPlayerId && <span className="you-badge">You</span>}
+            </li>
+          ))}
+        </ul>
+        <button type="button" onClick={handleToggleRematch} className="primary-btn">
+          {iVoted ? "Cancel Rematch Vote" : "Confirm Rematch"}
+        </button>
+      </div>
+
+      <div className="post-game-buttons">
+        {isHost && (
+          <button type="button" onClick={handleReturnToLobby} className="secondary-btn">
+            Return to Lobby
+          </button>
+        )}
+        <button type="button" onClick={onLeaveRoom} className="leave-btn">
+          Leave Room
+        </button>
+      </div>
+
+      {actionError && <p className="error-text">{actionError}</p>}
+    </div>
+  );
+}
+
+export default function ResultsScreen({ room, currentPlayerId, socket, onLeaveRoom }) {
   const { resultsStatus, results } = room;
 
   if (resultsStatus === "failed") {
@@ -18,13 +91,11 @@ export default function ResultsScreen({ room, currentPlayerId, onLeaveRoom }) {
       <div className="draft-board">
         <div className="draft-header">
           <h2>Draft Complete</h2>
-          <button type="button" onClick={onLeaveRoom} className="secondary-btn">
-            Leave Room
-          </button>
         </div>
         <p className="error-text">
           Couldn't compute final scores (the stats service may be unreachable). Your rosters are still saved below.
         </p>
+        <PostGameActions room={room} currentPlayerId={currentPlayerId} socket={socket} onLeaveRoom={onLeaveRoom} />
       </div>
     );
   }
@@ -50,9 +121,6 @@ export default function ResultsScreen({ room, currentPlayerId, onLeaveRoom }) {
     <div className="draft-board">
       <div className="draft-header">
         <h2>Final Results</h2>
-        <button type="button" onClick={onLeaveRoom} className="secondary-btn">
-          Leave Room
-        </button>
       </div>
 
       <div className="results-standings">
@@ -79,9 +147,11 @@ export default function ResultsScreen({ room, currentPlayerId, onLeaveRoom }) {
                   <PlayerHeadshot nbaPlayerId={p.nbaPlayerId} alt={p.fullName || p.slot} className="results-headshot" />
                   <div className="results-player-info">
                     <span className="slot-label">{p.slot}</span>
-                    <span className="results-player-name" title={p.fullName || undefined}>
-                      {p.fullName || "—"}
-                    </span>
+                    <PlayerNameLink
+                      nbaPlayerId={p.nbaPlayerId}
+                      name={p.fullName || "—"}
+                      className="results-player-name"
+                    />
                   </div>
                   <div className="results-player-scores">
                     <span title="Offense Score">Op {formatScore(p.op)}</span>
@@ -125,6 +195,8 @@ export default function ResultsScreen({ room, currentPlayerId, onLeaveRoom }) {
         * marks estimated USG%/defensive stats where the real figure isn't available for that player's era (see
         README for methodology).
       </p>
+
+      <PostGameActions room={room} currentPlayerId={currentPlayerId} socket={socket} onLeaveRoom={onLeaveRoom} />
     </div>
   );
 }

@@ -5,7 +5,16 @@ import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
 const MAX_PLAYERS = 4;
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 
-function getHintText(playerCount, isHost) {
+const DIFFICULTIES = [
+  { id: "easy", label: "Easy", hint: "Stars come up often" },
+  { id: "normal", label: "Normal", hint: "A healthy mix" },
+  { id: "hard", label: "Hard", hint: "True random draw" },
+];
+
+function getHintText(playerCount, isHost, isLocal) {
+  if (isLocal) {
+    return isHost ? "Everyone's added — start whenever you're ready." : "Waiting for the host to start.";
+  }
   if (playerCount === 1) {
     return isHost
       ? "Playing solo — start whenever you're ready. You'll draft a full roster and get a score at the end."
@@ -26,6 +35,7 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
 
   const [eras, setEras] = useState([]);
   const [era, setEra] = useState("all");
+  const [difficulty, setDifficulty] = useState("normal");
   const [allowPositionSwaps, setAllowPositionSwaps] = useState(false);
 
   useEffect(() => {
@@ -53,15 +63,21 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
     <div className="room-card">
       <div className="room-header">
         <div>
-          <h2>Room Code</h2>
-          <button type="button" onClick={copyRoomCode} className="room-code-btn" title="Copy code">
-            <span className="room-code">{room.code}</span>
-            <span className="room-code-copy-hint">{codeCopied ? "Copied!" : "Click to copy"}</span>
-          </button>
+          <h2>{room.isLocal ? "Local Game" : "Room Code"}</h2>
+          {room.isLocal ? (
+            <span className="room-code local">Pass &amp; Play</span>
+          ) : (
+            <button type="button" onClick={copyRoomCode} className="room-code-btn" title="Copy code">
+              <span className="room-code">{room.code}</span>
+              <span className="room-code-copy-hint">{codeCopied ? "Copied!" : "Click to copy"}</span>
+            </button>
+          )}
         </div>
-        <button type="button" onClick={copyInviteLink} className="secondary-btn">
-          Copy Invite Link
-        </button>
+        {!room.isLocal && (
+          <button type="button" onClick={copyInviteLink} className="secondary-btn">
+            Copy Invite Link
+          </button>
+        )}
       </div>
 
       <h3>
@@ -79,14 +95,15 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
             <CoinRow budget={p.budget} />
           </li>
         ))}
-        {Array.from({ length: emptySlots }).map((_, i) => (
-          <li key={`empty-${i}`} className="empty-slot">
-            Waiting for player…
-          </li>
-        ))}
+        {!room.isLocal &&
+          Array.from({ length: emptySlots }).map((_, i) => (
+            <li key={`empty-${i}`} className="empty-slot">
+              Waiting for player…
+            </li>
+          ))}
       </ul>
 
-      <p className="hint-text">{getHintText(room.players.length, isHost)}</p>
+      <p className="hint-text">{getHintText(room.players.length, isHost, room.isLocal)}</p>
 
       {isHost && (
         <>
@@ -101,6 +118,22 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
               ))}
             </select>
           </label>
+          <label className="era-picker-label">
+            Difficulty (how often you land a stronger player)
+            <div className="difficulty-picker">
+              {DIFFICULTIES.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  className={`difficulty-option ${difficulty === d.id ? "active" : ""}`}
+                  onClick={() => setDifficulty(d.id)}
+                  title={d.hint}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </label>
           <label className="swap-setting-label">
             <input
               type="checkbox"
@@ -111,7 +144,7 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
           </label>
           <button
             type="button"
-            onClick={() => onStartDraft(era, allowPositionSwaps)}
+            onClick={() => onStartDraft(era, allowPositionSwaps, difficulty)}
             className="primary-btn start-btn"
           >
             {room.players.length === 1 ? "Start Solo Draft" : "Start Draft"}

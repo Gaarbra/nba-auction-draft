@@ -1,21 +1,33 @@
 import {
   createRoom,
   addPlayerToRoom,
+  addLocalPlayersToRoom,
   startDraft,
   getRoom,
   finalizePlayerExit,
   beginDisconnectGrace,
   reconnectPlayer,
+  returnToLobby,
+  setRematchVote,
+  recheckRematchAfterExit,
   RECONNECT_GRACE_MS,
+  DIFFICULTY_STATIC_ODDS,
 } from "../rooms/roomStore.js";
 import { nominatePlayer, placeBid, passOnNomination, assignPosition, swapRosterPositions } from "../rooms/draftStore.js";
 import { getPlayers } from "../services/playerCache.js";
+import { getNotablePlayerIds } from "../services/notablePlayers.js";
 import { filterPlayersByEra } from "../services/era.js";
 import { fetchPlayerStats } from "../services/statsClient.js";
+import { saveDraftResults } from "../services/db.js";
 import { computeDraftResults } from "../scoring/computeResults.js";
 import { createKeyedRateLimiter, createSocketEventLimiter } from "../middleware/rateLimit.js";
 
-const MAX_STATS_DRAW_ATTEMPTS = 6;
+// Worst case per candidate is roughly MAX_STATS_DRAW_ATTEMPTS × the
+// per-attempt timeout (see fetchPlayerStats's AbortSignal in
+// statsClient.js) — kept low and tight so a roll takes roughly the same
+// amount of time whether the draw succeeds on the first try or has to
+// retry, instead of the duration swinging from ~1s up to a minute-plus.
+const MAX_STATS_DRAW_ATTEMPTS = 2;
 const MIN_ROLL_MS = 1400;
 const MAX_NAME_LENGTH = 30;
 
@@ -29,33 +41,65 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Normally a socket controls exactly one player, so socket.data.playerId is
+// authoritative. In local pass-and-play (room:create-local), one socket
+// controls every player in the room instead, and the client tells us who's
+// "at the controls" for a given action via payload.playerId — trusted only
+// when it's one of the identities this socket actually owns.
+function resolveActingPlayerId(socket, payload) {
+  const requested = payload?.playerId;
+  if (requested && socket.data.localPlayerIds?.includes(requested)) return requested;
+  return socket.data.playerId;
+}
+
+function toNominatedPlayer(candidate, result) {
+  if (!result) return { player: candidate, stats: { unavailable: true }, nbaPlayerId: null };
+
+  // Pool entries (nbaPlayersClient.js) only carry id/name/active-status/
+  // career span — position, team, and draft year live in the stats response
+  // instead (see stats-service's fetch_stats_for_player).
+  //
+  // Which team "represents" them: an active player's last team already is
+  // their current one, so use that; a retired player's last team was often
+  // just wherever they happened to finish (a late-career bench stint), so
+  // use whichever team they actually played the most games for instead —
+  // that's what team color/branding should follow.
+  const primaryTeam = candidate.isActive ? result.stats.team : result.stats.mostPlayedTeam || result.stats.team;
+
+  return {
+    player: {
+      ...candidate,
+      position: result.stats.position ?? null,
+      team: primaryTeam ? { abbreviation: primaryTeam } : null,
+      teamHistory: result.stats.teamHistory || [],
+      draftYear: result.stats.draftYear ?? null,
+    },
+    stats: result.stats,
+    nbaPlayerId: result.nbaPlayerId,
+  };
+}
+
+// One candidate at a time, with a few retries against the same shared pool
+// if a candidate's stats fail to fetch (a stats-service hiccup shouldn't
+// sink an otherwise-fine roll). Deliberately NOT sampling several
+// candidates in parallel per roll anymore — that made rolls slow and much
+// more likely to trip stats.nba.com's rate limiting for only a modest
+// quality bump. Difficulty instead comes entirely from which pool this
+// draws from (see draft:nominate below): a big, real, all-time-leaders pool
+// vs. the full pool.
 async function drawPlayerWithStats(candidates) {
   const pool = [...candidates];
-  let lastPlayer = null;
+  let lastCandidate = null;
 
   for (let attempt = 0; attempt < MAX_STATS_DRAW_ATTEMPTS && pool.length > 0; attempt += 1) {
     const index = Math.floor(Math.random() * pool.length);
     const [candidate] = pool.splice(index, 1);
+    lastCandidate = candidate;
     const result = await fetchPlayerStats(candidate.id);
-    lastPlayer = candidate;
-    if (result) {
-      // Pool entries (nbaPlayersClient.js) only carry id/name/active-status/
-      // career span — position, team, and draft year live in the stats
-      // response instead (see stats-service's fetch_stats_for_player).
-      return {
-        player: {
-          ...candidate,
-          position: result.stats.position ?? null,
-          team: result.stats.team ? { abbreviation: result.stats.team } : null,
-          draftYear: result.stats.draftYear ?? null,
-        },
-        stats: result.stats,
-        nbaPlayerId: result.nbaPlayerId,
-      };
-    }
+    if (result) return toNominatedPlayer(candidate, result);
   }
 
-  return { player: lastPlayer, stats: { unavailable: true }, nbaPlayerId: null };
+  return toNominatedPlayer(lastCandidate, null);
 }
 
 function toPublicRoom(room) {
@@ -63,9 +107,12 @@ function toPublicRoom(room) {
     code: room.code,
     status: room.status,
     draftEra: room.draftEra || null,
+    difficulty: room.difficulty || null,
+    isLocal: room.isLocal || false,
     allowPositionSwaps: room.allowPositionSwaps || false,
     resultsStatus: room.resultsStatus || null,
     results: room.results || null,
+    rematchVotes: room.rematchVotes ? Array.from(room.rematchVotes) : [],
     reconnectGraceMs: RECONNECT_GRACE_MS,
     players: room.players.map((p) => ({
       id: p.id,
@@ -104,6 +151,7 @@ function maybeComputeResults(io, room, roomCode) {
       room.results = results;
       room.resultsStatus = "ready";
       io.to(roomCode).emit("room:update", toPublicRoom(room));
+      saveDraftResults(room, results); // fire-and-forget — analytics persistence, never blocks the live room
     })
     .catch((err) => {
       console.error(`[computeDraftResults] failed for room ${roomCode}:`, err);
@@ -197,14 +245,77 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("room:start", ({ era, allowPositionSwaps } = {}, callback) => {
+  // Pass-and-play: one device, multiple named local players sharing this
+  // one socket. Everything downstream (draft:*, room:leave, disconnect)
+  // treats socket.data.localPlayerIds as the set of identities this socket
+  // is allowed to act as — see resolveActingPlayerId above.
+  socket.on("room:create-local", ({ names } = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    if (!Array.isArray(names) || names.length < 2 || names.length > 4) {
+      return callback?.({ error: "INVALID_LOCAL_PLAYERS" });
+    }
+    for (const n of names) {
+      if (typeof n !== "string" || !n.trim()) return callback?.({ error: "NAME_REQUIRED" });
+      if (n.trim().length > MAX_NAME_LENGTH) return callback?.({ error: "NAME_TOO_LONG" });
+    }
+    const clientIp = socket.handshake.address;
+    if (clientIp && !roomCreateLimiter(clientIp)) {
+      return callback?.({ error: "RATE_LIMITED" });
+    }
+
+    const result = addLocalPlayersToRoom(names, socket.id);
+    if (result.error) {
+      return callback?.({ error: result.error });
+    }
+
+    socket.join(result.room.code);
+    socket.data.roomCode = result.room.code;
+    socket.data.localPlayerIds = result.players.map((p) => p.id);
+    socket.data.playerId = result.players[0].id;
+
+    callback?.({ room: toPublicRoom(result.room), playerIds: socket.data.localPlayerIds });
+    io.to(result.room.code).emit("room:update", toPublicRoom(result.room));
+  });
+
+  socket.on("room:rejoin-local", ({ code, playerIds } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = (code || "").trim().toUpperCase();
+    if (!roomCode || !Array.isArray(playerIds) || playerIds.length === 0) {
+      return callback?.({ error: "RECONNECT_FAILED" });
+    }
+
+    let room = null;
+    const previousSocketIds = new Set();
+    for (const pid of playerIds) {
+      const result = reconnectPlayer(roomCode, pid, socket.id);
+      if (result.error) return callback?.({ error: "RECONNECT_FAILED" });
+      room = result.room;
+      if (result.previousSocketId) previousSocketIds.add(result.previousSocketId);
+    }
+
+    for (const sid of previousSocketIds) {
+      io.sockets.sockets.get(sid)?.disconnect(true);
+    }
+
+    socket.join(roomCode);
+    socket.data.roomCode = roomCode;
+    socket.data.localPlayerIds = playerIds;
+    socket.data.playerId = playerIds[0];
+
+    callback?.({ room: toPublicRoom(room), playerIds });
+    io.to(roomCode).emit("room:update", toPublicRoom(room));
+  });
+
+  socket.on("room:start", (payload = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const { era, allowPositionSwaps, difficulty } = payload;
     const roomCode = socket.data.roomCode;
     if (!roomCode) {
       return callback?.({ error: "NOT_IN_ROOM" });
     }
 
-    const result = startDraft(roomCode, socket.data.playerId, era, allowPositionSwaps);
+    const playerId = resolveActingPlayerId(socket, payload);
+    const result = startDraft(roomCode, playerId, era, allowPositionSwaps, difficulty);
     if (result.error) {
       return callback?.({ error: result.error });
     }
@@ -213,10 +324,10 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("draft:nominate", async (payload, callback) => {
+  socket.on("draft:nominate", async (payload = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = socket.data.roomCode;
-    const playerId = socket.data.playerId;
+    const playerId = resolveActingPlayerId(socket, payload);
     if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
@@ -244,11 +355,25 @@ export function registerRoomHandlers(io, socket) {
       return callback?.({ error: "NO_PLAYERS_LEFT" });
     }
 
+    // The whole difficulty system now: narrow the candidates down to the
+    // data-driven "notable" pool (all-time leaders — see notablePlayers.js)
+    // with odds set by difficulty, then do a single random draw from
+    // whichever pool that leaves. Only one stats-service call per roll
+    // (with retries on failure, not extra parallel candidates) — that's
+    // what keeps rolls fast and resilient to stats.nba.com's rate limiting.
+    // Falls back to the full pool whenever the notable list came back empty
+    // (fetch failure) or this era has none in it.
+    const notableIds = await getNotablePlayerIds();
+    const notableSet = new Set(notableIds);
+    const notablePool = notableSet.size > 0 ? available.filter((p) => notableSet.has(p.id)) : [];
+    const staticOdds = DIFFICULTY_STATIC_ODDS[room.difficulty] ?? DIFFICULTY_STATIC_ODDS.normal;
+    const drawPool = notablePool.length > 0 && Math.random() < staticOdds ? notablePool : available;
+
     // The actual draw (with its stats-lookup retries) runs alongside a fixed
     // minimum delay, so the shared rolling animation always plays for at
     // least MIN_ROLL_MS even when the draw resolves instantly from cache.
     const [{ player: chosenPlayer, stats, nbaPlayerId }] = await Promise.all([
-      drawPlayerWithStats(available),
+      drawPlayerWithStats(drawPool),
       sleep(MIN_ROLL_MS),
     ]);
 
@@ -262,10 +387,11 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("draft:bid", ({ amount } = {}, callback) => {
+  socket.on("draft:bid", (payload = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const { amount } = payload;
     const roomCode = socket.data.roomCode;
-    const playerId = socket.data.playerId;
+    const playerId = resolveActingPlayerId(socket, payload);
     if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
@@ -278,10 +404,10 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("draft:pass", (payload, callback) => {
+  socket.on("draft:pass", (payload = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = socket.data.roomCode;
-    const playerId = socket.data.playerId;
+    const playerId = resolveActingPlayerId(socket, payload);
     if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
@@ -294,10 +420,11 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("draft:assign", ({ position } = {}, callback) => {
+  socket.on("draft:assign", (payload = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const { position } = payload;
     const roomCode = socket.data.roomCode;
-    const playerId = socket.data.playerId;
+    const playerId = resolveActingPlayerId(socket, payload);
     if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
@@ -311,10 +438,11 @@ export function registerRoomHandlers(io, socket) {
     maybeComputeResults(io, result.room, roomCode);
   });
 
-  socket.on("draft:swap-positions", ({ slotA, slotB } = {}, callback) => {
+  socket.on("draft:swap-positions", (payload = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const { slotA, slotB } = payload;
     const roomCode = socket.data.roomCode;
-    const playerId = socket.data.playerId;
+    const playerId = resolveActingPlayerId(socket, payload);
     if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
     const room = getRoom(roomCode);
@@ -327,39 +455,86 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
+  socket.on("room:return-to-lobby", (payload = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return callback?.({ error: "NOT_IN_ROOM" });
+
+    const playerId = resolveActingPlayerId(socket, payload);
+    const result = returnToLobby(roomCode, playerId);
+    if (result.error) return callback?.({ error: result.error });
+
+    callback?.({ room: toPublicRoom(result.room) });
+    io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+  });
+
+  // Rematch needs every currently connected, non-forfeited player to confirm
+  // before it fires — see setRematchVote/recheckRematch in roomStore.js. A
+  // player can also un-confirm (confirmed: false) before the vote resolves.
+  socket.on("room:vote-rematch", (payload = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) return callback?.({ error: "NOT_IN_ROOM" });
+
+    const playerId = resolveActingPlayerId(socket, payload);
+    const confirmed = payload?.confirmed !== false;
+    const result = setRematchVote(roomCode, playerId, confirmed);
+    if (result.error) return callback?.({ error: result.error });
+
+    callback?.({ room: toPublicRoom(result.room) });
+    io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+  });
+
   socket.on("room:leave", () => {
     const roomCode = socket.data.roomCode;
-    const playerId = socket.data.playerId;
+    const playerIds = socket.data.localPlayerIds || (socket.data.playerId ? [socket.data.playerId] : []);
     socket.data.roomCode = undefined;
     socket.data.playerId = undefined;
-    if (!roomCode || !playerId) return;
+    socket.data.localPlayerIds = undefined;
+    if (!roomCode || playerIds.length === 0) return;
 
-    const room = getRoom(roomCode);
+    let room = getRoom(roomCode);
     if (!room) return;
 
-    const result = finalizePlayerExit(room, playerId);
-    if (result.room) {
-      io.to(roomCode).emit("room:update", toPublicRoom(result.room));
-      maybeComputeResults(io, result.room, roomCode);
+    for (const pid of playerIds) {
+      const result = finalizePlayerExit(room, pid);
+      room = result.room;
+      if (!room) break;
+    }
+
+    if (room) {
+      // A departure can turn an already-pending rematch vote unanimous on
+      // its own (everyone remaining had confirmed, the room was just
+      // waiting on the person who left) — recheck before broadcasting.
+      recheckRematchAfterExit(room);
+      io.to(roomCode).emit("room:update", toPublicRoom(room));
+      maybeComputeResults(io, room, roomCode);
     }
   });
 
   socket.on("disconnect", () => {
     const roomCode = socket.data.roomCode;
-    const playerId = socket.data.playerId;
-    if (!roomCode || !playerId) return;
+    const playerIds = socket.data.localPlayerIds || (socket.data.playerId ? [socket.data.playerId] : []);
+    if (!roomCode || playerIds.length === 0) return;
 
     const room = getRoom(roomCode);
     if (!room) return;
 
-    beginDisconnectGrace(room, playerId, socket.id, () => {
-      const result = finalizePlayerExit(room, playerId);
-      if (result.room) {
-        io.to(roomCode).emit("room:update", toPublicRoom(result.room));
-        maybeComputeResults(io, result.room, roomCode);
-      }
-    });
+    for (const pid of playerIds) {
+      beginDisconnectGrace(room, pid, socket.id, () => {
+        const result = finalizePlayerExit(room, pid);
+        if (result.room) {
+          recheckRematchAfterExit(result.room);
+          io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+          maybeComputeResults(io, result.room, roomCode);
+        }
+      });
+    }
 
+    // A disconnect (even before its grace period expires) already drops the
+    // player out of the rematch's required-confirmations set, same as
+    // finalizePlayerExit does — recheck here too, not just on expiry.
+    recheckRematchAfterExit(room);
     io.to(roomCode).emit("room:update", toPublicRoom(room));
   });
 }

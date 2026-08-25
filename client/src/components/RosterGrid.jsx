@@ -1,12 +1,17 @@
 import { useState } from "react";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
+import PlayerNameLink from "./PlayerNameLink.jsx";
 import CoinRow from "./CoinRow.jsx";
 import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
 import { getTeamColors } from "../teamColors.js";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
-export default function RosterGrid({ room, currentPlayerId, socket }) {
+function formatStat(value) {
+  return value === null || value === undefined ? "N/A" : value;
+}
+
+export default function RosterGrid({ room, currentPlayerId, socket, nominatingId }) {
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   const canSwap = Boolean(room.allowPositionSwaps) && room.status === "drafting";
@@ -23,7 +28,7 @@ export default function RosterGrid({ room, currentPlayerId, socket }) {
       return;
     }
 
-    socket.emit("draft:swap-positions", { slotA: selectedSlot, slotB: pos }, () => {});
+    socket.emit("draft:swap-positions", { slotA: selectedSlot, slotB: pos, playerId: currentPlayerId }, () => {});
     setSelectedSlot(null);
   }
 
@@ -39,6 +44,7 @@ export default function RosterGrid({ room, currentPlayerId, socket }) {
                 {player.name}
                 {player.isHost && <span className="host-badge">Host</span>}
                 {isMine && <span className="you-badge">You</span>}
+                {player.id === nominatingId && <span className="nominating-badge">Nominating</span>}
                 <PlayerStatusBadge player={player} reconnectGraceMs={room.reconnectGraceMs} />
               </span>
             </div>
@@ -48,12 +54,24 @@ export default function RosterGrid({ room, currentPlayerId, socket }) {
                 const occupant = roster[pos];
                 const interactive = isMine && canSwap;
                 const colors = occupant ? getTeamColors(occupant.team?.abbreviation) : null;
+                // A plain div, not a <button> — the hover tooltip nests a
+                // real <a> (the NBA.com stats link) inside it, and a link
+                // inside a <button> is invalid HTML that browsers handle
+                // inconsistently. role/tabIndex/onKeyDown restore the
+                // button-like keyboard behavior only when swaps are on.
                 return (
-                  <button
+                  <div
                     key={pos}
-                    type="button"
-                    disabled={!interactive}
+                    role={interactive ? "button" : undefined}
+                    tabIndex={interactive ? 0 : undefined}
                     onClick={() => handleSlotClick(pos)}
+                    onKeyDown={(e) => {
+                      if (!interactive) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleSlotClick(pos);
+                      }
+                    }}
                     className={[
                       "roster-slot",
                       occupant ? "filled" : "open",
@@ -83,14 +101,31 @@ export default function RosterGrid({ room, currentPlayerId, socket }) {
                     {occupant && <span className="slot-cost">{occupant.acquiredFor}c</span>}
                     {occupant && (
                       <div className="slot-tooltip">
-                        <span className="slot-tooltip-name">{occupant.fullName}</span>
+                        <span className="slot-tooltip-name">
+                          <PlayerNameLink nbaPlayerId={occupant.nbaPlayerId} name={occupant.fullName} />
+                        </span>
                         <span className="slot-tooltip-meta">
                           {occupant.team?.abbreviation || "Free Agent"}
                           {occupant.position ? ` · ${occupant.position}` : ""}
+                          {occupant.acquiredFor != null ? ` · ${occupant.acquiredFor}c` : ""}
                         </span>
+                        {occupant.stats && !occupant.stats.unavailable && (
+                          <span className="slot-tooltip-stats">
+                            {formatStat(occupant.stats.pointsPerGame)} PTS ·{" "}
+                            {formatStat(occupant.stats.reboundsPerGame)} REB ·{" "}
+                            {formatStat(occupant.stats.assistsPerGame)} AST ·{" "}
+                            {formatStat(occupant.stats.stealsPerGame)} STL ·{" "}
+                            {formatStat(occupant.stats.blocksPerGame)} BLK
+                          </span>
+                        )}
+                        {occupant.teamHistory?.length > 1 && (
+                          <span className="slot-tooltip-teams">
+                            Teams: {occupant.teamHistory.map((t) => t.abbreviation).join(", ")}
+                          </span>
+                        )}
                       </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>

@@ -1,3 +1,15 @@
+databases:
+  # Free-tier Render Postgres. Both hoop-bids-stats-service (player/stats
+  # reference data) and hoop-bids-server (draft history) write to the same
+  # database — see db/schema.sql for the full schema and db.py/db.js for
+  # the two services' persistence layers. Entirely optional: neither
+  # service errors or degrades without it, they just skip persistence (see
+  # each db module's DATABASE_URL check).
+  - name: hoop-bids-db
+    plan: free
+    databaseName: hoop_bids
+    user: hoop_bids
+
 services:
   # Python/Flask stats microservice. Not meant to be hit directly by the
   # browser — only the Node server calls it — but Render's free web
@@ -11,6 +23,11 @@ services:
     rootDir: stats-service
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --workers 2 --timeout 120 --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hoop-bids-db
+          property: connectionString
 
   # Node/Express/Socket.IO backend — the only service the frontend talks to.
   - type: web
@@ -23,6 +40,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hoop-bids-db
+          property: connectionString
       # Fill these in from the Render dashboard after the first deploy, once
       # you can see the actual URLs Render assigned the other two services
       # (Settings tab on each service). sync: false just means "don't try to

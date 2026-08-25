@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import NominationForm from "./NominationForm.jsx";
 import RosterGrid from "./RosterGrid.jsx";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
+import PlayerNameLink from "./PlayerNameLink.jsx";
 import ResultsScreen from "./ResultsScreen.jsx";
 import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
 import { getTeamColors } from "../teamColors.js";
@@ -57,6 +57,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
 
   const rollSampleRef = useRef([]);
   const rollIntervalRef = useRef(null);
+  const autoNominatedForRef = useRef(null);
 
   const draft = room.draft;
   const isComplete = room.status === "complete";
@@ -132,15 +133,29 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
 
   function handleNominate() {
     setNominateError("");
-    socket.emit("draft:nominate", {}, (res) => {
+    socket.emit("draft:nominate", { playerId: currentPlayerId }, (res) => {
       if (res?.error) setNominateError(friendlyError(res.error));
     });
   }
 
+  // Nominating used to be a manual "Reveal Random Player" click; now it
+  // fires on its own the moment it becomes your turn. The dedupe key mixes
+  // in draftedPlayerIds.length (not just currentNominatorId) so a fresh
+  // draft — solo replay, a rematch, anyone nominating a second time — still
+  // triggers again instead of being silently skipped as "already handled".
+  useEffect(() => {
+    if (!isMyTurn || nomination || isRolling || !draft?.currentNominatorId) return;
+    const turnKey = `${draft.currentNominatorId}:${draft.draftedPlayerIds?.length ?? 0}`;
+    if (autoNominatedForRef.current === turnKey) return;
+    autoNominatedForRef.current = turnKey;
+    handleNominate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMyTurn, nomination, isRolling, draft?.currentNominatorId, draft?.draftedPlayerIds?.length]);
+
   function handleBid() {
     setBidError("");
     const amount = Number(bidInput);
-    socket.emit("draft:bid", { amount }, (res) => {
+    socket.emit("draft:bid", { amount, playerId: currentPlayerId }, (res) => {
       if (res?.error) setBidError(friendlyError(res.error));
       else setBidInput("");
     });
@@ -148,14 +163,14 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
 
   function handlePass() {
     setBidError("");
-    socket.emit("draft:pass", {}, (res) => {
+    socket.emit("draft:pass", { playerId: currentPlayerId }, (res) => {
       if (res?.error) setBidError(friendlyError(res.error));
     });
   }
 
   function submitAssign(position) {
     setAssignError("");
-    socket.emit("draft:assign", { position }, (res) => {
+    socket.emit("draft:assign", { position, playerId: currentPlayerId }, (res) => {
       if (res?.error) setAssignError(friendlyError(res.error));
     });
     setPendingAssignment(null);
@@ -176,26 +191,37 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   }
 
   if (isComplete) {
-    return <ResultsScreen room={room} currentPlayerId={currentPlayerId} onLeaveRoom={onLeaveRoom} />;
+    return <ResultsScreen room={room} currentPlayerId={currentPlayerId} socket={socket} onLeaveRoom={onLeaveRoom} />;
   }
 
   return (
     <div className="draft-board">
       <div className="draft-header">
         <div>
-          <h2>Room {room.code}</h2>
-          {room.draftEra && room.draftEra !== "all" && <p className="hint-text">Pool: {room.draftEra}</p>}
+          <h2>{room.isLocal ? "Local Game" : `Room ${room.code}`}</h2>
+          <div className="draft-meta">
+            {room.draftEra && room.draftEra !== "all" && <span className="meta-chip">Pool: {room.draftEra}</span>}
+            {room.difficulty && <span className={`meta-chip difficulty-${room.difficulty}`}>{room.difficulty}</span>}
+          </div>
         </div>
-        <button type="button" onClick={onLeaveRoom} className="secondary-btn">
-          Leave Room
-        </button>
+        <div className="draft-header-right">
+          {nominator && (
+            <div className="on-the-clock">
+              <span className="on-the-clock-label">On the clock</span>
+              <span className="on-the-clock-name">{isMyTurn ? "You" : nominator.name}</span>
+            </div>
+          )}
+          <button type="button" onClick={onLeaveRoom} className="secondary-btn">
+            Leave Room
+          </button>
+        </div>
       </div>
 
       {!isRolling && !nomination && (
-        <p className="turn-banner">{isMyTurn ? "It's your turn to nominate!" : `Waiting for ${nominator?.name || "…"} to nominate…`}</p>
+        <p className="turn-banner">{isMyTurn ? "It's your turn — rolling a player…" : `Waiting for ${nominator?.name || "…"} to nominate…`}</p>
       )}
 
-      {!isRolling && !nomination && isMyTurn && <NominationForm onNominate={handleNominate} error={nominateError} />}
+      {!isRolling && !nomination && nominateError && <p className="error-text">{nominateError}</p>}
 
       {isRolling && (
         <div className="rolling-panel">
@@ -222,11 +248,20 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                 className="player-headshot"
               />
               <div className="nominated-player-info">
-                <h3>{nomination.player.fullName}</h3>
+                <h3>
+                  <PlayerNameLink nbaPlayerId={nomination.player.nbaPlayerId} name={nomination.player.fullName} />
+                </h3>
                 <p className="player-meta">
-                  {nomination.player.position || "—"} · {nomination.player.team?.abbreviation || "Free Agent"} ·{" "}
+                  {nomination.player.position || "—"} ·{" "}
+                  {nomination.player.isActive ? "Currently" : "Played for"}{" "}
+                  {nomination.player.team?.abbreviation || "Free Agent"} ·{" "}
                   {nomination.player.draftYear ? `Drafted ${nomination.player.draftYear}` : "Undrafted"}
                 </p>
+                {nomination.player.teamHistory?.length > 1 && (
+                  <p className="player-meta player-team-history">
+                    Career teams: {nomination.player.teamHistory.map((t) => t.abbreviation).join(", ")}
+                  </p>
+                )}
                 {nomination.player.stats?.unavailable && (
                   <p className="player-stats loading">Stats unavailable for this player.</p>
                 )}
@@ -358,7 +393,12 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         </div>
       )}
 
-      <RosterGrid room={room} currentPlayerId={currentPlayerId} socket={socket} />
+      <RosterGrid
+        room={room}
+        currentPlayerId={currentPlayerId}
+        socket={socket}
+        nominatingId={draft?.currentNominatorId}
+      />
     </div>
   );
 }
