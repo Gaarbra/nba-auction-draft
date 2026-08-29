@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
 import CoinRow from "./CoinRow.jsx";
 import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
+import { KickButton } from "./VoteKick.jsx";
 import { getTeamColors } from "../teamColors.js";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
@@ -11,7 +13,7 @@ function formatStat(value) {
   return value === null || value === undefined ? "N/A" : value;
 }
 
-export default function RosterGrid({ room, currentPlayerId, socket, nominatingId }) {
+export default function RosterGrid({ room, currentPlayerId, socket, nominatingId, floatingByPlayer = {} }) {
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   const canSwap = Boolean(room.allowPositionSwaps) && room.status === "drafting";
@@ -37,8 +39,27 @@ export default function RosterGrid({ room, currentPlayerId, socket, nominatingId
       {room.players.map((player) => {
         const roster = room.draft?.rosters?.[player.id] || {};
         const isMine = player.id === currentPlayerId;
+        const floating = floatingByPlayer[player.id];
         return (
           <div key={player.id} className={`roster-card ${isMine ? "you" : ""} ${player.forfeited ? "forfeited" : ""}`}>
+            <AnimatePresence>
+              {floating && (
+                <motion.div
+                  key={floating.id}
+                  className={`floating-bubble floating-bubble-${floating.kind}`}
+                  initial={{ opacity: 0, y: 6, scale: 0.7 }}
+                  animate={{ opacity: 1, y: -6, scale: 1 }}
+                  exit={{ opacity: 0, y: -16, scale: 0.85 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 22 }}
+                >
+                  {floating.kind === "reaction" ? (
+                    <span className="floating-bubble-emoji">{floating.content}</span>
+                  ) : (
+                    <span className="floating-bubble-text">{floating.content}</span>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div className="roster-card-header">
               <span className="player-name">
                 {player.name}
@@ -47,6 +68,9 @@ export default function RosterGrid({ room, currentPlayerId, socket, nominatingId
                 {player.id === nominatingId && <span className="nominating-badge">Nominating</span>}
                 <PlayerStatusBadge player={player} reconnectGraceMs={room.reconnectGraceMs} />
               </span>
+              {!player.forfeited && (
+                <KickButton room={room} currentPlayerId={currentPlayerId} socket={socket} targetPlayerId={player.id} />
+              )}
             </div>
             <CoinRow budget={player.budget} />
             <div className="roster-slots">
@@ -87,15 +111,25 @@ export default function RosterGrid({ room, currentPlayerId, socket, nominatingId
                     }
                   >
                     <div className="roster-slot-media">
-                      {occupant ? (
-                        <PlayerHeadshot
-                          nbaPlayerId={occupant.nbaPlayerId}
-                          alt={occupant.fullName}
-                          className="roster-slot-headshot"
-                        />
-                      ) : (
-                        <span className="roster-slot-empty-icon" aria-hidden="true" />
-                      )}
+                      <AnimatePresence>
+                        {occupant ? (
+                          <motion.div
+                            key={occupant.nbaPlayerId ?? occupant.fullName}
+                            initial={{ opacity: 0, scale: 0.4 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 18 }}
+                            style={{ width: "100%", height: "100%" }}
+                          >
+                            <PlayerHeadshot
+                              nbaPlayerId={occupant.nbaPlayerId}
+                              alt={occupant.fullName}
+                              className="roster-slot-headshot"
+                            />
+                          </motion.div>
+                        ) : (
+                          <span className="roster-slot-empty-icon" aria-hidden="true" />
+                        )}
+                      </AnimatePresence>
                     </div>
                     <span className="slot-label">{pos}</span>
                     {occupant && <span className="slot-cost">{occupant.acquiredFor}c</span>}

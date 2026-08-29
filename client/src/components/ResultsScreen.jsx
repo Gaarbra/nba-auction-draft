@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "motion/react";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
 
@@ -62,9 +63,15 @@ function PostGameActions({ room, currentPlayerId, socket, onLeaveRoom }) {
             </li>
           ))}
         </ul>
-        <button type="button" onClick={handleToggleRematch} className="primary-btn">
+        <motion.button
+          type="button"
+          onClick={handleToggleRematch}
+          className="primary-btn"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+        >
           {iVoted ? "Cancel Rematch Vote" : "Confirm Rematch"}
-        </button>
+        </motion.button>
       </div>
 
       <div className="post-game-buttons">
@@ -124,8 +131,14 @@ export default function ResultsScreen({ room, currentPlayerId, socket, onLeaveRo
       </div>
 
       <div className="results-standings">
-        {results.teams.map((team) => (
-          <div key={team.id} className={`results-team-card ${team.id === currentPlayerId ? "you" : ""}`}>
+        {results.teams.map((team, index) => (
+          <motion.div
+            key={team.id}
+            className={`results-team-card ${team.id === currentPlayerId ? "you" : ""}`}
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.12, type: "spring", stiffness: 260, damping: 24 }}
+          >
             <div className="results-team-header">
               <span className="results-rank">{RANK_LABELS[team.rank] || `#${team.rank}`}</span>
               <span className="results-team-name">
@@ -167,7 +180,7 @@ export default function ResultsScreen({ room, currentPlayerId, socket, onLeaveRo
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
 

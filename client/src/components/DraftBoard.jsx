@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import RosterGrid from "./RosterGrid.jsx";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
 import ResultsScreen from "./ResultsScreen.jsx";
 import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
+import StatRadarChart from "./StatRadarChart.jsx";
+import StatHighlightRow from "./StatHighlightRow.jsx";
+import VoteKickBanner from "./VoteKick.jsx";
+import BidStepper from "./BidStepper.jsx";
+import ChatPanel from "./ChatPanel.jsx";
+import LocalBiddingRows from "./LocalBiddingRows.jsx";
+import PlayerInsights from "./PlayerInsights.jsx";
+import { isSoundMuted, setSoundMuted, playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
@@ -23,6 +32,7 @@ const ERROR_MESSAGES = {
   ROSTER_FULL: "Your roster is already full.",
   BID_TOO_LOW: "Your bid must be higher than the current bid.",
   CANNOT_PASS_AS_HIGH_BIDDER: "You can't pass while you're the high bidder.",
+  NOT_YOUR_BID_TURN: "It's not your turn to bid yet — this room is using orderly bidding.",
   NOT_ASSIGNING: "Not currently assigning a position.",
   NOT_YOUR_ASSIGNMENT: "It's not your pick to assign.",
   INVALID_POSITION: "That's not a valid position.",
@@ -54,10 +64,63 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   const [assignError, setAssignError] = useState("");
   const [isRolling, setIsRolling] = useState(false);
   const [rollDisplayName, setRollDisplayName] = useState("");
+  const [soundMuted, setSoundMutedState] = useState(() => isSoundMuted());
+
+  function toggleSound() {
+    const next = !soundMuted;
+    setSoundMutedState(next);
+    setSoundMuted(next);
+  }
 
   const rollSampleRef = useRef([]);
   const rollIntervalRef = useRef(null);
   const autoNominatedForRef = useRef(null);
+
+  // Chat/reactions are ephemeral (see roomHandlers.js) — chatMessages is just
+  // a session-local scrollback for the panel, and floatingByPlayer tracks at
+  // most one pop-up per player at a time, auto-clearing itself via a timer
+  // per player rather than one global sweep.
+  const [chatMessages, setChatMessages] = useState([]);
+  const [floatingByPlayer, setFloatingByPlayer] = useState({});
+  const floatingTimersRef = useRef({});
+
+  function showFloating(playerId, item) {
+    clearTimeout(floatingTimersRef.current[playerId]);
+    setFloatingByPlayer((prev) => ({ ...prev, [playerId]: item }));
+    const duration = item.kind === "reaction" ? 2200 : 3400;
+    floatingTimersRef.current[playerId] = setTimeout(() => {
+      setFloatingByPlayer((prev) => {
+        if (prev[playerId]?.id !== item.id) return prev;
+        const next = { ...prev };
+        delete next[playerId];
+        return next;
+      });
+    }, duration);
+  }
+
+  useEffect(() => {
+    function handleChatMessage(msg) {
+      setChatMessages((prev) => [...prev.slice(-49), msg]);
+      showFloating(msg.playerId, { id: msg.id, kind: "message", content: msg.text });
+    }
+    function handleChatReaction(r) {
+      showFloating(r.playerId, { id: r.id, kind: "reaction", content: r.emoji });
+    }
+    socket.on("chat:message", handleChatMessage);
+    socket.on("chat:reaction", handleChatReaction);
+    return () => {
+      socket.off("chat:message", handleChatMessage);
+      socket.off("chat:reaction", handleChatReaction);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
+
+  useEffect(
+    () => () => {
+      Object.values(floatingTimersRef.current).forEach(clearTimeout);
+    },
+    []
+  );
 
   const draft = room.draft;
   const isComplete = room.status === "complete";
@@ -102,6 +165,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         rollIntervalRef.current = setInterval(() => {
           if (sample.length > 0) {
             setRollDisplayName(sample[Math.floor(Math.random() * sample.length)]);
+            playRollTick();
           }
         }, ROLL_INTERVAL_MS);
       });
@@ -128,6 +192,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
     if (nomination && isRolling) {
       clearInterval(rollIntervalRef.current);
       setIsRolling(false);
+      playRollSelectChime();
     }
   }, [nomination, isRolling]);
 
@@ -151,6 +216,16 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
     handleNominate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMyTurn, nomination, isRolling, draft?.currentNominatorId, draft?.draftedPlayerIds?.length]);
+
+  // The stepper's starting point is always "one more than the current bid" —
+  // reset it every time that changes (a fresh nomination, or someone else
+  // raising) so a stale typed amount from the previous bid never lingers
+  // as an invalid (too-low) value.
+  useEffect(() => {
+    if (nomination?.phase === "bidding") {
+      setBidInput(String(nomination.currentBid + 1));
+    }
+  }, [nomination?.currentBid, nomination?.phase, nomination?.player?.nbaPlayerId]);
 
   function handleBid() {
     setBidError("");
@@ -202,6 +277,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           <div className="draft-meta">
             {room.draftEra && room.draftEra !== "all" && <span className="meta-chip">Pool: {room.draftEra}</span>}
             {room.difficulty && <span className={`meta-chip difficulty-${room.difficulty}`}>{room.difficulty}</span>}
+            {room.biddingMode === "orderly" && <span className="meta-chip">Orderly bidding</span>}
           </div>
         </div>
         <div className="draft-header-right">
@@ -211,11 +287,22 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               <span className="on-the-clock-name">{isMyTurn ? "You" : nominator.name}</span>
             </div>
           )}
+          <button
+            type="button"
+            onClick={toggleSound}
+            className="icon-btn"
+            title={soundMuted ? "Unmute roll sound" : "Mute roll sound"}
+            aria-label={soundMuted ? "Unmute roll sound" : "Mute roll sound"}
+          >
+            {soundMuted ? "🔇" : "🔊"}
+          </button>
           <button type="button" onClick={onLeaveRoom} className="secondary-btn">
             Leave Room
           </button>
         </div>
       </div>
+
+      {!room.isLocal && <VoteKickBanner room={room} currentPlayerId={currentPlayerId} socket={socket} />}
 
       {!isRolling && !nomination && (
         <p className="turn-banner">{isMyTurn ? "It's your turn — rolling a player…" : `Waiting for ${nominator?.name || "…"} to nominate…`}</p>
@@ -233,7 +320,19 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
       )}
 
       {!isRolling && nomination && (
-        <div className="active-nomination">
+        // No AnimatePresence/exit animation here on purpose — this panel is
+        // load-bearing (it's how you assign a won player to a slot), and an
+        // exit transition that never resolves would leave it stuck showing
+        // stale content forever with mode="wait" queued behind it. A keyed
+        // motion.div gets the same "new nomination pops in" effect just by
+        // remounting on key change, with no exit-timing failure mode.
+        <motion.div
+          className="active-nomination"
+          key={`${nomination.player.nbaPlayerId ?? nomination.player.fullName}-${nomination.nominatedBy}`}
+          initial={{ opacity: 0, y: 14, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 24 }}
+        >
           <div
             className="nominated-player-card"
             style={(() => {
@@ -266,23 +365,22 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                   <p className="player-stats loading">Stats unavailable for this player.</p>
                 )}
                 {nomination.player.stats && !nomination.player.stats.unavailable && (
-                  <p className="player-stats">
-                    {formatStat(nomination.player.stats.pointsPerGame)} PTS ·{" "}
-                    {formatStat(nomination.player.stats.reboundsPerGame)} REB ·{" "}
-                    {formatStat(nomination.player.stats.assistsPerGame)} AST ·{" "}
-                    {formatStat(nomination.player.stats.stealsPerGame)} STL ·{" "}
-                    {formatStat(nomination.player.stats.blocksPerGame)} BLK
-                    <span className="stats-season">
-                      {" "}
-                      (career avg, {nomination.player.stats.seasonsPlayed} season
+                  <>
+                    <p className="stats-season">
+                      Career avg, {nomination.player.stats.seasonsPlayed} season
                       {nomination.player.stats.seasonsPlayed === 1 ? "" : "s"}:{" "}
                       {nomination.player.stats.firstSeason === nomination.player.stats.lastSeason
                         ? nomination.player.stats.firstSeason
                         : `${nomination.player.stats.firstSeason}–${nomination.player.stats.lastSeason}`}
-                      )
-                    </span>
-                  </p>
+                    </p>
+                    <StatHighlightRow stats={nomination.player.stats} />
+                  </>
                 )}
+                <PlayerInsights
+                  nbaPlayerId={nomination.player.nbaPlayerId}
+                  era={room.draftEra}
+                  difficulty={room.difficulty}
+                />
                 <p className="nominated-by">
                   Nominated by {playerName(nomination.nominatedBy)}
                   {(() => {
@@ -291,6 +389,12 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                   })()}
                 </p>
               </div>
+              {nomination.player.stats && !nomination.player.stats.unavailable && (
+                <StatRadarChart
+                  stats={nomination.player.stats}
+                  color={getTeamColors(nomination.player.team?.abbreviation).primary}
+                />
+              )}
             </div>
           </div>
 
@@ -303,40 +407,65 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                 <p className="hint-text">Passed: {nomination.passed.map(playerName).join(", ")}</p>
               )}
 
-              {currentPlayerId === nomination.currentBidder && (
-                <p className="hint-text">You're the high bidder!</p>
+              {room.isLocal ? (
+                <LocalBiddingRows room={room} nomination={nomination} socket={socket} friendlyError={friendlyError} />
+              ) : (
+                <>
+                  {currentPlayerId === nomination.currentBidder && (
+                    <p className="hint-text">You're the high bidder!</p>
+                  )}
+
+                  {currentPlayerId !== nomination.currentBidder && nomination.passed.includes(currentPlayerId) && (
+                    <p className="hint-text">You passed on this player.</p>
+                  )}
+
+                  {currentPlayerId !== nomination.currentBidder &&
+                    !nomination.passed.includes(currentPlayerId) &&
+                    myOpenSlots.length === 0 && <p className="hint-text">Your roster is full — spectating.</p>}
+
+                  {room.biddingMode === "orderly" &&
+                    currentPlayerId !== nomination.currentBidder &&
+                    !nomination.passed.includes(currentPlayerId) &&
+                    myOpenSlots.length > 0 &&
+                    nomination.currentBidTurnId !== currentPlayerId && (
+                      <p className="hint-text">Waiting for {playerName(nomination.currentBidTurnId)} to bid or pass…</p>
+                    )}
+
+                  {(room.biddingMode !== "orderly" || nomination.currentBidTurnId === currentPlayerId) &&
+                    currentPlayerId !== nomination.currentBidder &&
+                    !nomination.passed.includes(currentPlayerId) &&
+                    myOpenSlots.length > 0 && (
+                      <div className="bid-controls">
+                        <BidStepper
+                          value={bidInput}
+                          min={nomination.currentBid + 1}
+                          max={currentPlayer?.budget ?? nomination.currentBid + 1}
+                          onChange={setBidInput}
+                        />
+                        <motion.button
+                          type="button"
+                          onClick={handleBid}
+                          className="primary-btn"
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.96 }}
+                        >
+                          Raise
+                        </motion.button>
+                        <motion.button
+                          type="button"
+                          onClick={handlePass}
+                          className="secondary-btn"
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.96 }}
+                        >
+                          Pass
+                        </motion.button>
+                      </div>
+                    )}
+
+                  {bidError && <p className="error-text">{bidError}</p>}
+                </>
               )}
-
-              {currentPlayerId !== nomination.currentBidder && nomination.passed.includes(currentPlayerId) && (
-                <p className="hint-text">You passed on this player.</p>
-              )}
-
-              {currentPlayerId !== nomination.currentBidder &&
-                !nomination.passed.includes(currentPlayerId) &&
-                myOpenSlots.length === 0 && <p className="hint-text">Your roster is full — spectating.</p>}
-
-              {currentPlayerId !== nomination.currentBidder &&
-                !nomination.passed.includes(currentPlayerId) &&
-                myOpenSlots.length > 0 && (
-                  <div className="bid-controls">
-                    <input
-                      type="number"
-                      min={nomination.currentBid + 1}
-                      max={currentPlayer?.budget}
-                      value={bidInput}
-                      onChange={(e) => setBidInput(e.target.value)}
-                      placeholder={`> ${nomination.currentBid}`}
-                    />
-                    <button type="button" onClick={handleBid} className="primary-btn">
-                      Raise
-                    </button>
-                    <button type="button" onClick={handlePass} className="secondary-btn">
-                      Pass
-                    </button>
-                  </div>
-                )}
-
-              {bidError && <p className="error-text">{bidError}</p>}
             </div>
           )}
 
@@ -349,9 +478,16 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                   </p>
                   <div className="position-picker">
                     {myOpenSlots.map((pos) => (
-                      <button key={pos} type="button" onClick={() => handlePickPosition(pos)} className="secondary-btn">
+                      <motion.button
+                        key={pos}
+                        type="button"
+                        onClick={() => handlePickPosition(pos)}
+                        className="secondary-btn"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.94 }}
+                      >
                         {pos}
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
 
@@ -390,7 +526,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               )}
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       <RosterGrid
@@ -398,7 +534,10 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         currentPlayerId={currentPlayerId}
         socket={socket}
         nominatingId={draft?.currentNominatorId}
+        floatingByPlayer={floatingByPlayer}
       />
+
+      <ChatPanel socket={socket} room={room} currentPlayerId={currentPlayerId} messages={chatMessages} />
     </div>
   );
 }

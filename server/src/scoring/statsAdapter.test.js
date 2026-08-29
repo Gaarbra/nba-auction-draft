@@ -122,5 +122,17 @@ test("toPlayerStatLine: missing fields default to 0 rather than crashing downstr
   assert.strictEqual(line.fta, 0);
   assert.strictEqual(line.ast, 0);
   assert.strictEqual(line.tov, 0);
+  assert.strictEqual(line.reb, 0);
   assert.ok(Number.isFinite(line.usagePct));
+});
+
+test("toPlayerStatLine: reboundsPerGame is threaded through to `reb` for scoring.js's tracked-era DIR term", () => {
+  const line = toPlayerStatLine({
+    reboundsPerGame: 11.4,
+    stealsPerGame: 1.2,
+    blocksPerGame: 0.6,
+    gamesPlayed: 70,
+    usagePct: 25,
+  });
+  assert.strictEqual(line.reb, 11.4);
 });

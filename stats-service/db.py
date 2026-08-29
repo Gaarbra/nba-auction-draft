@@ -162,6 +162,44 @@ def upsert_player_and_stats(player_id, full_name, is_active, from_year, to_year,
         conn.close()
 
 
+def fetch_all_player_stats_for_similarity():
+    """Every player with a stats row, for building the in-memory player-
+    similarity index at startup (see ml.SimilarityIndex). Returns [] if
+    there's no DATABASE_URL or the query fails — the caller already treats
+    an empty list as "no similarity index available", not an error.
+    NUMERIC columns are cast to float8 in the query itself so callers get
+    plain Python floats, not decimal.Decimal (which doesn't mix with plain
+    float arithmetic — see the price-model training script for the version
+    of this bug that actually shipped once)."""
+    conn = _connect()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    p.id AS player_id,
+                    p.full_name,
+                    ps.points_per_game::float8   AS points_per_game,
+                    ps.rebounds_per_game::float8 AS rebounds_per_game,
+                    ps.assists_per_game::float8  AS assists_per_game,
+                    ps.steals_per_game::float8   AS steals_per_game,
+                    ps.blocks_per_game::float8   AS blocks_per_game,
+                    ps.fga_per_game::float8      AS fga_per_game,
+                    ps.fta_per_game::float8      AS fta_per_game
+                FROM players p
+                JOIN player_stats ps ON ps.player_id = p.id
+                """
+            )
+            return cur.fetchall()
+    except Exception as e:
+        print(f"[db] similarity rows fetch failed: {e.__class__.__name__}: {e}")
+        return []
+    finally:
+        conn.close()
+
+
 def update_usage_pct(player_id, usage_pct):
     """Usage% arrives later than the rest of a player's stats (it's a
     separate, heavier fetch — see fetch_usage_pct in app.py), so it gets its

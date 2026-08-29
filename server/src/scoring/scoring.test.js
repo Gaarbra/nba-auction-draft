@@ -84,6 +84,36 @@ test("defensiveImpactRating: tracked stats use STL*2.5 + BLK*2.0", () => {
   assert.strictEqual(result, 1.5 * 2.5 + 0.5 * 2.0);
 });
 
+test("defensiveImpactRating: tracked stats also add a small REB term (REB*0.3)", () => {
+  const result = defensiveImpactRating({ stl: 1.5, blk: 0.5, reb: 10 });
+  assert.strictEqual(result, 1.5 * 2.5 + 0.5 * 2.0 + 10 * 0.3);
+});
+
+test("defensiveImpactRating: a dominant rebounder's REB term lands in the same rough range as a plus defender's STL/BLK terms, not swamping them", () => {
+  // ~15 REB/g -> 4.5, comparable to a good defender's STL/BLK contribution
+  // (roughly 1-6 for realistic per-game rates) — this is meant to close the
+  // "rebounding counts for nothing" gap, not make DIR mostly about boards.
+  const dominantRebounder = defensiveImpactRating({ stl: 0.5, blk: 0.5, reb: 15 });
+  const plusDefenderNoReb = defensiveImpactRating({ stl: 1.5, blk: 1.5, reb: 0 });
+  assert.ok(dominantRebounder > 0 && dominantRebounder < plusDefenderNoReb * 2);
+});
+
+test("defensiveImpactRating: missing reb (undefined) contributes 0, same as before this term existed", () => {
+  const result = defensiveImpactRating({ stl: 1.5, blk: 0.5 });
+  assert.strictEqual(result, 1.5 * 2.5 + 0.5 * 2.0);
+});
+
+test("defensiveImpactRating: the untracked (DWS) branch never double-counts REB even if reb is present", () => {
+  // The DWS estimate is itself derived from rebounds/game (see
+  // statsAdapter.js's estimateSeasonDWS) — this branch must ignore a raw
+  // `reb` field entirely, not add REB_WEIGHT on top of an already
+  // rebounding-derived DWS number.
+  const withReb = defensiveImpactRating({ stl: null, blk: null, reb: 15, seasonDWS: 3.5, gamesPlayed: 70 });
+  const withoutReb = defensiveImpactRating({ stl: null, blk: null, seasonDWS: 3.5, gamesPlayed: 70 });
+  assert.strictEqual(withReb, withoutReb);
+  assert.strictEqual(withReb, (3.5 / 70) * 100);
+});
+
 test("defensiveImpactRating: untracked stats (null) fall back to (DWS/GP)*100", () => {
   const result = defensiveImpactRating({ stl: null, blk: null, seasonDWS: 3.5, gamesPlayed: 70 });
   assert.strictEqual(result, (3.5 / 70) * 100);

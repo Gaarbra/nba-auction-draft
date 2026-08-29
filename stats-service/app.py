@@ -4,6 +4,14 @@ import random
 import threading
 import time
 
+from dotenv import load_dotenv
+
+# Must run before `import db` — db.py reads DATABASE_URL from the
+# environment at import time, so .env needs to be loaded first. Harmless
+# locally-only convenience: production (Render/gunicorn) sets real
+# environment variables directly, no .env file involved.
+load_dotenv()
+
 from flask import Flask, jsonify, request
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import (
@@ -15,6 +23,7 @@ from nba_api.stats.endpoints import (
 )
 
 import db
+import ml
 
 app = Flask(__name__)
 
@@ -24,6 +33,22 @@ app = Flask(__name__)
 # EXISTS) and a no-op if DATABASE_URL isn't set, so it's safe to call from
 # every worker process without coordination.
 db.init_schema()
+
+# Both loaded/built at module level (like db.init_schema() above) so they're
+# ready under gunicorn too, not just the `if __name__ == "__main__"` dev
+# path. Both are optional in the exact same way the rest of this service's
+# DB-backed features are: no price_model.joblib on disk (run
+# scripts/train_price_model.py) means _price_model is None and
+# /predict-price says so; no DATABASE_URL means the similarity index builds
+# from an empty row list and /similar-players says so. Neither blocks the
+# service from starting or serving its other endpoints.
+_price_model = ml.load_price_model()
+_similarity_index = ml.SimilarityIndex()
+_similarity_index.build(db.fetch_all_player_stats_for_similarity())
+print(
+    f"[ml] price model {'loaded' if _price_model else 'NOT FOUND (run scripts/train_price_model.py)'}; "
+    f"similarity index built over {0 if _similarity_index.frame is None else len(_similarity_index.frame)} players"
+)
 
 # PORT is the convention most PaaS hosts (Render included) inject
 # automatically; STATS_SERVICE_PORT is kept as a fallback for local dev
@@ -513,6 +538,59 @@ def warm_notable_pool():
 
     print(f"[warmup] done — warmed {warmed}/{len(todo)} players")
     _warmup_status.update(running=False, finishedAt=time.time())
+
+
+@app.get("/predict-price")
+def get_predicted_price():
+    """Predicted auction price (in coins) for a player, given the room's era/
+    slot/difficulty context — see ml.py and scripts/train_price_model.py.
+    `slot` is optional (the client won't know it before an assignment
+    happens for a fresh nomination); era/difficulty default sensibly inside
+    ml.build_feature_row if omitted too."""
+    if _price_model is None:
+        return jsonify({"error": "MODEL_NOT_TRAINED"}), 404
+
+    player = resolve_player(request)
+    if not player:
+        return jsonify({"error": "PLAYER_NOT_FOUND"}), 404
+
+    try:
+        stats = fetch_stats_for_player(player["id"])
+    except Exception as e:
+        print(f"[predict-price] stats lookup failed player_id={player['id']} ({e.__class__.__name__}: {e})")
+        return jsonify({"error": "STATS_LOOKUP_FAILED"}), 502
+
+    if stats is None:
+        return jsonify({"error": "NO_STATS_AVAILABLE"}), 404
+
+    era = request.args.get("era")
+    slot = request.args.get("slot")
+    difficulty = request.args.get("difficulty")
+
+    try:
+        predicted = ml.predict_price(_price_model, stats, era=era, slot=slot, difficulty=difficulty)
+    except Exception as e:
+        print(f"[predict-price] prediction failed player_id={player['id']} ({e.__class__.__name__}: {e})")
+        return jsonify({"error": "PREDICTION_FAILED"}), 502
+
+    return jsonify({"player": {"id": player["id"], "fullName": player["full_name"]}, "predictedPrice": round(predicted, 1)})
+
+
+@app.get("/similar-players")
+def get_similar_players():
+    """The k nearest players by per-game stat profile (see ml.SimilarityIndex)
+    — playing style/production only, not context like era/slot/difficulty."""
+    player = resolve_player(request)
+    if not player:
+        return jsonify({"error": "PLAYER_NOT_FOUND"}), 404
+
+    try:
+        k = max(1, min(10, int(request.args.get("k", 5))))
+    except (TypeError, ValueError):
+        k = 5
+
+    results = _similarity_index.query(player["id"], k=k)
+    return jsonify({"player": {"id": player["id"], "fullName": player["full_name"]}, "similar": results})
 
 
 @app.get("/health")

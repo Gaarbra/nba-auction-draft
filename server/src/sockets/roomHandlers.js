@@ -1,17 +1,24 @@
+import { randomUUID } from "node:crypto";
 import {
   createRoom,
   addPlayerToRoom,
   addLocalPlayersToRoom,
   startDraft,
   getRoom,
+  listPublicRooms,
   finalizePlayerExit,
   beginDisconnectGrace,
   reconnectPlayer,
   returnToLobby,
   setRematchVote,
   recheckRematchAfterExit,
+  startVoteKick,
+  castVoteKick,
+  cancelVoteKickByHost,
+  recheckVoteKickAfterExit,
+  clearVoteKickIfComplete,
   RECONNECT_GRACE_MS,
-  DIFFICULTY_STATIC_ODDS,
+  computeNotablePoolOdds,
 } from "../rooms/roomStore.js";
 import { nominatePlayer, placeBid, passOnNomination, assignPosition, swapRosterPositions } from "../rooms/draftStore.js";
 import { getPlayers } from "../services/playerCache.js";
@@ -108,11 +115,24 @@ function toPublicRoom(room) {
     status: room.status,
     draftEra: room.draftEra || null,
     difficulty: room.difficulty || null,
+    biddingMode: room.biddingMode || null,
+    visibility: room.visibility || "private",
     isLocal: room.isLocal || false,
     allowPositionSwaps: room.allowPositionSwaps || false,
     resultsStatus: room.resultsStatus || null,
     results: room.results || null,
     rematchVotes: room.rematchVotes ? Array.from(room.rematchVotes) : [],
+    // Eligibility/threshold are derived client-side from players + targetId
+    // (connected, non-forfeited, not the target) — only the raw ballots need
+    // to cross the wire.
+    voteKick: room.voteKick
+      ? {
+          targetId: room.voteKick.targetId,
+          initiatedBy: room.voteKick.initiatedBy,
+          approveIds: [...room.voteKick.votes.entries()].filter(([, v]) => v).map(([id]) => id),
+          rejectIds: [...room.voteKick.votes.entries()].filter(([, v]) => !v).map(([id]) => id),
+        }
+      : null,
     reconnectGraceMs: RECONNECT_GRACE_MS,
     players: room.players.map((p) => ({
       id: p.id,
@@ -141,6 +161,7 @@ function toPublicRoom(room) {
 
 /** Kicks off the (slow, one-time) end-of-draft scoring pass if the draft just completed and hasn't been scored yet. */
 function maybeComputeResults(io, room, roomCode) {
+  clearVoteKickIfComplete(room);
   if (room.status !== "complete" || room.results || room.resultsStatus === "computing") return;
 
   room.resultsStatus = "computing";
@@ -165,7 +186,7 @@ export function registerRoomHandlers(io, socket) {
   // any of these events — each socket gets its own independent counter.
   const allowEvent = createSocketEventLimiter(10_000, 40);
 
-  socket.on("room:create", ({ name } = {}, callback) => {
+  socket.on("room:create", ({ name, visibility } = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     if (typeof name !== "string" || !name.trim()) {
       return callback?.({ error: "NAME_REQUIRED" });
@@ -178,7 +199,7 @@ export function registerRoomHandlers(io, socket) {
       return callback?.({ error: "RATE_LIMITED" });
     }
 
-    const room = createRoom();
+    const room = createRoom(visibility === "public" ? "public" : "private");
     const result = addPlayerToRoom(room.code, { name, socketId: socket.id });
 
     if (result.error) {
@@ -191,6 +212,15 @@ export function registerRoomHandlers(io, socket) {
 
     callback?.({ room: toPublicRoom(result.room), playerId: result.player.id });
     io.to(room.code).emit("room:update", toPublicRoom(result.room));
+  });
+
+  // Callable before joining any room — the lobby's "Public" tab uses this to
+  // browse open rooms it can join without needing a code. A snapshot on
+  // request, not a live subscription: simpler, and good enough for a list
+  // that's just there to help someone find a room to join.
+  socket.on("rooms:list-public", (payload, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    callback?.({ rooms: listPublicRooms() });
   });
 
   socket.on("room:join", ({ code, name } = {}, callback) => {
@@ -308,14 +338,14 @@ export function registerRoomHandlers(io, socket) {
 
   socket.on("room:start", (payload = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
-    const { era, allowPositionSwaps, difficulty } = payload;
+    const { era, allowPositionSwaps, difficulty, biddingMode } = payload;
     const roomCode = socket.data.roomCode;
     if (!roomCode) {
       return callback?.({ error: "NOT_IN_ROOM" });
     }
 
     const playerId = resolveActingPlayerId(socket, payload);
-    const result = startDraft(roomCode, playerId, era, allowPositionSwaps, difficulty);
+    const result = startDraft(roomCode, playerId, era, allowPositionSwaps, difficulty, biddingMode);
     if (result.error) {
       return callback?.({ error: result.error });
     }
@@ -366,7 +396,14 @@ export function registerRoomHandlers(io, socket) {
     const notableIds = await getNotablePlayerIds();
     const notableSet = new Set(notableIds);
     const notablePool = notableSet.size > 0 ? available.filter((p) => notableSet.has(p.id)) : [];
-    const staticOdds = DIFFICULTY_STATIC_ODDS[room.difficulty] ?? DIFFICULTY_STATIC_ODDS.normal;
+
+    // See computeNotablePoolOdds in roomStore.js for the actual threshold
+    // math (and why 2020s is the only era it meaningfully affects). The coin
+    // flip itself (Math.random() < odds) and the draw below
+    // (drawPlayerWithStats's Math.floor(Math.random() * n)) are both uniform
+    // over whichever pool this lands in — every player in that pool has an
+    // equal chance, in every era, every roll.
+    const staticOdds = computeNotablePoolOdds(room.difficulty, notablePool.length);
     const drawPool = notablePool.length > 0 && Math.random() < staticOdds ? notablePool : available;
 
     // The actual draw (with its stats-lookup retries) runs alongside a fixed
@@ -485,6 +522,95 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
+  // Executes the actual removal side-effects of a resolved votekick: tells
+  // the kicked player's own socket specifically (they're not the one who
+  // took the action, so they'd otherwise just see a room:update where
+  // they've silently vanished from the player list) and evicts that socket
+  // from the room's broadcast group so it stops receiving further updates
+  // for a room it's no longer part of.
+  function handleVoteKickResolution(room, roomCode, targetId, targetSocketId) {
+    // targetSocketId is captured by the caller (roomStore.js) before
+    // finalizePlayerExit runs — looking it up here instead, after the fact,
+    // would find nothing in the lobby case, since finalizePlayerExit already
+    // removed the target from room.players by the time this runs.
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+    if (targetSocket) {
+      targetSocket.emit("room:kicked");
+      targetSocket.leave(roomCode);
+      if (targetSocket.data.playerId === targetId) {
+        targetSocket.data.roomCode = undefined;
+        targetSocket.data.playerId = undefined;
+      }
+      if (targetSocket.data.localPlayerIds) {
+        targetSocket.data.localPlayerIds = targetSocket.data.localPlayerIds.filter((id) => id !== targetId);
+      }
+    }
+    if (room) {
+      recheckRematchAfterExit(room);
+      io.to(roomCode).emit("room:update", toPublicRoom(room));
+      maybeComputeResults(io, room, roomCode);
+    } else {
+      io.to(roomCode).emit("room:update", null);
+    }
+  }
+
+  // Host-only: opens a vote to remove another connected player, from either
+  // the lobby or mid-draft. Resolves instantly if the host is the only other
+  // eligible voter (nothing to wait on) — otherwise it's genuinely a vote,
+  // not a unilateral host kick, so the room's difficulty/era settings can't
+  // be steamrolled by one person just because they happened to create it.
+  socket.on("room:vote-kick-start", ({ targetId } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = socket.data.roomCode;
+    const playerId = resolveActingPlayerId(socket, {});
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
+
+    const result = startVoteKick(roomCode, playerId, targetId, () => {
+      const room = getRoom(roomCode);
+      if (room) io.to(roomCode).emit("room:update", toPublicRoom(room));
+    });
+    if (result.error) return callback?.({ error: result.error });
+
+    callback?.({ room: result.room ? toPublicRoom(result.room) : null });
+    if (result.kicked) {
+      handleVoteKickResolution(result.room, roomCode, targetId, result.targetSocketId);
+    } else {
+      io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+    }
+  });
+
+  socket.on("room:vote-kick-cast", ({ confirmed } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = socket.data.roomCode;
+    const playerId = resolveActingPlayerId(socket, {});
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
+
+    const room = getRoom(roomCode);
+    const targetId = room?.voteKick?.targetId;
+    const result = castVoteKick(roomCode, playerId, confirmed !== false);
+    if (result.error) return callback?.({ error: result.error });
+
+    callback?.({ room: result.room ? toPublicRoom(result.room) : null });
+    if (result.kicked) {
+      handleVoteKickResolution(result.room, roomCode, targetId, result.targetSocketId);
+    } else {
+      io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+    }
+  });
+
+  socket.on("room:vote-kick-cancel", (payload = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = socket.data.roomCode;
+    const playerId = resolveActingPlayerId(socket, {});
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
+
+    const result = cancelVoteKickByHost(roomCode, playerId);
+    if (result.error) return callback?.({ error: result.error });
+
+    callback?.({ room: toPublicRoom(result.room) });
+    io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+  });
+
   socket.on("room:leave", () => {
     const roomCode = socket.data.roomCode;
     const playerIds = socket.data.localPlayerIds || (socket.data.playerId ? [socket.data.playerId] : []);
@@ -503,10 +629,15 @@ export function registerRoomHandlers(io, socket) {
     }
 
     if (room) {
-      // A departure can turn an already-pending rematch vote unanimous on
-      // its own (everyone remaining had confirmed, the room was just
-      // waiting on the person who left) — recheck before broadcasting.
+      // A departure can turn an already-pending rematch vote unanimous, or
+      // resolve/moot a pending votekick, on its own — recheck both before
+      // broadcasting. The votekick recheck can (rarely) empty the room too,
+      // same as the finalizePlayerExit loop above.
       recheckRematchAfterExit(room);
+      room = recheckVoteKickAfterExit(room);
+    }
+
+    if (room) {
       io.to(roomCode).emit("room:update", toPublicRoom(room));
       maybeComputeResults(io, room, roomCode);
     }
@@ -525,16 +656,55 @@ export function registerRoomHandlers(io, socket) {
         const result = finalizePlayerExit(room, pid);
         if (result.room) {
           recheckRematchAfterExit(result.room);
-          io.to(roomCode).emit("room:update", toPublicRoom(result.room));
-          maybeComputeResults(io, result.room, roomCode);
+          const afterVoteKick = recheckVoteKickAfterExit(result.room);
+          if (afterVoteKick) {
+            io.to(roomCode).emit("room:update", toPublicRoom(afterVoteKick));
+            maybeComputeResults(io, afterVoteKick, roomCode);
+          }
         }
       });
     }
 
     // A disconnect (even before its grace period expires) already drops the
-    // player out of the rematch's required-confirmations set, same as
-    // finalizePlayerExit does — recheck here too, not just on expiry.
+    // player out of the rematch's/votekick's required-voter sets, same as
+    // finalizePlayerExit does — recheck both here too, not just on expiry.
     recheckRematchAfterExit(room);
-    io.to(roomCode).emit("room:update", toPublicRoom(room));
+    const afterVoteKick = recheckVoteKickAfterExit(room);
+    if (afterVoteKick) io.to(roomCode).emit("room:update", toPublicRoom(afterVoteKick));
+  });
+
+  // Chat and reactions are purely ephemeral — relayed to the room and never
+  // stored on `room` itself, so there's no history to send a new joiner and
+  // nothing here for toPublicRoom to serialize. That matches how they're
+  // actually used (a live pop-up near the sender's profile plus a
+  // session-local scrollback), not a persistent chat log.
+  const MAX_CHAT_MESSAGE_LENGTH = 200;
+  const ALLOWED_REACTIONS = new Set(["🔥", "😭", "💯", "💔"]);
+
+  socket.on("chat:message", (payload = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = socket.data.roomCode;
+    const playerId = resolveActingPlayerId(socket, payload);
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
+    if (!getRoom(roomCode)) return callback?.({ error: "ROOM_NOT_FOUND" });
+
+    const text = typeof payload.text === "string" ? payload.text.trim().slice(0, MAX_CHAT_MESSAGE_LENGTH) : "";
+    if (!text) return callback?.({ error: "EMPTY_MESSAGE" });
+
+    io.to(roomCode).emit("chat:message", { id: randomUUID(), playerId, text, at: Date.now() });
+    callback?.({ ok: true });
+  });
+
+  socket.on("chat:reaction", (payload = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = socket.data.roomCode;
+    const playerId = resolveActingPlayerId(socket, payload);
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
+    if (!getRoom(roomCode)) return callback?.({ error: "ROOM_NOT_FOUND" });
+
+    if (!ALLOWED_REACTIONS.has(payload.emoji)) return callback?.({ error: "INVALID_REACTION" });
+
+    io.to(roomCode).emit("chat:reaction", { id: randomUUID(), playerId, emoji: payload.emoji, at: Date.now() });
+    callback?.({ ok: true });
   });
 }

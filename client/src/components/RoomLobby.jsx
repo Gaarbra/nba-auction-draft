@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 
 // Matches the room-code alphabet the server generates from (roomStore.js) —
 // no I/O/0/1, to avoid characters that look alike. Sanitizing pasted text
@@ -14,11 +15,56 @@ function sanitizeCode(raw) {
 const MAX_LOCAL_PLAYERS = 4;
 const MIN_LOCAL_PLAYERS = 2;
 
-export default function RoomLobby({ onCreateRoom, onJoinRoom, onCreateLocalRoom, error, isSubmitting }) {
+export default function RoomLobby({
+  onCreateRoom,
+  onJoinRoom,
+  onCreateLocalRoom,
+  onListPublicRooms,
+  connected,
+  error,
+  isSubmitting,
+}) {
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState("");
-  const [mode, setMode] = useState("create");
+  const [mode, setMode] = useState("public");
+  const [privateSubMode, setPrivateSubMode] = useState("create");
   const [localNames, setLocalNames] = useState(["", ""]);
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
+
+  const [publicRooms, setPublicRooms] = useState([]);
+  const [publicRoomsLoading, setPublicRoomsLoading] = useState(false);
+
+  function refreshPublicRooms() {
+    setPublicRoomsLoading(true);
+    onListPublicRooms((rooms) => {
+      setPublicRooms(rooms);
+      setPublicRoomsLoading(false);
+    });
+  }
+
+  useEffect(() => {
+    // Also re-fires once `connected` flips true — the very first mount can
+    // race ahead of the socket actually being created (see App.jsx's
+    // handleListPublicRooms), so this is what recovers from that instead of
+    // leaving the list stuck empty until someone hits Refresh by hand.
+    if (mode === "public" && connected) refreshPublicRooms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, connected]);
+
+  // A subtle 3D tilt toward the cursor — capped small (±6deg) so it reads as
+  // "responsive" rather than gimmicky, and skipped for anyone who's asked
+  // the OS for reduced motion.
+  function handleCardMouseMove(e) {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ rx: py * -6, ry: px * 6 });
+  }
+
+  function handleCardMouseLeave() {
+    setTilt({ rx: 0, ry: 0 });
+  }
 
   function updateLocalName(index, value) {
     setLocalNames((prev) => prev.map((n, i) => (i === index ? value : n)));
@@ -37,42 +83,80 @@ export default function RoomLobby({ onCreateRoom, onJoinRoom, onCreateLocalRoom,
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (mode === "create") {
-      onCreateRoom(name);
-    } else if (mode === "join") {
+    if (mode === "public") {
+      onCreateRoom(name, "public");
+    } else if (mode === "private" && privateSubMode === "create") {
+      onCreateRoom(name, "private");
+    } else if (mode === "private" && privateSubMode === "join") {
       onJoinRoom(joinCode, name);
-    } else if (localNamesReady) {
+    } else if (mode === "local" && localNamesReady) {
       onCreateLocalRoom(validLocalNames);
     }
   }
 
+  function joinPublicRoom(code) {
+    onJoinRoom(code, name);
+  }
+
+  const submitLabel =
+    mode === "public"
+      ? "Create Public Room"
+      : mode === "private"
+        ? privateSubMode === "create"
+          ? "Create Room"
+          : "Join Room"
+        : "Start Local Game";
+
   return (
-    <div className="lobby-card">
+    <motion.div
+      className="lobby-card"
+      onMouseMove={handleCardMouseMove}
+      onMouseLeave={handleCardMouseLeave}
+      animate={{ rotateX: tilt.rx, rotateY: tilt.ry }}
+      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+      style={{ transformPerspective: 900 }}
+    >
       <h1>Hoop Bids</h1>
 
       <div className="mode-toggle">
-        <button
-          type="button"
-          className={mode === "create" ? "active" : ""}
-          onClick={() => setMode("create")}
-        >
-          Create Room
+        <button type="button" className={mode === "public" ? "active" : ""} onClick={() => setMode("public")}>
+          Public
         </button>
-        <button
-          type="button"
-          className={mode === "join" ? "active" : ""}
-          onClick={() => setMode("join")}
-        >
-          Join Room
+        <button type="button" className={mode === "private" ? "active" : ""} onClick={() => setMode("private")}>
+          Private
         </button>
-        <button
-          type="button"
-          className={mode === "local" ? "active" : ""}
-          onClick={() => setMode("local")}
-        >
-          Local Play
+        <button type="button" className={mode === "local" ? "active" : ""} onClick={() => setMode("local")}>
+          Local
         </button>
       </div>
+
+      {mode === "private" && (
+        <div className="private-submode-toggle">
+          <button
+            type="button"
+            className={privateSubMode === "create" ? "active" : ""}
+            onClick={() => setPrivateSubMode("create")}
+          >
+            Create
+          </button>
+          <button
+            type="button"
+            className={privateSubMode === "join" ? "active" : ""}
+            onClick={() => setPrivateSubMode("join")}
+          >
+            Join with Code
+          </button>
+        </div>
+      )}
+
+      {mode === "public" && (
+        <p className="hint-text lobby-mode-hint">
+          Open to anyone — create a room others can find and join without a code.
+        </p>
+      )}
+      {mode === "private" && privateSubMode === "create" && (
+        <p className="hint-text lobby-mode-hint">Only joinable with the room code you share.</p>
+      )}
 
       <form onSubmit={handleSubmit}>
         {mode !== "local" && (
@@ -89,7 +173,7 @@ export default function RoomLobby({ onCreateRoom, onJoinRoom, onCreateLocalRoom,
           </label>
         )}
 
-        {mode === "join" && (
+        {mode === "private" && privateSubMode === "join" && (
           <label>
             Room Code
             <input
@@ -151,9 +235,49 @@ export default function RoomLobby({ onCreateRoom, onJoinRoom, onCreateLocalRoom,
           className="primary-btn"
           disabled={isSubmitting || (mode === "local" && !localNamesReady)}
         >
-          {mode === "create" ? "Create Room" : mode === "join" ? "Join Room" : "Start Local Game"}
+          {submitLabel}
         </button>
       </form>
-    </div>
+
+      {mode === "public" && (
+        <div className="public-room-list">
+          <div className="public-room-list-header">
+            <span>Open Rooms</span>
+            <button type="button" className="public-room-refresh" onClick={refreshPublicRooms} disabled={publicRoomsLoading}>
+              {publicRoomsLoading ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+          {publicRooms.length === 0 ? (
+            <p className="hint-text">
+              {publicRoomsLoading ? "Looking for open rooms…" : "No open public rooms right now — start one above."}
+            </p>
+          ) : (
+            <ul className="public-room-items">
+              {publicRooms.map((r) => (
+                <li key={r.code} className="public-room-item">
+                  <span className="public-room-item-info">
+                    <strong>{r.hostName}</strong>'s room
+                    <span className="public-room-item-count">
+                      {r.playerCount}/{r.maxPlayers}
+                    </span>
+                  </span>
+                  <motion.button
+                    type="button"
+                    className="secondary-btn public-room-join-btn"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.96 }}
+                    disabled={!name.trim() || isSubmitting}
+                    onClick={() => joinPublicRoom(r.code)}
+                    title={!name.trim() ? "Enter your name above first" : undefined}
+                  >
+                    Join
+                  </motion.button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }

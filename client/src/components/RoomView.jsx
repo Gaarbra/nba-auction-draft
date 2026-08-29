@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import CoinRow from "./CoinRow.jsx";
 import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
+import VoteKickBanner, { KickButton } from "./VoteKick.jsx";
+import Dropdown from "./Dropdown.jsx";
 
 const MAX_PLAYERS = 4;
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -9,6 +12,11 @@ const DIFFICULTIES = [
   { id: "easy", label: "Easy", hint: "Stars come up often" },
   { id: "normal", label: "Normal", hint: "A healthy mix" },
   { id: "hard", label: "Hard", hint: "True random draw" },
+];
+
+const BIDDING_MODES = [
+  { id: "open", label: "Open", hint: "First come, first served — anyone can raise or pass anytime" },
+  { id: "orderly", label: "Orderly", hint: "One at a time, in turn order — wait your turn to raise or pass" },
 ];
 
 function getHintText(playerCount, isHost, isLocal) {
@@ -28,7 +36,7 @@ function getHintText(playerCount, isHost, isLocal) {
     : "Waiting for the host to start (or for more players to join).";
 }
 
-export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDraft }) {
+export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, onStartDraft }) {
   const emptySlots = MAX_PLAYERS - room.players.length;
   const currentPlayer = room.players.find((p) => p.id === currentPlayerId);
   const isHost = Boolean(currentPlayer?.isHost);
@@ -36,6 +44,7 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
   const [eras, setEras] = useState([]);
   const [era, setEra] = useState("all");
   const [difficulty, setDifficulty] = useState("normal");
+  const [biddingMode, setBiddingMode] = useState("open");
   const [allowPositionSwaps, setAllowPositionSwaps] = useState(false);
 
   useEffect(() => {
@@ -63,7 +72,14 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
     <div className="room-card">
       <div className="room-header">
         <div>
-          <h2>{room.isLocal ? "Local Game" : "Room Code"}</h2>
+          <h2>
+            {room.isLocal ? "Local Game" : "Room Code"}
+            {!room.isLocal && (
+              <span className={`visibility-chip ${room.visibility}`}>
+                {room.visibility === "public" ? "Public" : "Private"}
+              </span>
+            )}
+          </h2>
           {room.isLocal ? (
             <span className="room-code local">Pass &amp; Play</span>
           ) : (
@@ -80,6 +96,8 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
         )}
       </div>
 
+      {!room.isLocal && <VoteKickBanner room={room} currentPlayerId={currentPlayerId} socket={socket} />}
+
       <h3>
         Players ({room.players.length}/{MAX_PLAYERS})
       </h3>
@@ -92,7 +110,10 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
               {p.id === currentPlayerId && <span className="you-badge">You</span>}
               <PlayerStatusBadge player={p} reconnectGraceMs={room.reconnectGraceMs} />
             </span>
-            <CoinRow budget={p.budget} />
+            <span className="player-list-right">
+              <CoinRow budget={p.budget} />
+              <KickButton room={room} currentPlayerId={currentPlayerId} socket={socket} targetPlayerId={p.id} />
+            </span>
           </li>
         ))}
         {!room.isLocal &&
@@ -107,17 +128,19 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
 
       {isHost && (
         <>
-          <label className="era-picker-label">
+          <div className="era-picker-label">
             Player pool for this draft
-            <select value={era} onChange={(e) => setEra(e.target.value)} className="era-select era-picker">
-              {eras.length === 0 && <option value="all">All Eras</option>}
-              {eras.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.label} ({e.count})
-                </option>
-              ))}
-            </select>
-          </label>
+            <Dropdown
+              className="era-picker"
+              value={era}
+              onChange={setEra}
+              options={
+                eras.length === 0
+                  ? [{ value: "all", label: "All Eras" }]
+                  : eras.map((e) => ({ value: e.id, label: `${e.label} (${e.count})` }))
+              }
+            />
+          </div>
           <label className="era-picker-label">
             Difficulty (how often you land a stronger player)
             <div className="difficulty-picker">
@@ -134,6 +157,22 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
               ))}
             </div>
           </label>
+          <label className="era-picker-label">
+            Bidding
+            <div className="difficulty-picker">
+              {BIDDING_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`difficulty-option ${biddingMode === m.id ? "active" : ""}`}
+                  onClick={() => setBiddingMode(m.id)}
+                  title={m.hint}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </label>
           <label className="swap-setting-label">
             <input
               type="checkbox"
@@ -142,13 +181,15 @@ export default function RoomView({ room, currentPlayerId, onLeaveRoom, onStartDr
             />
             Allow players to swap drafted players' positions later
           </label>
-          <button
+          <motion.button
             type="button"
-            onClick={() => onStartDraft(era, allowPositionSwaps, difficulty)}
+            onClick={() => onStartDraft(era, allowPositionSwaps, difficulty, biddingMode)}
             className="primary-btn start-btn"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
           >
             {room.players.length === 1 ? "Start Solo Draft" : "Start Draft"}
-          </button>
+          </motion.button>
         </>
       )}
 

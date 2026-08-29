@@ -19,7 +19,11 @@
  *    and a fragile target; we don't do that. Estimated from rebounds per
  *    game instead, calibrated so a strong rebounding season (~15 REB/g)
  *    lands around a DIR of 5 — comparable in scale to a modern
- *    plus-defender's STL/BLK-based score.
+ *    plus-defender's STL/BLK-based score. This is a single fixed calibration
+ *    point, not a dynamic fit against real per-era league averages (which
+ *    would need a league-average-stats data feed this app doesn't have) —
+ *    good enough to put pre-1974 defenders in the right ballpark, not a
+ *    rigorously era-adjusted rating.
  *
  * Both estimates are flagged (`usagePctEstimated`) or implicit (DIR
  * estimates only ever apply when scoring.js already detects untracked
@@ -90,6 +94,10 @@ export function toPlayerStatLine(rawStats) {
     tov: rawStats.tovPerGame ?? 0,
     stl: rawStats.stealsPerGame ?? null,
     blk: rawStats.blocksPerGame ?? null,
+    // Feeds the tracked-era DIR branch's small rebounding term (see
+    // REB_WEIGHT in scoring.js) — separate from this same reboundsPerGame
+    // value's other use just below, seeding the pre-1974 DWS estimate.
+    reb: rawStats.reboundsPerGame ?? 0,
     seasonDWS: estimateSeasonDWS(rawStats),
     gamesPlayed: rawStats.gamesPlayed,
     usagePct,

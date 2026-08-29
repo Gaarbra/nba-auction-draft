@@ -53,3 +53,77 @@ export async function fetchFullPlayerStats(playerId) {
     return null;
   }
 }
+
+const FULL_STATS_MAX_ATTEMPTS = 2;
+const FULL_STATS_RETRY_BASE_MS = 500;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * fetchFullPlayerStats with a couple of retries (exponential backoff + a
+ * little jitter) on failure, before falling back to null. Used for the
+ * end-of-draft results computation, where up to 20 of these run for one
+ * results page — a single flaky call there shouldn't need someone to
+ * manually recompute, and a plain null (no stats) fallback is a worse
+ * outcome than one quick retry when the first attempt was just transient
+ * (a timeout, a 502, stats.nba.com hiccuping).
+ */
+export async function fetchFullPlayerStatsWithRetry(playerId, attempts = FULL_STATS_MAX_ATTEMPTS) {
+  let lastResult = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    lastResult = await fetchFullPlayerStats(playerId);
+    if (lastResult) return lastResult;
+    if (attempt < attempts - 1) {
+      const backoffMs = FULL_STATS_RETRY_BASE_MS * 2 ** attempt + Math.random() * 200;
+      await sleep(backoffMs);
+    }
+  }
+  return lastResult;
+}
+
+/**
+ * Predicted auction price (in coins) from the trained price model — see
+ * stats-service/ml.py and scripts/train_price_model.py. Returns null on any
+ * failure (model not trained yet, player not found, timeout) — this is a
+ * "nice to have" hint for the bidding UI, never something the draft flow
+ * should block or error on.
+ */
+export async function fetchPredictedPrice(playerId, { era, difficulty, slot } = {}) {
+  try {
+    const params = new URLSearchParams({ id: String(playerId) });
+    if (era) params.set("era", era);
+    if (difficulty) params.set("difficulty", difficulty);
+    if (slot) params.set("slot", slot);
+
+    const res = await fetch(`${STATS_SERVICE_URL}/predict-price?${params}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.predictedPrice === "number" ? data.predictedPrice : null;
+  } catch (err) {
+    console.warn(`[statsClient] predict-price failed for id=${playerId}: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Up to `k` nearest players by per-game stat profile (see
+ * stats-service/ml.SimilarityIndex). Returns [] on any failure.
+ */
+export async function fetchSimilarPlayers(playerId, k = 5) {
+  try {
+    const params = new URLSearchParams({ id: String(playerId), k: String(k) });
+    const res = await fetch(`${STATS_SERVICE_URL}/similar-players?${params}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.similar) ? data.similar : [];
+  } catch (err) {
+    console.warn(`[statsClient] similar-players failed for id=${playerId}: ${err.message}`);
+    return [];
+  }
+}

@@ -3,7 +3,8 @@ import { useSocket } from "./hooks/useSocket.js";
 import RoomLobby from "./components/RoomLobby.jsx";
 import RoomView from "./components/RoomView.jsx";
 import DraftBoard from "./components/DraftBoard.jsx";
-import LocalPlayerSwitcher from "./components/LocalPlayerSwitcher.jsx";
+import Footer from "./components/Footer.jsx";
+import InteractiveBackground from "./components/InteractiveBackground.jsx";
 
 const SESSION_KEY = "nba-auction-draft:session";
 
@@ -19,6 +20,7 @@ const ERROR_MESSAGES = {
   ALREADY_STARTED: "The draft has already started.",
   INVALID_ERA: "That's not a valid era.",
   INVALID_DIFFICULTY: "That's not a valid difficulty.",
+  INVALID_BIDDING_MODE: "That's not a valid bidding mode.",
   NO_PLAYERS_LEFT: "No players left in this era's pool.",
   RECONNECT_FAILED: "Your previous session couldn't be resumed — please rejoin.",
   RATE_LIMITED: "Slow down a bit — try again in a few seconds.",
@@ -59,6 +61,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [kickedMessage, setKickedMessage] = useState("");
 
   const sessionRef = useRef(loadSession());
 
@@ -102,20 +105,36 @@ export default function App() {
       });
     }
 
+    // The server tells this socket directly when a votekick against it
+    // resolves — a normal room:update broadcast wouldn't be enough on its
+    // own, since the player would just silently vanish from the list with
+    // no explanation for why their own screen still shows the room.
+    function handleKicked() {
+      sessionRef.current = null;
+      clearSession();
+      setRoom(null);
+      setCurrentPlayerId(null);
+      setLocalPlayerIds(null);
+      setKickedMessage("You were removed from the room by a vote.");
+    }
+
     socket.on("room:update", handleRoomUpdate);
+    socket.on("room:kicked", handleKicked);
     socket.on("connect", attemptRejoin);
     if (socket.connected) attemptRejoin();
 
     return () => {
       socket.off("room:update", handleRoomUpdate);
+      socket.off("room:kicked", handleKicked);
       socket.off("connect", attemptRejoin);
     };
   }, [socketRef]);
 
-  function handleCreateRoom(name) {
+  function handleCreateRoom(name, visibility) {
     setError("");
+    setKickedMessage("");
     setIsSubmitting(true);
-    socketRef.current.emit("room:create", { name }, (response) => {
+    socketRef.current.emit("room:create", { name, visibility }, (response) => {
       setIsSubmitting(false);
       if (response.error) {
         setError(ERROR_MESSAGES[response.error] || "Could not create room.");
@@ -129,8 +148,23 @@ export default function App() {
     });
   }
 
+  function handleListPublicRooms(callback) {
+    // RoomLobby's own mount effect can fire before useSocket's effect has
+    // assigned socketRef.current (child effects run before the parent's on
+    // mount) — a real race, not just theoretical, so guard it rather than
+    // relying on ordering.
+    if (!socketRef.current) {
+      callback([]);
+      return;
+    }
+    socketRef.current.emit("rooms:list-public", {}, (response) => {
+      callback(response?.rooms || []);
+    });
+  }
+
   function handleJoinRoom(code, name) {
     setError("");
+    setKickedMessage("");
     setIsSubmitting(true);
     socketRef.current.emit("room:join", { code, name }, (response) => {
       setIsSubmitting(false);
@@ -148,6 +182,7 @@ export default function App() {
 
   function handleCreateLocalRoom(names) {
     setError("");
+    setKickedMessage("");
     setIsSubmitting(true);
     socketRef.current.emit("room:create-local", { names }, (response) => {
       setIsSubmitting(false);
@@ -172,8 +207,9 @@ export default function App() {
     setLocalPlayerIds(null);
   }
 
-  function handleStartDraft(era, allowPositionSwaps, difficulty) {
-    socketRef.current.emit("room:start", { era, allowPositionSwaps, difficulty, playerId: currentPlayerId }, (response) => {
+  function handleStartDraft(era, allowPositionSwaps, difficulty, biddingMode) {
+    const payload = { era, allowPositionSwaps, difficulty, biddingMode, playerId: currentPlayerId };
+    socketRef.current.emit("room:start", payload, (response) => {
       if (response.error) {
         setError(ERROR_MESSAGES[response.error] || "Could not start draft.");
       }
@@ -199,6 +235,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <InteractiveBackground />
       <div className={`connection-badge ${connected ? "online" : "offline"}`}>
         {connected ? "Connected" : "Connecting…"}
       </div>
@@ -209,13 +246,11 @@ export default function App() {
         </div>
       ) : room ? (
         <div className="room-with-switcher">
-          {localPlayerIds && (
-            <LocalPlayerSwitcher room={room} currentPlayerId={currentPlayerId} onSwitch={setCurrentPlayerId} />
-          )}
           {room.status === "waiting" ? (
             <RoomView
               room={room}
               currentPlayerId={currentPlayerId}
+              socket={socketRef.current}
               onLeaveRoom={handleLeaveRoom}
               onStartDraft={handleStartDraft}
             />
@@ -229,13 +264,18 @@ export default function App() {
           )}
         </div>
       ) : (
-        <RoomLobby
-          onCreateRoom={handleCreateRoom}
-          onJoinRoom={handleJoinRoom}
-          onCreateLocalRoom={handleCreateLocalRoom}
-          error={error}
-          isSubmitting={isSubmitting}
-        />
+        <>
+          <RoomLobby
+            onCreateRoom={handleCreateRoom}
+            onJoinRoom={handleJoinRoom}
+            onCreateLocalRoom={handleCreateLocalRoom}
+            onListPublicRooms={handleListPublicRooms}
+            connected={connected}
+            error={error || kickedMessage}
+            isSubmitting={isSubmitting}
+          />
+          <Footer />
+        </>
       )}
     </div>
   );

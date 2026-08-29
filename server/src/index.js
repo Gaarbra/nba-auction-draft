@@ -8,6 +8,7 @@ import { getPlayers, getCacheInfo } from "./services/playerCache.js";
 import { filterPlayersByEra, summarizeEras } from "./services/era.js";
 import { httpRateLimit } from "./middleware/rateLimit.js";
 import { initSchema } from "./services/db.js";
+import { fetchPredictedPrice, fetchSimilarPlayers } from "./services/statsClient.js";
 
 initSchema(); // no-op if DATABASE_URL isn't set — see db.js
 
@@ -79,6 +80,24 @@ app.get("/api/players/eras", async (req, res) => {
 
 app.get("/api/players/cache-info", async (req, res) => {
   res.json(await getCacheInfo());
+});
+
+// Both ML features: never a hard error for the client to handle — a missing
+// model or a stats-service hiccup just means "no prediction/no similar
+// players right now", not a broken page. See stats-service/ml.py.
+app.get("/api/players/:id/predicted-price", async (req, res) => {
+  const predictedPrice = await fetchPredictedPrice(req.params.id, {
+    era: req.query.era,
+    difficulty: req.query.difficulty,
+    slot: req.query.slot,
+  });
+  res.json({ predictedPrice });
+});
+
+app.get("/api/players/:id/similar", async (req, res) => {
+  const k = Math.min(10, Math.max(1, Number(req.query.k) || 5));
+  const similar = await fetchSimilarPlayers(req.params.id, k);
+  res.json({ similar });
 });
 
 app.post("/api/players/sync", async (req, res) => {

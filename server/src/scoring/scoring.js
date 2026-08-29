@@ -10,22 +10,40 @@
  * Formulas (as specified):
  *   TS%  = PTS / (2 * (FGA + 0.44 * FTA))
  *   Op   = (PTS * TS%) + (AST * 1.5) - (TOV * 2.0)
- *   DIR  = (STL * 2.5) + (BLK * 2.0)                    [stats tracked]
+ *   DIR  = (STL * 2.5) + (BLK * 2.0) + (REB * 0.3)      [stats tracked]
  *        = (Season DWS / Games Played) * 100            [stats untracked, pre-1974]
  *   Ms   = 1.10 if sum(USG%) <= 105
  *        = 1.00 if 105 < sum(USG%) <= 125
  *        = 0.85 if sum(USG%) > 125
  *   Final Team Score = sum(Op + DIR across 5 starters) * Ms
+ *
+ * Every raw counting stat here (PTS, AST, TOV, STL, BLK, REB) is a PER-GAME
+ * average, not a season total — mixing the two would put Op and DIR on
+ * wildly different scales (season PTS in the hundreds vs. per-game AST/TOV
+ * in the single digits) and make their sum meaningless. statsAdapter.js is
+ * the one place raw stats get shaped into this per-game form; scoring.js
+ * itself never touches a season total.
  */
 
 /** @typedef {{
  *   pts: number, fga: number, fta: number, ast: number, tov: number,
- *   stl: number | null, blk: number | null,
+ *   stl: number | null, blk: number | null, reb?: number,
  *   seasonDWS?: number | null, gamesPlayed?: number | null,
  *   usagePct?: number
  * }} PlayerStatLine */
 
 const ROSTER_SIZE = 5;
+
+// Weight for the tracked-era DIR rebounding term — small on purpose. A
+// dominant rebounder (~15 REB/g) contributes ~4.5, putting it in the same
+// rough range as the STL/BLK terms for a plus defender (1-6ish) rather than
+// swamping them; this only closes the "rebounding counts for nothing" gap,
+// it isn't meant to make DIR primarily about boards. Not applied in the
+// untracked (pre-1974) branch below — that branch's DWS estimate is already
+// itself derived from rebounds/game (see statsAdapter.js's
+// estimateSeasonDWS), so adding a second REB term there would double-count
+// the same signal.
+const REB_WEIGHT = 0.3;
 
 /**
  * TS% with a guarded zero-division: a player who never attempted a shot
@@ -57,13 +75,13 @@ export function offenseScore({ pts, fga, fta, ast, tov }) {
  * exist for this era". This function keys off that null distinction rather
  * than sniffing for a literal 0, which is a more faithful (and safer)
  * implementation of "untracked" than the literal value comparison.
- * @param {{ stl: number | null, blk: number | null, seasonDWS?: number | null, gamesPlayed?: number | null }} stats
+ * @param {{ stl: number | null, blk: number | null, reb?: number, seasonDWS?: number | null, gamesPlayed?: number | null }} stats
  * @returns {number}
  */
-export function defensiveImpactRating({ stl, blk, seasonDWS, gamesPlayed }) {
+export function defensiveImpactRating({ stl, blk, reb, seasonDWS, gamesPlayed }) {
   const tracked = stl != null && blk != null;
   if (tracked) {
-    return stl * 2.5 + blk * 2.0;
+    return stl * 2.5 + blk * 2.0 + (reb ?? 0) * REB_WEIGHT;
   }
 
   if (!gamesPlayed) return 0;
