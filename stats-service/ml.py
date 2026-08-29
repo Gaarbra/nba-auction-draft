@@ -18,7 +18,14 @@ import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-PRICE_MODEL_PATH = os.path.join(DATA_DIR, "price_model.joblib")
+# Deliberately NOT under data/ (that whole directory is gitignored — it's
+# just ephemeral caches, fine to lose). This is a real trained artifact
+# that needs to survive a redeploy: Render's free web services have an
+# ephemeral filesystem, so anything written to local disk at runtime is
+# gone on the next restart. Committing the model file to git and shipping
+# it with the code is what actually persists it there.
+MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
+PRICE_MODEL_PATH = os.path.join(MODELS_DIR, "price_model.joblib")
 
 # --- price model feature schema -------------------------------------------
 #
