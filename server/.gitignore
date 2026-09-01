@@ -1,3 +1,11 @@
 node_modules/
 .env
-data/
+
+# data/ is ignored by default (it's mostly a runtime cache), but the two
+# files below are committed on purpose: they're what let a fresh deploy
+# (Render's free tier especially — ephemeral filesystem, and stats.nba.com
+# is known to block/throttle cloud IPs) start with a warm player pool
+# instead of needing a live stats.nba.com fetch just to run at all.
+data/*
+!data/players.json
+!data/notablePlayers.json

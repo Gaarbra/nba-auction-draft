@@ -65,10 +65,14 @@ export async function getNotablePlayerIds() {
   if (isFresh(memoryCache)) return memoryCache.ids;
 
   if (!memoryCache) {
+    // Same reasoning as playerCache.js: keep the disk cache in memory even
+    // when stale, so a failed refresh (stats-service down, or stats.nba.com
+    // unreachable from wherever this is hosted) has real data to fall back
+    // to instead of collapsing straight to an empty list.
     const fromDisk = await readCacheFile().catch(() => null);
-    if (isFresh(fromDisk)) {
+    if (fromDisk) {
       memoryCache = fromDisk;
-      return memoryCache.ids;
+      if (isFresh(fromDisk)) return memoryCache.ids;
     }
   }
 

@@ -2,5 +2,13 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-data/
 .env
+
+# data/ is ignored by default (mostly a runtime cache), except the two files
+# below — committed on purpose so a fresh deploy starts with every player
+# already fetched this project has ever looked up, instead of needing
+# stats.nba.com to be reachable (and unblocked/unthrottled) from wherever
+# it's hosted just to show real stats for anyone.
+data/*
+!data/statsCache.json
+!data/usageCache.json

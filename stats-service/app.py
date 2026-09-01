@@ -210,6 +210,15 @@ def load_stats_cache_from_disk():
         _cache = {}
 
 
+# Module level, not just under `if __name__ == "__main__"` — this used to
+# only run for local `python app.py` dev, which meant gunicorn (production,
+# see render.yaml) never loaded the committed statsCache.json at all and
+# started every worker with an empty cache regardless of what shipped with
+# the code. Safe to call per-worker: it's just reading a file into that
+# worker's own memory, nothing to coordinate across workers.
+load_stats_cache_from_disk()
+
+
 def save_stats_cache_to_disk():
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -250,6 +259,11 @@ def load_usage_cache_from_disk():
     except (ValueError, OSError) as e:
         print(f"[usage cache] failed to load from disk, starting empty: {e}")
         _usage_cache = {}
+
+
+# Same reasoning as load_stats_cache_from_disk() above — module level so
+# gunicorn workers load the committed usageCache.json too, not just local dev.
+load_usage_cache_from_disk()
 
 
 def save_usage_cache_to_disk():
@@ -684,9 +698,6 @@ def get_full_stats():
 
 
 if __name__ == "__main__":
-    load_stats_cache_from_disk()
-    load_usage_cache_from_disk()
-
     # Runs the notable-pool warm-up once, in the background, only under
     # local dev (`python app.py`) — deliberately NOT at module level, since
     # production runs this file under gunicorn with multiple worker

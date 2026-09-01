@@ -47,18 +47,40 @@ export async function getPlayers({ forceRefresh = false, onProgress } = {}) {
     return memoryCache.players;
   }
 
-  if (!forceRefresh && !memoryCache) {
+  if (!memoryCache) {
+    // Read the disk cache even if it's stale (past CACHE_TTL_MS) — not just
+    // when fresh. A stale-but-real player pool is what refreshCache() below
+    // falls back to if stats.nba.com can't be reached (e.g. blocked/
+    // rate-limited from a cloud host's IP, a real risk this app has hit
+    // before from a residential connection too). Keeping it in memoryCache
+    // now, before we know whether the refresh will succeed, is what makes
+    // that fallback possible.
     const fromDisk = await readCacheFile();
-    if (isFresh(fromDisk)) {
+    if (fromDisk) {
       memoryCache = fromDisk;
-      return memoryCache.players;
+      if (!forceRefresh && isFresh(fromDisk)) {
+        return memoryCache.players;
+      }
     }
   }
 
   if (!inFlightRefresh) {
-    inFlightRefresh = refreshCache({ onProgress }).finally(() => {
-      inFlightRefresh = null;
-    });
+    inFlightRefresh = refreshCache({ onProgress })
+      .catch((err) => {
+        if (memoryCache) {
+          console.warn(
+            `[playerCache] refresh failed, serving stale cache from ${new Date(memoryCache.fetchedAt).toISOString()}: ${err.message}`
+          );
+          return memoryCache;
+        }
+        // Nothing to fall back to (first-ever run, no disk cache, and the
+        // very first fetch failed) — there's genuinely no player pool to
+        // serve, so this has to propagate.
+        throw err;
+      })
+      .finally(() => {
+        inFlightRefresh = null;
+      });
   }
 
   const entry = await inFlightRefresh;
