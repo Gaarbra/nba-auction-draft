@@ -24,6 +24,14 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --workers 2 --timeout 120 --bind 0.0.0.0:$PORT app:app
     envVars:
+      # Pinned explicitly rather than left to Render's default — that
+      # default has drifted to Python versions newer than psycopg[binary]==
+      # 3.2.3 has prebuilt wheels for (the actual cause of a "Requires-
+      # Python" build failure otherwise), and now that scikit-learn/pandas/
+      # scipy are also in requirements.txt, a well-supported, stable version
+      # matters more than it used to.
+      - key: PYTHON_VERSION
+        value: 3.12.7
       - key: DATABASE_URL
         fromDatabase:
           name: hoop-bids-db
