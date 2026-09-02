@@ -1,25 +1,23 @@
 name: Refresh player data
 
-# Periodically re-fetches the player pool, notable-players leaderboard, and
-# per-player career stats from stats.nba.com and commits the result — see
+# Fetches the player pool, notable-players leaderboard, and per-player stats
+# from stats.nba.com and commits the result — see
 # stats-service/scripts/refresh_all.py for the actual logic and why this
 # exists at all: Render's own outbound IP is confirmed blocked by
-# stats.nba.com (every live lookup from there fails outright), so production
-# can never refresh this data on its own. It has to come from somewhere else
-# and get shipped via a normal commit + push, which then triggers Render's
-# usual auto-deploy.
+# stats.nba.com, so production can never refresh its own data. It has to
+# come from somewhere else and get shipped via a normal commit + push, which
+# then triggers Render's usual auto-deploy.
 #
-# Whether this actually works depends on GitHub-hosted runners not *also*
-# being blocked — stats.nba.com is known to block a lot of datacenter/cloud
-# IP ranges broadly, not just Render's specifically. Untested until this
-# runs for real; if it turns out blocked too, this becomes a no-op (every
-# fetch fails, nothing changes, nothing gets committed) rather than
-# something actively harmful, so it's safe to leave enabled either way.
-
+# NOT scheduled — confirmed by an actual run (2026-09-01) that GitHub-hosted
+# runners are blocked too (same ReadTimeoutError signature as Render, not a
+# quick rejection — stats.nba.com blackholes a lot of datacenter/cloud IP
+# ranges, this one included). A cron trigger here would just email a
+# guaranteed failure notice every run for no benefit. Kept as
+# workflow_dispatch only, for the day this needs re-testing (stats.nba.com's
+# block list isn't static) or gets pointed at a self-hosted runner on a
+# machine that can actually reach it — the one thing proven to work so far.
 on:
-  schedule:
-    - cron: "0 9 * * 1" # Mondays, 09:00 UTC
-  workflow_dispatch: {} # lets you trigger a refresh on demand from the Actions tab
+  workflow_dispatch: {}
 
 permissions:
   contents: write
