@@ -8,7 +8,7 @@ import { getPlayers, getCacheInfo } from "./services/playerCache.js";
 import { filterPlayersByEra, summarizeEras } from "./services/era.js";
 import { httpRateLimit } from "./middleware/rateLimit.js";
 import { initSchema } from "./services/db.js";
-import { fetchPredictedPrice, fetchSimilarPlayers } from "./services/statsClient.js";
+import { fetchPredictedPrice, fetchSimilarPlayers, fetchPhotoUrl } from "./services/statsClient.js";
 
 initSchema(); // no-op if DATABASE_URL isn't set — see db.js
 
@@ -98,6 +98,13 @@ app.get("/api/players/:id/similar", async (req, res) => {
   const k = Math.min(10, Math.max(1, Number(req.query.k) || 5));
   const similar = await fetchSimilarPlayers(req.params.id, k);
   res.json({ similar });
+});
+
+// Client-side retry target for a nomination that had no photo yet at
+// reveal time — see PlayerHeadshot.jsx.
+app.get("/api/players/:id/photo", async (req, res) => {
+  const photoUrl = await fetchPhotoUrl(req.params.id);
+  res.json({ photoUrl });
 });
 
 app.post("/api/players/sync", async (req, res) => {

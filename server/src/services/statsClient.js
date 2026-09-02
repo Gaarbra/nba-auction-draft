@@ -141,3 +141,24 @@ export async function fetchSimilarPlayers(playerId, k = 5) {
     return [];
   }
 }
+
+/**
+ * Standalone from fetchPlayerStats on purpose — this is only ever called
+ * as a client-side retry a couple seconds after a nomination reveal that
+ * had no photo yet (see PlayerHeadshot.jsx), and doesn't need a full
+ * career-stats re-fetch just to ask "did the fallback resolve by now?".
+ * Returns null on any failure, same as a genuine "nothing found."
+ */
+export async function fetchPhotoUrl(playerId) {
+  try {
+    const res = await fetch(`${STATS_SERVICE_URL}/photo-url?id=${encodeURIComponent(playerId)}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.photoUrl === "string" ? data.photoUrl : null;
+  } catch (err) {
+    console.warn(`[statsClient] photo-url failed for id=${playerId}: ${err.message}`);
+    return null;
+  }
+}

@@ -75,7 +75,7 @@ export default function PriceTicker({ active }) {
             className="price-ticker-card"
             style={{ animationDuration: `${c.duration}s`, animationDelay: `${c.delay}s` }}
           >
-            <PlayerHeadshot nbaPlayerId={c.id} alt={c.fullName} className="price-ticker-photo" />
+            <PlayerHeadshot nbaPlayerId={c.id} alt={c.fullName} className="price-ticker-photo" allowRetry={false} />
             <span className="price-ticker-price">${c.price}</span>
           </div>
         ))}

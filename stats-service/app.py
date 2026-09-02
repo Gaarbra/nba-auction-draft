@@ -889,6 +889,24 @@ def get_similar_players():
     return jsonify({"player": {"id": player["id"], "fullName": player["full_name"]}, "similar": results})
 
 
+@app.get("/photo-url")
+def get_photo_url():
+    """Standalone from /stats on purpose: the client's retry for a player
+    whose first-ever nomination resolved with no photo yet (see
+    PlayerHeadshot.jsx) just wants this one answer a couple seconds later,
+    not a full re-fetch of career stats too. Same instant-if-cached,
+    resolve-in-background-if-not behavior as get_fallback_photo_url used
+    from /stats — by the time this retry actually fires client-side, the
+    background resolve kicked off by the original nomination has usually
+    already finished."""
+    player = resolve_player(request)
+    if not player:
+        return jsonify({"error": "PLAYER_NOT_FOUND"}), 404
+
+    photo_url = get_fallback_photo_url(player["id"], player["full_name"])
+    return jsonify({"player": {"id": player["id"], "fullName": player["full_name"]}, "photoUrl": photo_url})
+
+
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
