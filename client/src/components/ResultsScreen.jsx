@@ -157,7 +157,7 @@ export default function ResultsScreen({ room, currentPlayerId, socket, onLeaveRo
             <div className="results-roster">
               {team.roster.map((p) => (
                 <div key={p.slot} className="results-player-row">
-                  <PlayerHeadshot nbaPlayerId={p.nbaPlayerId} alt={p.fullName || p.slot} className="results-headshot" />
+                  <PlayerHeadshot nbaPlayerId={p.nbaPlayerId} photoUrl={p.photoUrl} alt={p.fullName || p.slot} className="results-headshot" />
                   <div className="results-player-info">
                     <span className="slot-label">{p.slot}</span>
                     <PlayerNameLink

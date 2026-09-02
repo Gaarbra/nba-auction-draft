@@ -344,6 +344,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
             <div className="nominated-player-header">
               <PlayerHeadshot
                 nbaPlayerId={nomination.player.nbaPlayerId}
+                photoUrl={nomination.player.stats?.photoUrl}
                 alt={nomination.player.fullName}
                 className="player-headshot"
               />

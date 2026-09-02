@@ -24,6 +24,7 @@ from nba_api.stats.endpoints import (
 
 import db
 import ml
+import photos
 
 app = Flask(__name__)
 
@@ -86,6 +87,7 @@ NOTABLE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # all-time leaderboards barely mov
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 STATS_CACHE_FILE = os.path.join(DATA_DIR, "statsCache.json")
 USAGE_CACHE_FILE = os.path.join(DATA_DIR, "usageCache.json")
+PHOTO_CACHE_FILE = os.path.join(DATA_DIR, "photoCache.json")
 
 # Render sets this env var to "true" for every service automatically. Used
 # to skip live stats.nba.com calls we've confirmed always fail from here
@@ -103,6 +105,7 @@ ON_RENDER = bool(os.environ.get("RENDER"))
 _cache = {}
 _usage_cache = {}
 _bio_cache = {}
+_photo_cache = {}
 _pool_cache = {"players": None, "fetchedAt": 0}
 _notable_cache = {"ids": None, "fetchedAt": 0}
 _warmup_status = {"running": False, "processed": 0, "total": 0, "warmed": 0, "startedAt": None, "finishedAt": None}
@@ -258,6 +261,36 @@ def save_stats_cache_to_disk():
             json.dump(_cache, f)
     except OSError as e:
         print(f"[stats cache] failed to save to disk: {e}")
+
+
+def load_photo_cache_from_disk():
+    """Per-player fallback photo URLs (see photos.py) for players NBA's own
+    CDN has no headshot for — {player_id: photoUrl or null}. Built offline
+    (scripts/warm_photos.py, run locally like the other warm scripts) and
+    shipped the same way as statsCache.json; never looked up live."""
+    global _photo_cache
+    try:
+        with open(PHOTO_CACHE_FILE, "r") as f:
+            raw = json.load(f)
+        _photo_cache = {int(k): v for k, v in raw.items()}
+        print(f"[photo cache] loaded {len(_photo_cache)} entries from disk")
+    except FileNotFoundError:
+        _photo_cache = {}
+    except (ValueError, OSError) as e:
+        print(f"[photo cache] failed to load from disk, starting empty: {e}")
+        _photo_cache = {}
+
+
+load_photo_cache_from_disk()
+
+
+def save_photo_cache_to_disk():
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(PHOTO_CACHE_FILE, "w") as f:
+            json.dump(_photo_cache, f)
+    except OSError as e:
+        print(f"[photo cache] failed to save to disk: {e}")
 
 
 def _is_stats_fresh(player_id):
@@ -865,6 +898,15 @@ def get_stats():
     if stats is None:
         return jsonify({"error": "NO_STATS_AVAILABLE"}), 404
 
+    # Only set when NBA's own CDN has no real photo for this player (see
+    # photos.py) — a plain lookup into the already-warmed cache, never a
+    # live Wikipedia call on this request path. None/missing here just
+    # means "NBA has one" (the client's default path) or "nothing found
+    # anywhere," both of which the client already falls back on its own.
+    fallback_photo_url = _photo_cache.get(player["id"])
+    if fallback_photo_url:
+        stats = {**stats, "photoUrl": fallback_photo_url}
+
     return jsonify({"player": {"id": player["id"], "fullName": player["full_name"]}, "stats": stats})
 
 
@@ -897,10 +939,15 @@ def get_full_stats():
             print(f"[usage lookup failed] player_id={player['id']} ({e.__class__.__name__}: {e})")
             usage_pct = None
 
+    fallback_photo_url = _photo_cache.get(player["id"])
+    merged_stats = {**stats, "usagePct": usage_pct}
+    if fallback_photo_url:
+        merged_stats["photoUrl"] = fallback_photo_url
+
     return jsonify(
         {
             "player": {"id": player["id"], "fullName": player["full_name"]},
-            "stats": {**stats, "usagePct": usage_pct},
+            "stats": merged_stats,
         }
     )
 

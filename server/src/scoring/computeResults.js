@@ -42,9 +42,9 @@ export async function computeDraftResults(room) {
     }
   }
 
-  const statLines = await mapWithConcurrency(slots, STATS_FETCH_CONCURRENCY, async (slot) => {
+  const fetched = await mapWithConcurrency(slots, STATS_FETCH_CONCURRENCY, async (slot) => {
     const rawStats = slot.drafted ? await fetchFullPlayerStatsWithRetry(slot.drafted.id) : null;
-    return toPlayerStatLine(rawStats || { gamesPlayed: 0, usagePct: null });
+    return { statLine: toPlayerStatLine(rawStats || { gamesPlayed: 0, usagePct: null }), photoUrl: rawStats?.photoUrl ?? null };
   });
 
   const rosterByTeam = new Map();
@@ -54,12 +54,17 @@ export async function computeDraftResults(room) {
     displayByTeam.set(player.id, []);
   }
   slots.forEach((slot, i) => {
-    const statLine = statLines[i];
+    const { statLine, photoUrl } = fetched[i];
     rosterByTeam.get(slot.playerId).push(statLine);
     displayByTeam.get(slot.playerId).push({
       slot: slot.pos,
       fullName: slot.drafted?.fullName ?? null,
       nbaPlayerId: slot.drafted?.nbaPlayerId ?? null,
+      // NBA's own CDN photo is constructed client-side from nbaPlayerId
+      // directly and needs no server involvement — this is only ever
+      // set as a fallback for players confirmed to have no photo there
+      // (see stats-service/photos.py).
+      photoUrl,
       realPosition: slot.drafted?.position ?? null,
       acquiredFor: slot.drafted?.acquiredFor ?? null,
       usagePctEstimated: statLine.usagePctEstimated,

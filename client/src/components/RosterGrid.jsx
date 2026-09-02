@@ -122,6 +122,7 @@ export default function RosterGrid({ room, currentPlayerId, socket, nominatingId
                           >
                             <PlayerHeadshot
                               nbaPlayerId={occupant.nbaPlayerId}
+                              photoUrl={occupant.stats?.photoUrl}
                               alt={occupant.fullName}
                               className="roster-slot-headshot"
                             />
