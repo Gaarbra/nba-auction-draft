@@ -78,6 +78,7 @@ def warm_missing_stats(all_ids):
     start = time.time()
     consecutive_failures = 0
     fetched = 0
+    no_stats = 0
     failed = 0
 
     for i, player_id in enumerate(to_fetch, 1):
@@ -90,19 +91,22 @@ def warm_missing_stats(all_ids):
 
         try:
             result = stats_app.fetch_stats_for_player(player_id)
+            # A clean return -- whether it found real stats or confirmed
+            # there are none to find -- isn't a failure, it's cached either
+            # way; only an actual exception (network error, timeout, rate
+            # limit) below counts toward the cooldown.
             if result:
                 fetched += 1
-                consecutive_failures = 0
             else:
-                failed += 1
-                consecutive_failures += 1
+                no_stats += 1
+            consecutive_failures = 0
         except Exception as e:
             failed += 1
             consecutive_failures += 1
             print(f"  [{i}/{len(to_fetch)}] id={player_id} failed: {e.__class__.__name__}: {e}")
 
         if i % SAVE_EVERY == 0:
-            print(f"  [{i}/{len(to_fetch)}] fetched={fetched} failed={failed}")
+            print(f"  [{i}/{len(to_fetch)}] fetched={fetched} no_stats={no_stats} failed={failed}")
 
         if consecutive_failures >= FAILURE_THRESHOLD:
             print(f"  {consecutive_failures} failures in a row, cooling down {COOLDOWN_SECONDS}s...")
@@ -111,7 +115,7 @@ def warm_missing_stats(all_ids):
 
         time.sleep(random.uniform(*DELAY_RANGE))
 
-    print(f"Stats warm-up done. fetched={fetched} failed={failed}. Cache now {len(stats_app._cache)} total.")
+    print(f"Stats warm-up done. fetched={fetched} no_stats={no_stats} failed={failed}. Cache now {len(stats_app._cache)} total.")
 
 
 def main():

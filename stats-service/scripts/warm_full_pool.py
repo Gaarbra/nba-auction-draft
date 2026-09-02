@@ -54,24 +54,30 @@ def main():
 
     consecutive_failures = 0
     fetched = 0
+    no_stats = 0
     failed = 0
 
     for i, player_id in enumerate(to_fetch, 1):
         try:
             result = stats_app.fetch_stats_for_player(player_id)
+            # A clean return -- whether it found real stats or confirmed
+            # there are none to find (see app.py's KeyError handling in
+            # _fetch_and_cache_stats) -- isn't a failure. It's cached
+            # either way, so it resets the streak just like a real fetch
+            # does; only an actual exception (network error, timeout,
+            # rate limit) below counts toward the cooldown.
             if result:
                 fetched += 1
-                consecutive_failures = 0
             else:
-                failed += 1
-                consecutive_failures += 1
+                no_stats += 1
+            consecutive_failures = 0
         except Exception as e:
             failed += 1
             consecutive_failures += 1
             print(f"  [{i}/{len(to_fetch)}] id={player_id} failed: {e.__class__.__name__}: {e}")
 
         if i % SAVE_EVERY == 0:
-            print(f"  [{i}/{len(to_fetch)}] fetched={fetched} failed={failed} (cache now {len(stats_app._cache)} total)")
+            print(f"  [{i}/{len(to_fetch)}] fetched={fetched} no_stats={no_stats} failed={failed} (cache now {len(stats_app._cache)} total)")
 
         if consecutive_failures >= FAILURE_THRESHOLD:
             print(f"  {consecutive_failures} failures in a row, cooling down {COOLDOWN_SECONDS}s...")
@@ -80,7 +86,7 @@ def main():
 
         time.sleep(random.uniform(*DELAY_RANGE))
 
-    print(f"Done. fetched={fetched} failed={failed}. Cache now {len(stats_app._cache)} total players.")
+    print(f"Done. fetched={fetched} no_stats={no_stats} failed={failed}. Cache now {len(stats_app._cache)} total players.")
 
 
 if __name__ == "__main__":
