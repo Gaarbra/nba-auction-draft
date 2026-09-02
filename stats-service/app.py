@@ -589,10 +589,98 @@ def fetch_notable_player_ids():
         for row in result_set["rowSet"]:
             ids.add(int(row[id_index]))
 
-    ids = list(ids)
+    ids = _topup_underrepresented_positions(ids)
     _notable_cache["ids"] = ids
     _notable_cache["fetchedAt"] = time.time()
     return ids
+
+
+def _broad_position(position):
+    """Collapses a possibly-hyphenated position ('F-C', 'G-F') down to its
+    primary (first-listed) component — NBA's own convention lists the
+    primary position first. Only used for the position-parity check below,
+    not anywhere stats/UI-facing (those keep the full hyphenated detail)."""
+    if not position:
+        return None
+    return position.split("-")[0]
+
+
+# Minimum career games for a top-up candidate — keeps a tiny, fluky
+# per-game sample (a handful of good garbage-time outings) from qualifying
+# just because the sample size is too small for the composite score to
+# mean anything.
+NOTABLE_TOPUP_MIN_GAMES = 100
+# Hard ceiling on how many extra players a single position can gain from
+# the top-up pass, so a large measured gap can't balloon the notable pool
+# unpredictably in one run.
+NOTABLE_TOPUP_MAX_PER_POSITION = 150
+
+
+def _topup_underrepresented_positions(ids):
+    """The base notable pool (5 global per-game leaderboards — points,
+    rebounds, assists, steals, blocks) systematically underrepresents
+    Forwards: centers dominate REB/BLK outright and guards dominate AST/STL
+    outright, so they clear a "top 500 in one category" bar easily, while
+    forwards are often good across several categories without leading any
+    single one. Measured, not assumed: 18.9% of cached forwards qualified
+    for the base pool vs 30.8% of centers, as of this function being added.
+
+    Tops up any broad position (G/F/C) whose notable RATE falls below the
+    pool-wide average, ranked by combined per-game production (PTS+REB+AST)
+    rather than requiring a #1 finish in any single category — that
+    single-category bar is exactly what shuts out well-rounded-but-not-
+    specialist players, which skews toward forwards specifically.
+
+    Uses only per-game stats + position already sitting in `_cache` — no
+    extra stats.nba.com calls — so this is most effective once a large
+    chunk of the pool is already warmed, and degrades gracefully (adds
+    little/nothing) on a colder cache rather than erroring."""
+    ids = set(ids)
+    candidates_by_position = {}
+    total_by_position = {}
+    notable_by_position = {}
+
+    for pid_str, entry in _cache.items():
+        stats = entry.get("stats")
+        if not stats:
+            continue
+        pid = int(pid_str)
+        position = _broad_position(stats.get("position"))
+        if not position:
+            continue
+
+        total_by_position[position] = total_by_position.get(position, 0) + 1
+        if pid in ids:
+            notable_by_position[position] = notable_by_position.get(position, 0) + 1
+            continue
+
+        if (stats.get("gamesPlayed") or 0) < NOTABLE_TOPUP_MIN_GAMES:
+            continue
+        score = (stats.get("pointsPerGame") or 0) + (stats.get("reboundsPerGame") or 0) + (stats.get("assistsPerGame") or 0)
+        candidates_by_position.setdefault(position, []).append((pid, score))
+
+    total_cached = sum(total_by_position.values())
+    total_notable = sum(notable_by_position.values())
+    if not total_cached or not total_notable:
+        return list(ids)
+    overall_rate = total_notable / total_cached
+
+    added = 0
+    for position, total in total_by_position.items():
+        current_notable = notable_by_position.get(position, 0)
+        if total and current_notable / total >= overall_rate:
+            continue
+        gap = min(int(overall_rate * total) - current_notable, NOTABLE_TOPUP_MAX_PER_POSITION)
+        if gap <= 0:
+            continue
+        ranked = sorted(candidates_by_position.get(position, []), key=lambda t: t[1], reverse=True)
+        for pid, _score in ranked[:gap]:
+            ids.add(pid)
+            added += 1
+
+    if added:
+        print(f"[notable pool] topped up {added} players from underrepresented positions")
+    return list(ids)
 
 
 # Pacing for the background warm-up job below. stats.nba.com's rate limiting
