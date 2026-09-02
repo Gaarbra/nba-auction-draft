@@ -14,10 +14,12 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
  * matching how every other stats-dependent panel in this app degrades. */
 export default function PlayerInsights({ nbaPlayerId, era, difficulty }) {
   const [predictedPrice, setPredictedPrice] = useState(null);
+  const [explanation, setExplanation] = useState([]);
   const [similar, setSimilar] = useState([]);
 
   useEffect(() => {
     setPredictedPrice(null);
+    setExplanation([]);
     setSimilar([]);
     if (!nbaPlayerId) return undefined;
 
@@ -29,7 +31,9 @@ export default function PlayerInsights({ nbaPlayerId, era, difficulty }) {
     fetch(`${SERVER_URL}/api/players/${nbaPlayerId}/predicted-price?${params}`)
       .then((res) => res.json())
       .then((data) => {
-        if (!cancelled && typeof data.predictedPrice === "number") setPredictedPrice(data.predictedPrice);
+        if (cancelled) return;
+        if (typeof data.predictedPrice === "number") setPredictedPrice(data.predictedPrice);
+        if (Array.isArray(data.explanation)) setExplanation(data.explanation);
       })
       .catch(() => {});
 
@@ -55,9 +59,26 @@ export default function PlayerInsights({ nbaPlayerId, era, difficulty }) {
       transition={{ duration: 0.2 }}
     >
       {predictedPrice !== null && (
-        <p className="predicted-price" title="Predicted from real past-draft prices — a rough guide, not a rule.">
+        // tabIndex makes the hover breakdown reachable by keyboard too
+        // (:focus-within in CSS) — cursor:help alone only signals mouse
+        // users that there's more here.
+        <p className="predicted-price" tabIndex={0}>
           <span className="predicted-price-label">Suggested value</span>
           <span className="predicted-price-value">~{predictedPrice.toFixed(1)} coins</span>
+          {explanation.length > 0 && (
+            <span className="predicted-price-tooltip" role="tooltip">
+              <span className="predicted-price-tooltip-title">Mainly based on</span>
+              {explanation.map((item) => (
+                <span className="predicted-price-tooltip-row" key={item.label}>
+                  <span className="predicted-price-tooltip-label">{item.label}</span>
+                  <span className="predicted-price-tooltip-value">{item.value}</span>
+                </span>
+              ))}
+              <span className="predicted-price-tooltip-footer">
+                From real past-draft prices — a rough guide, not a rule.
+              </span>
+            </span>
+          )}
         </p>
       )}
       {similar.length > 0 && (

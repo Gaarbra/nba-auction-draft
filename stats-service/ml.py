@@ -123,6 +123,96 @@ def predict_price(model, stats, era=None, slot=None, difficulty=None):
     return max(PRICE_CLIP_MIN, min(PRICE_CLIP_MAX, raw))
 
 
+# --- price model explanation ------------------------------------------------
+#
+# What the "Suggested value" hover in the UI shows. Not a true per-prediction
+# attribution — that's what a library like SHAP is for, and pulling in a
+# whole extra dependency (plus its own per-request compute cost) is more
+# than a hover tooltip is worth here. Instead: the model's own global
+# feature_importances_ (how much each feature typically moves ITS
+# predictions, learned across every training example) tells us what this
+# model leans on most in general, and pairing that with this specific
+# player's actual values for those features gives an honest, useful "here's
+# mainly what this is based on" without overclaiming precision it doesn't
+# have.
+_FEATURE_DISPLAY = {
+    "points_per_game": ("PPG", "{:.1f}"),
+    "rebounds_per_game": ("RPG", "{:.1f}"),
+    "assists_per_game": ("APG", "{:.1f}"),
+    "steals_per_game": ("SPG", "{:.1f}"),
+    "blocks_per_game": ("BPG", "{:.1f}"),
+    "ts_pct": ("TS%", "{:.0%}"),
+    "usage_pct": ("USG%", "{:.0%}"),
+    "minutes_per_game": ("MPG", "{:.1f}"),
+    "games_played": ("career games", "{:.0f}"),
+    "era": ("era", None),
+    "slot": ("slot", None),
+    "difficulty": ("difficulty", None),
+}
+
+
+def _model_feature_importance(model):
+    """Best-effort global importance per original FEATURE_COLS entry (a
+    one-hot categorical like "era" gets several encoded columns inside the
+    pipeline — e.g. era_2020s, era_1990s — whose weights get summed back
+    into a single "era" entry here). Returns {} if the model's regressor
+    doesn't expose feature_importances_/coef_, or if the pipeline's
+    internals don't match what train_price_model.py builds (display-only —
+    never worth this failing serving over)."""
+    try:
+        pipeline = model.regressor_  # TransformedTargetRegressor -> fitted inner Pipeline
+        preprocessor = pipeline.named_steps["preprocess"]
+        regressor = pipeline.named_steps["regress"]
+
+        raw = getattr(regressor, "feature_importances_", None)
+        if raw is None:
+            coef = getattr(regressor, "coef_", None)
+            if coef is None:
+                return {}
+            raw = np.abs(np.ravel(coef))  # a linear model's |coefficient| stands in for "importance"
+
+        totals = {}
+        for name, weight in zip(preprocessor.get_feature_names_out(), raw):
+            base = name.split("__", 1)[-1]  # "num__points_per_game" -> "points_per_game"
+            for col in FEATURE_COLS:
+                if base == col or base.startswith(col + "_"):  # one-hot: "era_2020s" -> "era"
+                    totals[col] = totals.get(col, 0.0) + float(weight)
+                    break
+
+        total = sum(totals.values())
+        return {k: v / total for k, v in totals.items()} if total else {}
+    except Exception:
+        return {}
+
+
+def explain_prediction(model, stats, era=None, slot=None, difficulty=None, top_n=4):
+    """The `top_n` features this model leans on most, each paired with this
+    player's actual value — what the "Suggested value" hover shows. []
+    (never an error) if importance introspection isn't available."""
+    importances = _model_feature_importance(model)
+    if not importances:
+        return []
+
+    row = build_feature_row(stats, era, slot, difficulty)
+    ranked = sorted(importances.items(), key=lambda kv: kv[1], reverse=True)[:top_n]
+
+    explanation = []
+    for col, weight in ranked:
+        label, fmt = _FEATURE_DISPLAY.get(col, (col, "{}"))
+        value = row.get(col)
+        if value is None:
+            detail = "—"
+        elif fmt is None:
+            detail = str(value)
+        else:
+            try:
+                detail = fmt.format(value)
+            except (ValueError, TypeError):
+                detail = str(value)
+        explanation.append({"label": label, "value": detail, "weight": round(weight, 3)})
+    return explanation
+
+
 # --- player similarity ------------------------------------------------------
 #
 # Deliberately a smaller, different feature set than the price model: this
