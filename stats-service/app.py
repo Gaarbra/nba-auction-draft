@@ -87,6 +87,19 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 STATS_CACHE_FILE = os.path.join(DATA_DIR, "statsCache.json")
 USAGE_CACHE_FILE = os.path.join(DATA_DIR, "usageCache.json")
 
+# Render sets this env var to "true" for every service automatically. Used
+# to skip live stats.nba.com calls we've confirmed always fail from here
+# (that outbound IP is blocked outright, not just rate-limited — see the
+# HANDOFF notes / this session's earlier debugging). This isn't just about
+# avoiding a wasted call: on the roll path (roomHandlers.js's
+# drawPlayerWithStats), Node is actually sitting there waiting on this
+# response, so every second spent here discovering an already-known
+# failure is a second directly added to how long a roll takes. Skipping the
+# attempt outright — rather than just trying it with a shorter timeout — is
+# what gets an uncached-player roll down to roughly the same speed as a
+# cached one, instead of "a bit less slow."
+ON_RENDER = bool(os.environ.get("RENDER"))
+
 _cache = {}
 _usage_cache = {}
 _bio_cache = {}
@@ -319,7 +332,13 @@ def fetch_stats_for_player(player_id):
             # good (if a few days old) numbers for them sitting right here.
             # A career average barely moves day to day, so stale is a fine
             # thing to serve while a fresher copy is fetched for next time.
-            if player_id not in _stats_refresh_in_flight:
+            if ON_RENDER:
+                # A background refresh here would just be a slow, silent way
+                # to burn a thread on a call already known to fail — skip it
+                # entirely rather than pay for a doomed attempt nothing is
+                # even waiting on.
+                print(f"[cache STALE, skipping refresh (blocked on Render)] player_id={player_id}")
+            elif player_id not in _stats_refresh_in_flight:
                 _stats_refresh_in_flight.add(player_id)
 
                 def _refresh():
@@ -335,6 +354,15 @@ def fetch_stats_for_player(player_id):
             else:
                 print(f"[cache STALE, refresh already in flight] player_id={player_id}")
         return cached["stats"]
+
+    if ON_RENDER:
+        # Known-doomed call — don't spend up to 15s (or however long
+        # nba_api's own retry/backoff takes) finding that out again for a
+        # player we already know isn't cached. Fail fast so the roll
+        # waiting on this (drawPlayerWithStats in roomHandlers.js) isn't
+        # stuck behind a call that can never succeed.
+        print(f"[cache MISS, skipping live fetch (blocked on Render)] player_id={player_id}")
+        raise RuntimeError(f"stats.nba.com unreachable from Render — player_id={player_id} not in cache")
 
     print(f"[cache MISS] player_id={player_id}")
     return _fetch_and_cache_stats(player_id)
