@@ -1,6 +1,24 @@
 const STATS_SERVICE_URL = process.env.STATS_SERVICE_URL || "http://127.0.0.1:5001";
 
 /**
+ * Fire-and-forget wake-up ping for stats-service. On Render's free tier it
+ * spins down after ~15 minutes with no traffic and takes ~20-60s to wake
+ * back up on the next request — nothing about normal lobby browsing (name
+ * entry, room list, chat) ever touches stats-service, so without this nudge
+ * the FIRST roll of a draft is what pays that wake-up cost, and every
+ * per-attempt timeout in the roll path (1.5s, see fetchPlayerStats) is
+ * nowhere near long enough to wait it out — a cold stats-service just looks
+ * identical to "no stats for this player" for that whole window. Called
+ * from GET /api/warm-stats-service as soon as the homepage loads, so the
+ * wake-up mostly happens while someone's still typing their name instead of
+ * during their first actual roll. Never awaited by the route that calls
+ * it — the caller doesn't need to know or care whether this succeeds.
+ */
+export function pingStatsService() {
+  fetch(`${STATS_SERVICE_URL}/health`, { signal: AbortSignal.timeout(60000) }).catch(() => {});
+}
+
+/**
  * Looks players up by NBA person id — the pool (server/src/services/
  * nbaPlayersClient.js) already carries the real id for every player, so
  * there's no need for stats-service to fuzzy-match on name anymore.

@@ -8,7 +8,7 @@ import { getPlayers, getCacheInfo } from "./services/playerCache.js";
 import { filterPlayersByEra, summarizeEras } from "./services/era.js";
 import { httpRateLimit } from "./middleware/rateLimit.js";
 import { initSchema } from "./services/db.js";
-import { fetchPredictedPrice, fetchSimilarPlayers, fetchPhotoUrl } from "./services/statsClient.js";
+import { fetchPredictedPrice, fetchSimilarPlayers, fetchPhotoUrl, pingStatsService } from "./services/statsClient.js";
 
 initSchema(); // no-op if DATABASE_URL isn't set — see db.js
 
@@ -105,6 +105,15 @@ app.get("/api/players/:id/similar", async (req, res) => {
 app.get("/api/players/:id/photo", async (req, res) => {
   const photoUrl = await fetchPhotoUrl(req.params.id);
   res.json({ photoUrl });
+});
+
+// Called once when the homepage loads (see App.jsx) — nudges stats-service
+// awake early so its Render free-tier spin-down (see pingStatsService)
+// mostly resolves before anyone's first roll, not during it. Responds
+// immediately either way; the ping itself runs in the background.
+app.get("/api/warm-stats-service", (req, res) => {
+  pingStatsService();
+  res.status(202).end();
 });
 
 app.post("/api/players/sync", async (req, res) => {

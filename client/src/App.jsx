@@ -7,6 +7,7 @@ import Footer from "./components/Footer.jsx";
 import InteractiveBackground from "./components/InteractiveBackground.jsx";
 
 const SESSION_KEY = "nba-auction-draft:session";
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 
 const ERROR_MESSAGES = {
   NAME_REQUIRED: "Please enter your name.",
@@ -64,6 +65,15 @@ export default function App() {
   const [kickedMessage, setKickedMessage] = useState("");
 
   const sessionRef = useRef(loadSession());
+
+  // Nudges stats-service awake as soon as the page loads instead of
+  // waiting for someone's first roll to discover it's asleep (Render's
+  // free tier spins it down after ~15 minutes idle — see
+  // pingStatsService). Fire-and-forget: nothing here depends on the
+  // response, this is purely about lead time before a draft's first roll.
+  useEffect(() => {
+    fetch(`${SERVER_URL}/api/warm-stats-service`).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const socket = socketRef.current;
