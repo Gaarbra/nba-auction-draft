@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "client/src/index.css"
+        ],
+        "createdAt": "2026-09-02T20:59:20.464Z",
+        "reason": "verified: .chat-panel is a flex sibling that must free real layout space for .draft-board (min-width:0) to reflow into on collapse/expand -- transform:scaleX() would squish content instead of freeing space, so width is the correct property here, not a lazy default. Independently confirmed by Assessment B (detector+browser evidence) during the /impeccable critique of the draft board, 2026-09-02."
+      }
+    ]
+  }
+}
