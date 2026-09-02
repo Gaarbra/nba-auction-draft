@@ -72,7 +72,13 @@ PORT = int(os.environ.get("PORT", os.environ.get("STATS_SERVICE_PORT", 5001)))
 # can be long. Long TTLs plus disk persistence (see STATS_CACHE_FILE below)
 # are what make the warm-up job's work actually stick between restarts,
 # instead of every dev restart starting back at a cold, empty cache.
-CACHE_TTL_SECONDS = 24 * 60 * 60
+# Was 24h; bumped to a week (matching BIO_CACHE_TTL_SECONDS below) now that
+# going stale has a real cost on Render specifically — stats.nba.com blocks
+# that outbound IP outright, so every stale-triggered refresh there is
+# doomed from the start (see fetch_stats_for_player's stale-while-revalidate
+# handling). A week of extra staleness on a career per-game average is
+# nothing; a week fewer wasted refresh attempts is a real win.
+CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 BIO_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # position/draft year never change
 POOL_CACHE_TTL_SECONDS = 60 * 60
 NOTABLE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # all-time leaderboards barely move week to week
@@ -289,13 +295,56 @@ def save_usage_cache_to_disk():
         print(f"[usage cache] failed to save to disk: {e}")
 
 
+# Guards against piling up duplicate background refreshes for the same
+# player — e.g. several nominations of a widely-cached-but-now-stale player
+# arriving close together shouldn't each spawn their own stats.nba.com call.
+_stats_refresh_in_flight = set()
+
+
 def fetch_stats_for_player(player_id):
     cached = _cache.get(player_id)
-    if cached and (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS:
-        print(f"[cache HIT] player_id={player_id}")
-        return cached["stats"]
-    print(f"[cache MISS] player_id={player_id}")
+    if cached:
+        if (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS:
+            print(f"[cache HIT] player_id={player_id}")
+        else:
+            # Stale, but real. Serve it immediately and refresh in the
+            # background rather than block this request on a live
+            # stats.nba.com call: on Render, that call doesn't just fail, it
+            # times out after 15-30s (the outbound IP is blocked outright —
+            # confirmed, not theoretical), which is already longer than
+            # Node's own 3s client-side timeout (see fetchPlayerStats in
+            # statsClient.js). Blocking here would just mean every stale
+            # player looks identical to a never-cached one: "Stats
+            # unavailable", no photo, no team — even though we have perfectly
+            # good (if a few days old) numbers for them sitting right here.
+            # A career average barely moves day to day, so stale is a fine
+            # thing to serve while a fresher copy is fetched for next time.
+            if player_id not in _stats_refresh_in_flight:
+                _stats_refresh_in_flight.add(player_id)
 
+                def _refresh():
+                    try:
+                        _fetch_and_cache_stats(player_id)
+                    except Exception as e:
+                        print(f"[background stats refresh failed, stale cache stays in place] player_id={player_id}: {e.__class__.__name__}: {e}")
+                    finally:
+                        _stats_refresh_in_flight.discard(player_id)
+
+                print(f"[cache STALE, serving stale + refreshing in background] player_id={player_id}")
+                threading.Thread(target=_refresh, daemon=True).start()
+            else:
+                print(f"[cache STALE, refresh already in flight] player_id={player_id}")
+        return cached["stats"]
+
+    print(f"[cache MISS] player_id={player_id}")
+    return _fetch_and_cache_stats(player_id)
+
+
+def _fetch_and_cache_stats(player_id):
+    """The actual live stats.nba.com lookup + cache write. Only called
+    synchronously (and allowed to raise, same as always) when nothing is
+    cached yet at all; called from a background thread — failures just get
+    logged, see fetch_stats_for_player — once something stale already is."""
     career = playercareerstats.PlayerCareerStats(player_id=player_id, timeout=15)
     df = career.get_data_frames()[0]
 
