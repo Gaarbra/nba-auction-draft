@@ -22,7 +22,7 @@ services:
     plan: free
     rootDir: stats-service
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --workers 2 --timeout 120 --bind 0.0.0.0:$PORT app:app
+    startCommand: gunicorn --workers 1 --timeout 120 --bind 0.0.0.0:$PORT app:app
     envVars:
       # Pinned explicitly rather than left to Render's default — that
       # default has drifted to Python versions newer than psycopg[binary]==

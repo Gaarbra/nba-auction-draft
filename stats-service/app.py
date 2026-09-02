@@ -34,21 +34,34 @@ app = Flask(__name__)
 # every worker process without coordination.
 db.init_schema()
 
-# Both loaded/built at module level (like db.init_schema() above) so they're
-# ready under gunicorn too, not just the `if __name__ == "__main__"` dev
-# path. Both are optional in the exact same way the rest of this service's
-# DB-backed features are: no price_model.joblib on disk (run
-# scripts/train_price_model.py) means _price_model is None and
-# /predict-price says so; no DATABASE_URL means the similarity index builds
-# from an empty row list and /similar-players says so. Neither blocks the
-# service from starting or serving its other endpoints.
+# price_model is just a local file read (joblib.load) — fast, stays
+# synchronous. The similarity index is a Postgres query + a scikit-learn
+# fit, which is NOT safe to leave synchronous here: this whole block runs at
+# module import time, before Flask/gunicorn can bind a port at all, and a
+# slow or briefly-unreachable free-tier Postgres turned that into a real
+# outage once already (a 14-minute gap between gunicorn starting and the
+# port actually opening, entirely spent waiting on this query — Render's own
+# port-scan timeout very nearly killed the deploy). Building it in a
+# background thread instead means the app can start serving immediately;
+# SimilarityIndex.query() already returns [] gracefully while frame/model
+# are still None, so /similar-players just degrades to empty until this
+# finishes, the same "optional, never blocks anything else" contract the
+# rest of this service's DB-backed features already follow.
 _price_model = ml.load_price_model()
 _similarity_index = ml.SimilarityIndex()
-_similarity_index.build(db.fetch_all_player_stats_for_similarity())
-print(
-    f"[ml] price model {'loaded' if _price_model else 'NOT FOUND (run scripts/train_price_model.py)'}; "
-    f"similarity index built over {0 if _similarity_index.frame is None else len(_similarity_index.frame)} players"
-)
+
+
+def _build_similarity_index_in_background():
+    try:
+        rows = db.fetch_all_player_stats_for_similarity()
+        _similarity_index.build(rows)
+        print(f"[ml] similarity index built over {0 if _similarity_index.frame is None else len(_similarity_index.frame)} players")
+    except Exception as e:
+        print(f"[ml] similarity index build failed, /similar-players will return empty: {e.__class__.__name__}: {e}")
+
+
+threading.Thread(target=_build_similarity_index_in_background, daemon=True).start()
+print(f"[ml] price model {'loaded' if _price_model else 'NOT FOUND (run scripts/train_price_model.py)'}; similarity index building in background")
 
 # PORT is the convention most PaaS hosts (Render included) inject
 # automatically; STATS_SERVICE_PORT is kept as a fallback for local dev
