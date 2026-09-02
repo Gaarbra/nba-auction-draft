@@ -10,7 +10,13 @@
   --line-bright: #34495e;
   --text: #eef2f6;
   --text-dim: #93a4b8;
-  --text-faint: #59697c;
+  /* Was #59697c (~3.35:1 against --bg-panel, ~3.49:1 against --bg-inset) --
+     under WCAG AA's 4.5:1 for normal-size text on all 33 of this token's
+     current uses (eyebrow labels, meta text, hints). This value clears
+     4.5:1 against both panel backgrounds with real margin (~5.1-5.3:1)
+     while staying visibly more subdued than --text-dim (~7.4:1), so the
+     two tokens still read as two distinct levels of de-emphasis. */
+  --text-faint: #75879c;
   --accent: #ff7a1a;
   --accent-bright: #ffa64d;
   --accent-dim: #7a3a10;
@@ -594,6 +600,17 @@ form input {
   box-shadow: none;
 }
 
+/* The browser's default focus ring is orange-on-orange here (the button's
+   own background is an orange gradient) -- verified live: focus genuinely
+   lands on the button, but the ring is visually indistinguishable from it
+   in a screenshot. A light ring with real offset is visible against both
+   the button and the dark page behind it, for every flow this class is
+   reused in (Raise, nominate, vote, budget-confirm). */
+.primary-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
 .secondary-btn {
   background: transparent;
   border: 1px solid var(--line-bright);
@@ -1014,13 +1031,21 @@ form input {
     flex-direction: column;
   }
 
-  .chat-panel,
-  .chat-panel.collapsed {
+  /* Scoped under .draft-layout (which .chat-panel is always inside), not
+     just .chat-panel/.chat-panel.collapsed on their own -- those match the
+     base (desktop) .chat-panel rules declared further down the file at
+     identical specificity, and same-specificity ties go to whichever rule
+     is LATER in source order, which was the base 280px/44px desktop rules,
+     not this media query. Verified live: without this scoping, the
+     collapsed chat rail rendered as a full-height 44px vertical strip on a
+     375px screen instead of a compact bar, on every mobile load. */
+  .draft-layout .chat-panel,
+  .draft-layout .chat-panel.collapsed {
     width: 100%;
     align-self: stretch;
   }
 
-  .chat-panel:not(.collapsed) {
+  .draft-layout .chat-panel:not(.collapsed) {
     max-height: 320px;
   }
 
@@ -1814,6 +1839,45 @@ form input {
 .bid-stepper-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+.bid-stepper-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bid-quick-jumps {
+  display: flex;
+  gap: 4px;
+}
+
+.bid-quick-jump-btn {
+  cursor: pointer;
+  padding: 0 8px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.bid-quick-jump-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  background: var(--accent-dim);
+}
+
+.bid-quick-jump-btn:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .bid-controls .primary-btn,

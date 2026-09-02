@@ -32,38 +32,72 @@ export default function BidStepper({ value, min, max, onChange }) {
     onChange(String(clamped));
   }
 
+  // Same clamp-to-[min,max] guarantee as step(), just to an absolute
+  // target instead of a relative delta — for the quick-jump buttons below.
+  // Bidding is the single most-repeated action across a whole draft, and
+  // ±1-at-a-time was the only way to move the number: fine for a close
+  // bid war, tedious for "I just want to go all-in" against a 15-coin gap.
+  function jumpTo(target) {
+    onChange(String(Math.min(max, Math.max(min, target))));
+  }
+
+  const canJumpBy5 = Number.isFinite(numValue) ? numValue + 5 <= max : max - min >= 5;
+  const canJumpToMax = Number.isFinite(numValue) ? numValue < max : true;
+
   return (
-    <div className="bid-stepper">
-      <motion.button
-        type="button"
-        className="bid-stepper-btn"
-        onClick={() => step(-1)}
-        disabled={!canDecrement}
-        whileTap={canDecrement ? { scale: 0.88 } : undefined}
-        aria-label="Decrease bid by 1"
-      >
-        −
-      </motion.button>
-      <input
-        type="number"
-        className="bid-stepper-input"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={handleBlur}
-        aria-label="Bid amount"
-      />
-      <motion.button
-        type="button"
-        className="bid-stepper-btn"
-        onClick={() => step(1)}
-        disabled={!canIncrement}
-        whileTap={canIncrement ? { scale: 0.88 } : undefined}
-        aria-label="Increase bid by 1"
-      >
-        +
-      </motion.button>
+    <div className="bid-stepper-group">
+      <div className="bid-stepper">
+        <motion.button
+          type="button"
+          className="bid-stepper-btn"
+          onClick={() => step(-1)}
+          disabled={!canDecrement}
+          whileTap={canDecrement ? { scale: 0.88 } : undefined}
+          aria-label="Decrease bid by 1"
+        >
+          −
+        </motion.button>
+        <input
+          type="number"
+          className="bid-stepper-input"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={handleBlur}
+          aria-label="Bid amount"
+        />
+        <motion.button
+          type="button"
+          className="bid-stepper-btn"
+          onClick={() => step(1)}
+          disabled={!canIncrement}
+          whileTap={canIncrement ? { scale: 0.88 } : undefined}
+          aria-label="Increase bid by 1"
+        >
+          +
+        </motion.button>
+      </div>
+      <div className="bid-quick-jumps">
+        <motion.button
+          type="button"
+          className="bid-quick-jump-btn"
+          onClick={() => step(5)}
+          disabled={!canJumpBy5}
+          whileTap={canJumpBy5 ? { scale: 0.92 } : undefined}
+        >
+          +5
+        </motion.button>
+        <motion.button
+          type="button"
+          className="bid-quick-jump-btn"
+          onClick={() => jumpTo(max)}
+          disabled={!canJumpToMax}
+          whileTap={canJumpToMax ? { scale: 0.92 } : undefined}
+        >
+          Max
+        </motion.button>
+      </div>
     </div>
   );
 }

@@ -58,7 +58,14 @@ export default function LocalBiddingRows({ room, nomination, socket, friendlyErr
   return (
     <div className="local-bid-rows">
       {eligible.map((p) => (
-        <div key={p.id} className="local-bid-row">
+        <form
+          key={p.id}
+          className="local-bid-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            bid(p.id);
+          }}
+        >
           <span className="local-bid-row-name">{p.name}</span>
           <BidStepper
             value={currentAmount(p.id)}
@@ -67,11 +74,10 @@ export default function LocalBiddingRows({ room, nomination, socket, friendlyErr
             onChange={(next) => setAmount(p.id, next)}
           />
           <motion.button
-            type="button"
+            type="submit"
             className="primary-btn"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
-            onClick={() => bid(p.id)}
           >
             Raise
           </motion.button>
@@ -85,7 +91,7 @@ export default function LocalBiddingRows({ room, nomination, socket, friendlyErr
             Pass
           </motion.button>
           {errors[p.id] && <span className="error-text local-bid-row-error">{errors[p.id]}</span>}
-        </div>
+        </form>
       ))}
     </div>
   );

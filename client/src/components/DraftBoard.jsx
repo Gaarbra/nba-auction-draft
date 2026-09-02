@@ -12,8 +12,10 @@ import BidStepper from "./BidStepper.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import LocalBiddingRows from "./LocalBiddingRows.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
+import InfoModal from "./InfoModal.jsx";
 import { isSoundMuted, setSoundMuted, playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
+import { PAGES } from "../siteContent.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -65,6 +67,11 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   const [isRolling, setIsRolling] = useState(false);
   const [rollDisplayName, setRollDisplayName] = useState("");
   const [soundMuted, setSoundMutedState] = useState(() => isSoundMuted());
+  // Footer (which owns "How to Play") only mounts on the pre-room screen —
+  // once a draft starts, a confused first-timer had zero way to reach the
+  // rules short of leaving the room entirely. This gives DraftBoard its
+  // own entry point to the exact same content.
+  const [showHelp, setShowHelp] = useState(false);
 
   function toggleSound() {
     const next = !soundMuted;
@@ -290,6 +297,15 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           )}
           <button
             type="button"
+            onClick={() => setShowHelp(true)}
+            className="icon-btn"
+            title="How to play"
+            aria-label="How to play"
+          >
+            ?
+          </button>
+          <button
+            type="button"
             onClick={toggleSound}
             className="icon-btn"
             title={soundMuted ? "Unmute roll sound" : "Mute roll sound"}
@@ -302,6 +318,10 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           </button>
         </div>
       </div>
+
+      {showHelp && (
+        <InfoModal title={PAGES.howToPlay.title} body={PAGES.howToPlay.body} onClose={() => setShowHelp(false)} />
+      )}
 
       {!room.isLocal && <VoteKickBanner room={room} currentPlayerId={currentPlayerId} socket={socket} />}
 
@@ -437,7 +457,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                     currentPlayerId !== nomination.currentBidder &&
                     !nomination.passed.includes(currentPlayerId) &&
                     myOpenSlots.length > 0 && (
-                      <div className="bid-controls">
+                      <form
+                        className="bid-controls"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleBid();
+                        }}
+                      >
                         <BidStepper
                           value={bidInput}
                           min={nomination.currentBid + 1}
@@ -445,8 +471,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                           onChange={setBidInput}
                         />
                         <motion.button
-                          type="button"
-                          onClick={handleBid}
+                          type="submit"
                           className="primary-btn"
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.96 }}
@@ -462,7 +487,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                         >
                           Pass
                         </motion.button>
-                      </div>
+                      </form>
                     )}
 
                   {bidError && <p className="error-text">{bidError}</p>}
