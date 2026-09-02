@@ -1,14 +1,15 @@
 import { useEffect, useRef } from "react";
 import PriceTicker from "./PriceTicker.jsx";
 
-/** Replaces the old static radial-gradient/SVG-court backdrop with something
- * that actually responds to the room: a soft spotlight that follows the
- * cursor, plus a few large blurred color orbs drifting slowly on their own
- * (pure CSS keyframes — no JS needed for that part), plus (homepage only,
- * via `ticker`) real player names drifting upward with a price tag, looping
- * endlessly. The mouse-follow layer is skipped under prefers-reduced-motion
- * and never runs on touch devices (no mousemove there anyway), so it never
- * fights a phone's own scrolling. */
+/** A soft spotlight that follows the cursor, plus (homepage only, via
+ * `ticker`) real player photos and prices drifting upward, looping
+ * endlessly — that's the background doing something specific to this app,
+ * rather than generic decoration. Deliberately no drifting color-blob
+ * layer here anymore: it was pure atmosphere with nothing to do with an
+ * NBA auction draft, competing with the ticker for the same "ambient
+ * movement" job. The mouse-follow spotlight is skipped under
+ * prefers-reduced-motion and never runs on touch devices (no mousemove
+ * there anyway), so it never fights a phone's own scrolling. */
 export default function InteractiveBackground({ ticker = false }) {
   const spotlightRef = useRef(null);
   const frameRef = useRef(null);
@@ -39,9 +40,6 @@ export default function InteractiveBackground({ ticker = false }) {
 
   return (
     <div className="interactive-bg" aria-hidden="true">
-      <div className="bg-orb bg-orb-a" />
-      <div className="bg-orb bg-orb-b" />
-      <div className="bg-orb bg-orb-c" />
       <div className="bg-spotlight" ref={spotlightRef} />
       <div className="bg-grain" />
       <PriceTicker active={ticker} />

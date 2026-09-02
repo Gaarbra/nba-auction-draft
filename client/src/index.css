@@ -63,58 +63,6 @@ body {
   pointer-events: none;
 }
 
-.bg-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.35;
-  will-change: transform;
-}
-
-.bg-orb-a {
-  width: 480px;
-  height: 480px;
-  top: -120px;
-  left: -80px;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-  animation: orb-drift-a 22s ease-in-out infinite;
-}
-
-.bg-orb-b {
-  width: 420px;
-  height: 420px;
-  bottom: -140px;
-  right: -100px;
-  background: radial-gradient(circle, #2f6fed 0%, transparent 70%);
-  opacity: 0.22;
-  animation: orb-drift-b 26s ease-in-out infinite;
-}
-
-.bg-orb-c {
-  width: 320px;
-  height: 320px;
-  top: 40%;
-  left: 60%;
-  background: radial-gradient(circle, #22c55e 0%, transparent 70%);
-  opacity: 0.14;
-  animation: orb-drift-c 30s ease-in-out infinite;
-}
-
-@keyframes orb-drift-a {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(60px, 40px); }
-}
-
-@keyframes orb-drift-b {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(-50px, -30px); }
-}
-
-@keyframes orb-drift-c {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-40px, 30px) scale(1.15); }
-}
-
 .bg-spotlight {
   position: absolute;
   inset: 0;
@@ -218,11 +166,6 @@ body {
   background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.012) 0px, transparent 1px, transparent 3px);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .bg-orb {
-    animation: none;
-  }
-}
 
 .site-footer {
   position: fixed;
@@ -269,9 +212,11 @@ body {
   max-width: 520px;
   max-height: 80vh;
   overflow-y: auto;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)), var(--bg-panel);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Flat, not glass — there's nothing worth blurring behind this (the
+     backdrop overlay already dims the real page content; that's the
+     functional blur). A gradient-tinted blur here was just decoration. */
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line);
   border-top: 2px solid var(--accent);
   border-radius: 16px;
   padding: 24px;
@@ -367,15 +312,15 @@ body {
 
 .lobby-card,
 .room-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)), var(--bg-panel);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Flat, not glass — see .footer-modal's comment above; same reasoning. */
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line);
   border-top: 2px solid var(--accent);
   border-radius: 18px;
   padding: 32px;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55), 0 0 40px rgba(255, 122, 26, 0.06);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
 }
 
 .lobby-card h1 {
@@ -388,32 +333,16 @@ body {
   line-height: 1.05;
   text-transform: uppercase;
   text-align: center;
-  background: linear-gradient(90deg, var(--text) 0%, var(--accent-bright) 35%, var(--accent) 50%, var(--accent-bright) 65%, var(--text) 100%);
-  background-size: 220% auto;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  animation: title-shimmer 5s linear infinite;
-  filter: drop-shadow(0 4px 24px rgba(255, 122, 26, 0.35));
+  /* Solid, not a shimmering gradient — the accent already shows up once,
+     deliberately, on the card's border-top; a second, moving, lower-
+     contrast version of it on the actual product name was competing with
+     itself rather than adding anything. */
+  color: var(--text);
 }
 
 @media (max-width: 480px) {
   .lobby-card h1 {
     font-size: 32px;
-  }
-}
-
-@keyframes title-shimmer {
-  to {
-    background-position: -220% center;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lobby-card h1 {
-    animation: none;
-    background: none;
-    color: var(--text);
   }
 }
 
@@ -520,7 +449,6 @@ body {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
   max-height: 200px;
   overflow-y: auto;
 }
@@ -530,10 +458,16 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  background: var(--bg-inset);
-  border: 1px solid var(--line);
+  padding: 9px 2px;
+  /* A plain divided row, not a card-inside-a-card — the outer .lobby-card
+     is already the only "card" this list needs to sit inside; giving each
+     row its own background + border + radius on top of that just stacked
+     three layers of "card-ness" for what's really a simple list. */
+  border-bottom: 1px solid var(--line);
+}
+
+.public-room-item:last-child {
+  border-bottom: none;
 }
 
 .public-room-item-info {
@@ -2493,9 +2427,9 @@ form input {
 .chat-panel {
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)), var(--bg-panel);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Flat, not glass — see .footer-modal's comment. */
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   overflow: hidden;
