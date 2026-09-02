@@ -569,6 +569,20 @@ def fetch_usage_pct(player_id, season):
     if cached and (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS:
         return cached["value"]
 
+    if ON_RENDER:
+        # Same bug class as fetch_stats_for_player, just missed here the
+        # first time around: a genuine miss (this season never warmed)
+        # meant every uncached season paid this call's full 20s timeout —
+        # doomed from the start on Render, same as any other stats.nba.com
+        # call. computeResults.js fetches every drafted player's full stats
+        # concurrently at end-of-draft, so a room with picks spread across
+        # several never-warmed seasons (more likely in "All Eras," where
+        # the pool spans every decade) could stack up multiple 20s stalls
+        # back to back — this is what "crunching the numbers" being slow
+        # actually was. Fail fast; get_full_stats already treats a missing
+        # usage_pct as an acceptable gap, not an error.
+        raise RuntimeError(f"stats.nba.com unreachable from Render — season {season} not in usage cache")
+
     resp = leaguedashplayerstats.LeagueDashPlayerStats(
         season=season,
         season_type_all_star="Regular Season",
