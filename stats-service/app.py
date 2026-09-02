@@ -4,6 +4,7 @@ import random
 import threading
 import time
 
+import requests
 from dotenv import load_dotenv
 
 # Must run before `import db` — db.py reads DATABASE_URL from the
@@ -859,6 +860,48 @@ def warmup_status():
     the notable pool it's gotten, and how many players are actually cached
     right now. Not used by the app itself, just for checking progress."""
     return jsonify({**_warmup_status, "cachedPlayers": len(_cache)})
+
+
+@app.get("/debug-reachability")
+def debug_reachability():
+    """One-off diagnostic: is stats.nba.com the only blocked host from
+    wherever this is deployed, or does that block extend to NBA's separate
+    photo CDN and/or Wikipedia too? Answers whether photos.py's lookups
+    could ever safely run live (server-side, at nomination time) instead of
+    only ever offline — see photoCache.json/warm_photos.py for the current
+    (offline-only) approach. Not used by the app itself."""
+    results = {}
+
+    start = time.time()
+    try:
+        # Same nba_api call fetch_stats_for_player itself makes for a
+        # genuine cache miss — the confirmed-blocked baseline everything
+        # else here is being compared against.
+        playercareerstats.PlayerCareerStats(player_id=2544, timeout=8)
+        results["stats_nba_com"] = {"ok": True, "seconds": round(time.time() - start, 2)}
+    except Exception as e:
+        results["stats_nba_com"] = {"ok": False, "error": e.__class__.__name__, "seconds": round(time.time() - start, 2)}
+
+    start = time.time()
+    try:
+        resp = requests.head(photos.NBA_HEADSHOT_URL.format(player_id=2544), timeout=8)
+        results["ak_static_nba_photo_cdn"] = {"ok": resp.status_code == 200, "status": resp.status_code, "seconds": round(time.time() - start, 2)}
+    except requests.RequestException as e:
+        results["ak_static_nba_photo_cdn"] = {"ok": False, "error": e.__class__.__name__, "seconds": round(time.time() - start, 2)}
+
+    start = time.time()
+    try:
+        resp = requests.get(
+            photos.WIKIPEDIA_API_URL,
+            params={"action": "query", "format": "json", "titles": "LeBron James"},
+            timeout=8,
+            headers=photos.REQUEST_HEADERS,
+        )
+        results["wikipedia_api"] = {"ok": resp.status_code == 200, "status": resp.status_code, "seconds": round(time.time() - start, 2)}
+    except requests.RequestException as e:
+        results["wikipedia_api"] = {"ok": False, "error": e.__class__.__name__, "seconds": round(time.time() - start, 2)}
+
+    return jsonify(results)
 
 
 @app.get("/players")
