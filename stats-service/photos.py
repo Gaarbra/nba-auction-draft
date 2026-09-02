@@ -53,61 +53,51 @@ def find_wikipedia_photo(full_name):
     query (not just the bare name) so Wikipedia's own relevance ranking
     does the disambiguation work for a common name shared with an
     unrelated, more-famous person — full-text search naturally favors the
-    page whose content actually matches those extra terms. Not bulletproof
-    (a wrong match is possible for an unlucky name collision), but a
-    reasonable, low-effort disambiguation given this only ever runs
-    offline in a batch script, with a human able to spot-check the result
-    before it ships."""
+    page whose content actually matches those extra terms.
+
+    One consolidated request (search + the matched page's thumbnail, via
+    generator=search) instead of two separate ones — halves the request
+    count across a multi-thousand-player batch. A content-based check (does
+    the page mention "basketball"/"NBA") was considered and rejected: tested
+    against the same degenerate case below, it would have happily accepted
+    Wikipedia's own general "Basketball" article, which obviously mentions
+    basketball constantly. Matching the searched name against the returned
+    page's TITLE is the check that actually catches that — an empty/garbage
+    name matched "Basketball" (or, in another run, Steph Curry's page) with
+    zero relevance to the real query; a real player's name should always
+    appear in their own page's title. Not bulletproof (a wrong match is
+    still possible for an unlucky same-name collision), but a reasonable,
+    low-effort disambiguation given this only ever runs offline in a batch
+    script, with a human able to spot-check the result before it ships."""
     try:
-        search_resp = requests.get(
+        resp = requests.get(
             WIKIPEDIA_API_URL,
             params={
                 "action": "query",
-                "list": "search",
-                "srsearch": f"{full_name} basketball player",
-                "format": "json",
-                "srlimit": 1,
-            },
-            timeout=REQUEST_TIMEOUT,
-            headers=REQUEST_HEADERS,
-        )
-        search_resp.raise_for_status()
-        results = search_resp.json().get("query", {}).get("search", [])
-        if not results:
-            return None
-        title = results[0]["title"]
-
-        # Sanity check: the matched title has to actually share a word
-        # with the name being searched for. Confirmed necessary, not just
-        # theoretical — an empty/garbage name (the "basketball player"
-        # boilerplate alone) matched an unrelated, simply-popular page
-        # (Steph Curry's) with zero relevance to the actual query. A real
-        # player's name should always appear in their own page's title;
-        # this catches exactly the degenerate case where it doesn't
-        # without needing a full-blown identity/biography cross-check.
-        name_words = {w.lower() for w in full_name.split() if len(w) > 1}
-        title_words = {w.lower().strip("()") for w in title.split()}
-        if not name_words or not (name_words & title_words):
-            return None
-
-        image_resp = requests.get(
-            WIKIPEDIA_API_URL,
-            params={
-                "action": "query",
-                "titles": title,
+                "generator": "search",
+                "gsrsearch": f"{full_name} basketball player",
+                "gsrlimit": 1,
                 "prop": "pageimages",
-                "format": "json",
                 "pithumbsize": 400,
+                "format": "json",
             },
             timeout=REQUEST_TIMEOUT,
             headers=REQUEST_HEADERS,
         )
-        image_resp.raise_for_status()
-        pages = image_resp.json().get("query", {}).get("pages", {})
+        resp.raise_for_status()
+        pages = resp.json().get("query", {}).get("pages", {})
         for page in pages.values():
+            title = page.get("title", "")
+
+            # Sanity check: see docstring above for why this exists and why
+            # a basketball/NBA content check wouldn't be enough on its own.
+            name_words = {w.lower() for w in full_name.split() if len(w) > 1}
+            title_words = {w.lower().strip("()") for w in title.split()}
+            if not name_words or not (name_words & title_words):
+                return None
+
             thumbnail = page.get("thumbnail", {}).get("source")
-            if thumbnail:
-                return thumbnail
+            return thumbnail or None
         return None
     except (requests.RequestException, ValueError, KeyError):
         return None
