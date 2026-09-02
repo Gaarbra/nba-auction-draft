@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import PlayerHeadshot from "./PlayerHeadshot.jsx";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 const LANES = 6; // columns of drifting cards, split across both sides of the lobby card
@@ -17,7 +18,7 @@ function mulberry32(seed) {
   };
 }
 
-/** The homepage background from the sketch: real player names drifting
+/** The homepage background from the sketch: real player headshots drifting
  * slowly upward with a "$price" tag, looping endlessly, new ones entering
  * from the bottom as old ones exit the top — like a stock ticker for the
  * draft pool. Purely decorative (prices are randomized, not real
@@ -48,6 +49,7 @@ export default function PriceTicker({ active }) {
         items.push({
           key: `${lane}-${slot}`,
           lane,
+          id: player.id,
           fullName: player.fullName,
           price: 1 + Math.floor(rand() * 19),
           duration: 22 + rand() * 14, // seconds for one full bottom-to-top loop
@@ -73,7 +75,7 @@ export default function PriceTicker({ active }) {
             className="price-ticker-card"
             style={{ animationDuration: `${c.duration}s`, animationDelay: `${c.delay}s` }}
           >
-            <span className="price-ticker-name">{c.fullName}</span>
+            <PlayerHeadshot nbaPlayerId={c.id} alt={c.fullName} className="price-ticker-photo" />
             <span className="price-ticker-price">${c.price}</span>
           </div>
         ))}
