@@ -8,7 +8,16 @@ const STATS_SERVICE_URL = process.env.STATS_SERVICE_URL || "http://127.0.0.1:500
 export async function fetchPlayerStats(playerId) {
   try {
     const res = await fetch(`${STATS_SERVICE_URL}/stats?id=${encodeURIComponent(playerId)}`, {
-      signal: AbortSignal.timeout(3000),
+      // A cache hit on the stats-service side answers in single-digit
+      // milliseconds (see fetch_stats_for_player in app.py) — this timeout
+      // only ever actually gets used on a genuine cache miss, and on Render
+      // that live stats.nba.com lookup is confirmed to never succeed (the
+      // outbound IP is blocked outright, not just rate-limited). Was 3000ms;
+      // with up to MAX_STATS_DRAW_ATTEMPTS misses per roll, that made a
+      // roll that happened to draw two uncached players take up to 6s for
+      // no payoff. 1500ms halves that worst case while staying well above
+      // what any cache hit needs.
+      signal: AbortSignal.timeout(1500),
     });
     if (!res.ok) {
       console.warn(`[statsClient] ${res.status} for id=${playerId}`);
@@ -84,11 +93,13 @@ export async function fetchFullPlayerStatsWithRetry(playerId, attempts = FULL_ST
 }
 
 /**
- * Predicted auction price (in coins) from the trained price model — see
- * stats-service/ml.py and scripts/train_price_model.py. Returns null on any
- * failure (model not trained yet, player not found, timeout) — this is a
- * "nice to have" hint for the bidding UI, never something the draft flow
- * should block or error on.
+ * Predicted auction price (in coins) from the trained price model, plus a
+ * short "what this is mainly based on" breakdown for the UI's hover
+ * tooltip — see stats-service/ml.py (predict_price / explain_prediction)
+ * and scripts/train_price_model.py. Returns predictedPrice: null (and
+ * explanation: []) on any failure (model not trained yet, player not
+ * found, timeout) — this is a "nice to have" hint for the bidding UI, never
+ * something the draft flow should block or error on.
  */
 export async function fetchPredictedPrice(playerId, { era, difficulty, slot } = {}) {
   try {
@@ -100,12 +111,15 @@ export async function fetchPredictedPrice(playerId, { era, difficulty, slot } = 
     const res = await fetch(`${STATS_SERVICE_URL}/predict-price?${params}`, {
       signal: AbortSignal.timeout(3000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { predictedPrice: null, explanation: [] };
     const data = await res.json();
-    return typeof data.predictedPrice === "number" ? data.predictedPrice : null;
+    return {
+      predictedPrice: typeof data.predictedPrice === "number" ? data.predictedPrice : null,
+      explanation: Array.isArray(data.explanation) ? data.explanation : [],
+    };
   } catch (err) {
     console.warn(`[statsClient] predict-price failed for id=${playerId}: ${err.message}`);
-    return null;
+    return { predictedPrice: null, explanation: [] };
   }
 }
 

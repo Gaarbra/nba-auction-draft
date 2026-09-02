@@ -86,12 +86,12 @@ app.get("/api/players/cache-info", async (req, res) => {
 // model or a stats-service hiccup just means "no prediction/no similar
 // players right now", not a broken page. See stats-service/ml.py.
 app.get("/api/players/:id/predicted-price", async (req, res) => {
-  const predictedPrice = await fetchPredictedPrice(req.params.id, {
+  const { predictedPrice, explanation } = await fetchPredictedPrice(req.params.id, {
     era: req.query.era,
     difficulty: req.query.difficulty,
     slot: req.query.slot,
   });
-  res.json({ predictedPrice });
+  res.json({ predictedPrice, explanation });
 });
 
 app.get("/api/players/:id/similar", async (req, res) => {

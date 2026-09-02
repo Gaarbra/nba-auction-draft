@@ -649,7 +649,21 @@ def get_predicted_price():
         print(f"[predict-price] prediction failed player_id={player['id']} ({e.__class__.__name__}: {e})")
         return jsonify({"error": "PREDICTION_FAILED"}), 502
 
-    return jsonify({"player": {"id": player["id"], "fullName": player["full_name"]}, "predictedPrice": round(predicted, 1)})
+    # Best-effort — the hover-tooltip breakdown of what drove this number.
+    # Never lets an explanation failure take down the prediction itself.
+    try:
+        explanation = ml.explain_prediction(_price_model, stats, era=era, slot=slot, difficulty=difficulty)
+    except Exception as e:
+        print(f"[predict-price] explanation failed player_id={player['id']} ({e.__class__.__name__}: {e})")
+        explanation = []
+
+    return jsonify(
+        {
+            "player": {"id": player["id"], "fullName": player["full_name"]},
+            "predictedPrice": round(predicted, 1),
+            "explanation": explanation,
+        }
+    )
 
 
 @app.get("/similar-players")
