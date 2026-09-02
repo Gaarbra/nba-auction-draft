@@ -8,7 +8,9 @@ const MAX_MESSAGE_LENGTH = 200;
  * this only shows what arrived while mounted (see server/src/sockets/
  * roomHandlers.js's chat handlers), there's no history to fetch on open. */
 export default function ChatPanel({ socket, room, currentPlayerId, messages }) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Starts collapsed — expanded-by-default was covering roster columns the
+  // moment a draft loaded, before anyone had even opened it on purpose.
+  const [collapsed, setCollapsed] = useState(true);
   const [text, setText] = useState("");
   const listRef = useRef(null);
 

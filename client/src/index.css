@@ -247,9 +247,14 @@ body {
 }
 
 .connection-badge {
-  position: absolute;
+  position: fixed;
   top: 16px;
   right: 16px;
+  /* Explicit and high — the draft board can now stretch close to full
+     viewport width (see .draft-board's max-width), so its own header
+     content can land right under this same corner. Relying on implicit
+     paint order was fragile; a real z-index guarantees this always wins. */
+  z-index: 25;
   font-family: var(--font-display);
   font-size: 11px;
   font-weight: 600;
@@ -259,6 +264,7 @@ body {
   border-radius: 3px;
   background: var(--bg-panel-raised);
   border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
 .connection-badge.online {
