@@ -2501,6 +2501,15 @@ form input {
   overflow: hidden;
   flex-shrink: 0;
   width: 280px;
+  /* Without this, the panel had no bounded height to distribute among its
+     flex children, so .chat-panel-messages's flex:1 + overflow-y:auto
+     never actually had anything to clip against -- the whole panel just
+     grew taller with every message instead of staying put and scrolling
+     internally. align-items:stretch on .draft-layout doesn't help here
+     either: it makes this match .draft-board's height, but .draft-board
+     itself has no cap, so "stretch to match" was stretching to an
+     unbounded height too. */
+  max-height: calc(100vh - 32px);
   transition: width 0.18s ease;
 }
 
