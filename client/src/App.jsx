@@ -13,6 +13,7 @@ const ERROR_MESSAGES = {
   NAME_REQUIRED: "Please enter your name.",
   NAME_AND_CODE_REQUIRED: "Please enter your name and a room code.",
   NAME_TOO_LONG: "That name is too long.",
+  NAME_INAPPROPRIATE: "Please choose a different name.",
   ROOM_NOT_FOUND: "No room found with that code.",
   ROOM_FULL: "That room already has 4 players.",
   NAME_TAKEN: "Someone in that room already has that name.",

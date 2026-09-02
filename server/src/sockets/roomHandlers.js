@@ -28,6 +28,7 @@ import { fetchPlayerStats } from "../services/statsClient.js";
 import { saveDraftResults } from "../services/db.js";
 import { computeDraftResults } from "../scoring/computeResults.js";
 import { createKeyedRateLimiter, createSocketEventLimiter } from "../middleware/rateLimit.js";
+import { containsProfanity } from "../utils/nameFilter.js";
 
 // Worst case per candidate is roughly MAX_STATS_DRAW_ATTEMPTS × the
 // per-attempt timeout (see fetchPlayerStats's AbortSignal in
@@ -194,6 +195,9 @@ export function registerRoomHandlers(io, socket) {
     if (name.trim().length > MAX_NAME_LENGTH) {
       return callback?.({ error: "NAME_TOO_LONG" });
     }
+    if (containsProfanity(name)) {
+      return callback?.({ error: "NAME_INAPPROPRIATE" });
+    }
     const clientIp = socket.handshake.address;
     if (clientIp && !roomCreateLimiter(clientIp)) {
       return callback?.({ error: "RATE_LIMITED" });
@@ -231,6 +235,9 @@ export function registerRoomHandlers(io, socket) {
     }
     if (name.trim().length > MAX_NAME_LENGTH) {
       return callback?.({ error: "NAME_TOO_LONG" });
+    }
+    if (containsProfanity(name)) {
+      return callback?.({ error: "NAME_INAPPROPRIATE" });
     }
 
     const result = addPlayerToRoom(roomCode, { name, socketId: socket.id });
@@ -287,6 +294,7 @@ export function registerRoomHandlers(io, socket) {
     for (const n of names) {
       if (typeof n !== "string" || !n.trim()) return callback?.({ error: "NAME_REQUIRED" });
       if (n.trim().length > MAX_NAME_LENGTH) return callback?.({ error: "NAME_TOO_LONG" });
+      if (containsProfanity(n)) return callback?.({ error: "NAME_INAPPROPRIATE" });
     }
     const clientIp = socket.handshake.address;
     if (clientIp && !roomCreateLimiter(clientIp)) {
