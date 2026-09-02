@@ -270,7 +270,8 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   }
 
   return (
-    <div className="draft-board">
+    <div className="draft-layout">
+      <div className="draft-board">
       <div className="draft-header">
         <div>
           <h2>{room.isLocal ? "Local Game" : `Room ${room.code}`}</h2>
@@ -536,6 +537,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         nominatingId={draft?.currentNominatorId}
         floatingByPlayer={floatingByPlayer}
       />
+      </div>
 
       <ChatPanel socket={socket} room={room} currentPlayerId={currentPlayerId} messages={chatMessages} />
     </div>

@@ -235,7 +235,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <InteractiveBackground />
+      <InteractiveBackground ticker={!room} />
       <div className={`connection-badge ${connected ? "online" : "offline"}`}>
         {connected ? "Connected" : "Connecting…"}
       </div>
