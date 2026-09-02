@@ -1,0 +1,63 @@
+name: Refresh player data
+
+# Periodically re-fetches the player pool, notable-players leaderboard, and
+# per-player career stats from stats.nba.com and commits the result — see
+# stats-service/scripts/refresh_all.py for the actual logic and why this
+# exists at all: Render's own outbound IP is confirmed blocked by
+# stats.nba.com (every live lookup from there fails outright), so production
+# can never refresh this data on its own. It has to come from somewhere else
+# and get shipped via a normal commit + push, which then triggers Render's
+# usual auto-deploy.
+#
+# Whether this actually works depends on GitHub-hosted runners not *also*
+# being blocked — stats.nba.com is known to block a lot of datacenter/cloud
+# IP ranges broadly, not just Render's specifically. Untested until this
+# runs for real; if it turns out blocked too, this becomes a no-op (every
+# fetch fails, nothing changes, nothing gets committed) rather than
+# something actively harmful, so it's safe to leave enabled either way.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Mondays, 09:00 UTC
+  workflow_dispatch: {} # lets you trigger a refresh on demand from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: stats-service/requirements.txt
+
+      - name: Install stats-service dependencies
+        working-directory: stats-service
+        run: pip install -r requirements.txt
+
+      - name: Refresh player pool, notable players, and stats cache
+        working-directory: stats-service
+        # No DATABASE_URL on purpose — this only touches the git-shipped
+        # JSON caches, not Postgres, and app.py already treats a missing
+        # DATABASE_URL as "skip DB persistence" everywhere, not an error.
+        env:
+          REFRESH_MAX_RUNTIME_SECONDS: "1200"
+        run: python scripts/refresh_all.py
+
+      - name: Commit and push if anything changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add server/data/players.json server/data/notablePlayers.json stats-service/data/statsCache.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Scheduled data refresh: player pool, notable players, stats cache"
+            git push
+          fi
