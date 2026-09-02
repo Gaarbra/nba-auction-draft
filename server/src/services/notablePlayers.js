@@ -13,6 +13,15 @@ const STATS_SERVICE_URL = process.env.STATS_SERVICE_URL || "http://127.0.0.1:500
 
 let memoryCache = null; // { fetchedAt, ids: number[] }
 let inFlightRefresh = null;
+// Set on a failed refresh, separate from memoryCache.fetchedAt (which stays
+// the last real success and never gets bumped by a failure). Without this,
+// once memoryCache passes CACHE_TTL_MS, isFresh() is false forever and
+// EVERY call re-triggers a live refresh — on Render, where stats.nba.com is
+// confirmed unreachable, that turned every single roll into a multi-second
+// (sometimes much longer) wait instead of the one-time cost this was meant
+// to be. Real production bug, not theoretical: hit this exact path live.
+let lastRefreshFailureAt = 0;
+const REFRESH_RETRY_COOLDOWN_MS = 30 * 60 * 1000;
 
 async function readCacheFile() {
   try {
@@ -76,10 +85,17 @@ export async function getNotablePlayerIds() {
     }
   }
 
+  // Already tried recently and it failed — serve stale data immediately
+  // rather than pay for the same doomed attempt again on every request.
+  if (memoryCache && Date.now() - lastRefreshFailureAt < REFRESH_RETRY_COOLDOWN_MS) {
+    return memoryCache.ids;
+  }
+
   if (!inFlightRefresh) {
     inFlightRefresh = refreshCache()
       .catch((err) => {
         console.warn(`[notablePlayers] refresh failed, falling back: ${err.message}`);
+        lastRefreshFailureAt = Date.now();
         return memoryCache || { fetchedAt: 0, ids: [] };
       })
       .finally(() => {

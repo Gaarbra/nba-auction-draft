@@ -14,6 +14,14 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 let memoryCache = null;
 let inFlightRefresh = null;
+// Set on a failed refresh, separate from memoryCache.fetchedAt (the last
+// real success — a failure never bumps it). Without this, once memoryCache
+// passes CACHE_TTL_MS, isFresh() is false forever and EVERY getPlayers()
+// call — i.e. every single roll — re-triggers a live refresh attempt. Same
+// bug, same fix, as notablePlayers.js; see that file's comment for the
+// production incident this caused.
+let lastRefreshFailureAt = 0;
+const REFRESH_RETRY_COOLDOWN_MS = 30 * 60 * 1000;
 
 async function readCacheFile() {
   try {
@@ -64,6 +72,13 @@ export async function getPlayers({ forceRefresh = false, onProgress } = {}) {
     }
   }
 
+  // Already tried recently and it failed — serve stale data immediately
+  // rather than pay for the same doomed attempt again on every request.
+  // forceRefresh always bypasses this (an explicit request to actually try).
+  if (!forceRefresh && memoryCache && Date.now() - lastRefreshFailureAt < REFRESH_RETRY_COOLDOWN_MS) {
+    return memoryCache.players;
+  }
+
   if (!inFlightRefresh) {
     inFlightRefresh = refreshCache({ onProgress })
       .catch((err) => {
@@ -71,6 +86,7 @@ export async function getPlayers({ forceRefresh = false, onProgress } = {}) {
           console.warn(
             `[playerCache] refresh failed, serving stale cache from ${new Date(memoryCache.fetchedAt).toISOString()}: ${err.message}`
           );
+          lastRefreshFailureAt = Date.now();
           return memoryCache;
         }
         // Nothing to fall back to (first-ever run, no disk cache, and the
