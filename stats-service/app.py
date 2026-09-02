@@ -373,10 +373,26 @@ def _fetch_and_cache_stats(player_id):
     synchronously (and allowed to raise, same as always) when nothing is
     cached yet at all; called from a background thread — failures just get
     logged, see fetch_stats_for_player — once something stale already is."""
-    career = playercareerstats.PlayerCareerStats(player_id=player_id, timeout=15)
-    df = career.get_data_frames()[0]
+    try:
+        career = playercareerstats.PlayerCareerStats(player_id=player_id, timeout=15)
+        df = career.get_data_frames()[0]
+    except KeyError:
+        # Confirmed by hand on several ids that hit exactly this: the HTTP
+        # request itself succeeds, but stats.nba.com's response body is a
+        # genuinely empty {} for a player who's in the pool (drafted, on a
+        # roster) but never actually appeared in a real box score — nba_api's
+        # own parsing throws KeyError reaching for a "resultSet" key that
+        # just isn't there. Not a network hiccup (those raise a requests/
+        # urllib3 exception instead, and still propagate below to be retried
+        # later) — this is stats.nba.com telling us there's nothing to find,
+        # so caching it as "no stats" (same as the total_gp == 0 case right
+        # below) is what stops every future warm run from retrying it
+        # forever, and is the difference between capping out at ~96%
+        # coverage and actually resolving the full pool.
+        print(f"[no career record] player_id={player_id} — stats.nba.com has nothing for this id")
+        df = None
 
-    if df.empty:
+    if df is None or df.empty:
         stats = None
     else:
         season_rows = dedupe_traded_seasons(df)
