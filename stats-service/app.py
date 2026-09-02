@@ -294,6 +294,46 @@ def save_photo_cache_to_disk():
         print(f"[photo cache] failed to save to disk: {e}")
 
 
+# Unlike stats.nba.com, /debug-reachability confirmed NBA's photo CDN and
+# Wikipedia are BOTH reachable from Render — so this can safely resolve
+# live, on the request path, for any player the offline warm_photos.py
+# batch hasn't gotten to yet (new rookies included — this is what keeps
+# photo coverage current going forward with no manual re-run ever needed,
+# unlike everything stats.nba.com-sourced). Still never blocks the
+# response: a genuine miss resolves in the background exactly like a
+# stale stats cache entry does (see fetch_stats_for_player) — a player's
+# first-ever nomination might show the plain placeholder, but the answer
+# is cached for every nomination after that, for anyone.
+_photo_lookup_in_flight = set()
+
+
+def get_fallback_photo_url(player_id, full_name):
+    """None means either "NBA has a real photo" (the client's default
+    path) or "checked, nothing anywhere" — both already cached permanently,
+    since neither answer changes for a given player. Only a genuine
+    never-checked id costs anything, and even that never blocks: it's
+    resolved in the background and simply isn't available for THIS
+    response."""
+    if player_id in _photo_cache:
+        return _photo_cache[player_id]
+
+    if player_id not in _photo_lookup_in_flight:
+        _photo_lookup_in_flight.add(player_id)
+
+        def _resolve():
+            try:
+                _photo_cache[player_id] = None if photos.has_nba_headshot(player_id) else photos.find_wikipedia_photo(full_name)
+                save_photo_cache_to_disk()
+            except Exception as e:
+                print(f"[photo lookup failed] player_id={player_id} ({e.__class__.__name__}: {e})")
+            finally:
+                _photo_lookup_in_flight.discard(player_id)
+
+        threading.Thread(target=_resolve, daemon=True).start()
+
+    return None
+
+
 def _is_stats_fresh(player_id):
     cached = _cache.get(player_id)
     return bool(cached) and (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS
@@ -942,11 +982,11 @@ def get_stats():
         return jsonify({"error": "NO_STATS_AVAILABLE"}), 404
 
     # Only set when NBA's own CDN has no real photo for this player (see
-    # photos.py) — a plain lookup into the already-warmed cache, never a
-    # live Wikipedia call on this request path. None/missing here just
-    # means "NBA has one" (the client's default path) or "nothing found
-    # anywhere," both of which the client already falls back on its own.
-    fallback_photo_url = _photo_cache.get(player["id"])
+    # get_fallback_photo_url) — resolves instantly from cache for anyone
+    # already checked (the offline warm_photos.py batch, or a previous
+    # live nomination); a genuine first-ever miss never blocks this
+    # response, see that function's docstring.
+    fallback_photo_url = get_fallback_photo_url(player["id"], player["full_name"])
     if fallback_photo_url:
         stats = {**stats, "photoUrl": fallback_photo_url}
 
