@@ -45,7 +45,9 @@ const TEAM_COLORS = {
   WSB: { primary: "#002B5C", secondary: "#E31837" },
 };
 
-const FALLBACK = { primary: "#7a3a10", secondary: "#34495e" };
+// Neutral grays, not an accent tint -- a free agent or an era the team
+// data doesn't cover isn't "highlighted," it's just untinted.
+const FALLBACK = { primary: "#3a3a40", secondary: "#232326" };
 
 export function getTeamColors(abbreviation) {
   if (!abbreviation) return FALLBACK;
