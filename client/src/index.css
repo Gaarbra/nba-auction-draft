@@ -567,7 +567,10 @@ form input {
   border: 1px solid var(--line);
   background: var(--bg-inset);
   color: var(--text);
-  font-size: 15px;
+  /* 16px, not smaller -- iOS Safari auto-zooms the whole page on focus for
+     any input under 16px, which is exactly the kind of thing that reads as
+     "janky" on a phone. */
+  font-size: 16px;
 }
 
 .primary-btn,
@@ -1055,7 +1058,13 @@ form input {
     max-height: 320px;
   }
 
-  .chat-panel.collapsed .chat-panel-header {
+  /* Scoped under .draft-layout for the same reason as above -- this is the
+     exact same selector, at the exact same specificity, as the desktop
+     ".chat-panel.collapsed .chat-panel-header" rule declared later in this
+     file, so an unscoped version here would keep losing that tie and the
+     collapsed header would keep rendering as a full-height vertical column
+     (a big empty box) instead of a short horizontal bar. Verified live. */
+  .draft-layout .chat-panel.collapsed .chat-panel-header {
     writing-mode: horizontal-tb;
     flex-direction: row;
     height: auto;
@@ -1335,7 +1344,8 @@ form input {
   border: 1px solid var(--line);
   background: var(--bg-panel-raised);
   color: var(--text);
-  font-size: 14px;
+  /* 16px floor -- see form input's comment on iOS Safari's zoom-on-focus. */
+  font-size: 16px;
 }
 
 .player-search-input {
@@ -1841,7 +1851,9 @@ form input {
   color: var(--text);
   text-align: center;
   font-family: var(--font-display);
-  font-size: 15px;
+  /* 16px floor -- see form input's comment on iOS Safari's zoom-on-focus;
+     the bid amount is the single most-tapped input in the app. */
+  font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   /* Hide the native up/down spinner — this input already has its own
@@ -2651,7 +2663,9 @@ form input {
   border: 1px solid var(--line);
   background: var(--bg-inset);
   color: var(--text);
-  font-size: 13px;
+  /* 16px floor -- see form input's comment on iOS Safari's zoom-on-focus;
+     this is the input most likely to get tapped mid-draft on a phone. */
+  font-size: 16px;
 }
 
 .chat-send-btn {
