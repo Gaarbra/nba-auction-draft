@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
+import LogoMark from "./LogoMark.jsx";
 
 // Matches the room-code alphabet the server generates from (roomStore.js) —
 // no I/O/0/1, to avoid characters that look alike. Sanitizing pasted text
@@ -116,7 +117,10 @@ export default function RoomLobby({
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
       style={{ transformPerspective: 900 }}
     >
-      <h1>Hoop Bids</h1>
+      <div className="lobby-brand">
+        <LogoMark className="lobby-brand-logo" />
+        <h1>Hoop Bids</h1>
+      </div>
 
       <div className="mode-toggle">
         <button type="button" className={mode === "public" ? "active" : ""} onClick={() => setMode("public")}>

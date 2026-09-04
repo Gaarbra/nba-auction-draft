@@ -4,6 +4,9 @@ import RoomLobby from "./components/RoomLobby.jsx";
 import RoomView from "./components/RoomView.jsx";
 import DraftBoard from "./components/DraftBoard.jsx";
 import Footer from "./components/Footer.jsx";
+import TopNav from "./components/TopNav.jsx";
+import BottomNav from "./components/BottomNav.jsx";
+import RoomFooter from "./components/RoomFooter.jsx";
 import InteractiveBackground from "./components/InteractiveBackground.jsx";
 
 const SESSION_KEY = "nba-auction-draft:session";
@@ -244,38 +247,60 @@ export default function App() {
     }
   }, [room?.draft?.currentNominatorId, room?.draft?.nomination?.phase, room?.draft?.nomination?.currentBidder, localPlayerIds]);
 
+  const draft = room?.draft;
+  const inDraft = Boolean(room) && room.status !== "waiting" && room.status !== "complete";
+  const onClockPlayer = draft ? room.players.find((p) => p.id === draft.currentNominatorId) : null;
+  const isMyNominationTurn = draft?.currentNominatorId === currentPlayerId;
+  const myBudget = room ? room.players.find((p) => p.id === currentPlayerId)?.budget ?? null : null;
+  // Each team drafts on the same fixed purse; CoinRow's meter maxes at 20.
+  const teamBudget = 20;
+
   return (
     <div className="app-shell">
       <InteractiveBackground ticker={!room} />
-      <div className={`connection-badge ${connected ? "online" : "offline"}`}>
-        {connected ? "Connected" : "Connecting…"}
-      </div>
 
-      {isReconnecting && !room ? (
-        <div className="lobby-card">
-          <p className="hint-text">Reconnecting to your room…</p>
-        </div>
-      ) : room ? (
-        <div className="room-with-switcher">
-          {room.status === "waiting" ? (
-            <RoomView
-              room={room}
-              currentPlayerId={currentPlayerId}
-              socket={socketRef.current}
-              onLeaveRoom={handleLeaveRoom}
-              onStartDraft={handleStartDraft}
-            />
-          ) : (
-            <DraftBoard
-              room={room}
-              currentPlayerId={currentPlayerId}
-              socket={socketRef.current}
-              onLeaveRoom={handleLeaveRoom}
-            />
-          )}
-        </div>
+      {room ? (
+        <TopNav
+          variant="room"
+          connected={connected}
+          isLocal={room.isLocal}
+          roomLabel="Local Game"
+          roomCode={room.code}
+          difficulty={room.difficulty}
+          biddingMode={room.biddingMode}
+          onClockName={inDraft && onClockPlayer ? (isMyNominationTurn ? "You" : onClockPlayer.name) : null}
+          coins={inDraft ? myBudget : null}
+          onLeaveRoom={handleLeaveRoom}
+        />
       ) : (
-        <>
+        <TopNav variant="lobby" connected={connected} />
+      )}
+
+      <main className="app-main">
+        {isReconnecting && !room ? (
+          <div className="lobby-card">
+            <p className="hint-text">Reconnecting to your room…</p>
+          </div>
+        ) : room ? (
+          <div className="room-with-switcher">
+            {room.status === "waiting" ? (
+              <RoomView
+                room={room}
+                currentPlayerId={currentPlayerId}
+                socket={socketRef.current}
+                onLeaveRoom={handleLeaveRoom}
+                onStartDraft={handleStartDraft}
+              />
+            ) : (
+              <DraftBoard
+                room={room}
+                currentPlayerId={currentPlayerId}
+                socket={socketRef.current}
+                onLeaveRoom={handleLeaveRoom}
+              />
+            )}
+          </div>
+        ) : (
           <RoomLobby
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
@@ -285,7 +310,15 @@ export default function App() {
             error={error || kickedMessage}
             isSubmitting={isSubmitting}
           />
+        )}
+      </main>
+
+      {room ? (
+        inDraft && <RoomFooter totalBudget={teamBudget} />
+      ) : (
+        <>
           <Footer />
+          <BottomNav />
         </>
       )}
     </div>

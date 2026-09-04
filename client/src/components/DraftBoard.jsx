@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import RosterGrid from "./RosterGrid.jsx";
+import AssignBoard from "./AssignBoard.jsx";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
 import ResultsScreen from "./ResultsScreen.jsx";
@@ -12,10 +13,8 @@ import BidStepper from "./BidStepper.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import LocalBiddingRows from "./LocalBiddingRows.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
-import InfoModal from "./InfoModal.jsx";
-import { isSoundMuted, setSoundMuted, playRollTick, playRollSelectChime } from "../rollSound.js";
+import { playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
-import { PAGES } from "../siteContent.jsx";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -66,18 +65,6 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   const [assignError, setAssignError] = useState("");
   const [isRolling, setIsRolling] = useState(false);
   const [rollDisplayName, setRollDisplayName] = useState("");
-  const [soundMuted, setSoundMutedState] = useState(() => isSoundMuted());
-  // Footer (which owns "How to Play") only mounts on the pre-room screen —
-  // once a draft starts, a confused first-timer had zero way to reach the
-  // rules short of leaving the room entirely. This gives DraftBoard its
-  // own entry point to the exact same content.
-  const [showHelp, setShowHelp] = useState(false);
-
-  function toggleSound() {
-    const next = !soundMuted;
-    setSoundMutedState(next);
-    setSoundMuted(next);
-  }
 
   const rollSampleRef = useRef([]);
   const rollIntervalRef = useRef(null);
@@ -276,52 +263,18 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
     return <ResultsScreen room={room} currentPlayerId={currentPlayerId} socket={socket} onLeaveRoom={onLeaveRoom} />;
   }
 
+  const isAssigningAsWinner =
+    nomination?.phase === "assigning" && currentPlayerId === nomination.currentBidder;
+
   return (
     <div className="draft-layout">
       <div className="draft-board">
-      <div className="draft-header">
-        <div>
-          <h2>{room.isLocal ? "Local Game" : `Room ${room.code}`}</h2>
-          <div className="draft-meta">
-            {room.draftEra && room.draftEra !== "all" && <span className="meta-chip">Pool: {room.draftEra}</span>}
-            {room.difficulty && <span className={`meta-chip difficulty-${room.difficulty}`}>{room.difficulty}</span>}
-            {room.biddingMode === "orderly" && <span className="meta-chip">Orderly bidding</span>}
-          </div>
+      {(room.draftEra && room.draftEra !== "all") || room.biddingMode === "orderly" ? (
+        <div className="draft-meta">
+          {room.draftEra && room.draftEra !== "all" && <span className="meta-chip">Pool: {room.draftEra}</span>}
+          {room.biddingMode === "orderly" && <span className="meta-chip">Orderly bidding</span>}
         </div>
-        <div className="draft-header-right">
-          {nominator && (
-            <div className="on-the-clock">
-              <span className="on-the-clock-label">On the clock</span>
-              <span className="on-the-clock-name">{isMyTurn ? "You" : nominator.name}</span>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setShowHelp(true)}
-            className="icon-btn"
-            title="How to play"
-            aria-label="How to play"
-          >
-            ?
-          </button>
-          <button
-            type="button"
-            onClick={toggleSound}
-            className="icon-btn"
-            title={soundMuted ? "Unmute roll sound" : "Mute roll sound"}
-            aria-label={soundMuted ? "Unmute roll sound" : "Mute roll sound"}
-          >
-            {soundMuted ? "🔇" : "🔊"}
-          </button>
-          <button type="button" onClick={onLeaveRoom} className="secondary-btn">
-            Leave Room
-          </button>
-        </div>
-      </div>
-
-      {showHelp && (
-        <InfoModal title={PAGES.howToPlay.title} body={PAGES.howToPlay.body} onClose={() => setShowHelp(false)} />
-      )}
+      ) : null}
 
       {!room.isLocal && <VoteKickBanner room={room} currentPlayerId={currentPlayerId} socket={socket} />}
 
@@ -340,7 +293,22 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         </div>
       )}
 
-      {!isRolling && nomination && (
+      {isAssigningAsWinner && (
+        <AssignBoard
+          ownerName={currentPlayer?.name || "Your"}
+          roster={myRoster}
+          budget={currentPlayer?.budget ?? 0}
+          nomination={nomination}
+          nominatedByName={playerName(nomination.nominatedBy)}
+          pendingAssignment={pendingAssignment}
+          assignError={assignError}
+          onPickPosition={handlePickPosition}
+          onConfirmPending={submitAssign}
+          onCancelPending={() => setPendingAssignment(null)}
+        />
+      )}
+
+      {!isRolling && nomination && !isAssigningAsWinner && (
         // No AnimatePresence/exit animation here on purpose — this panel is
         // load-bearing (it's how you assign a won player to a slot), and an
         // exit transition that never resolves would leave it stuck showing
@@ -543,15 +511,17 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         </motion.div>
       )}
 
-      <RosterGrid
-        room={room}
-        currentPlayerId={currentPlayerId}
-        socket={socket}
-        nominatingId={draft?.currentNominatorId}
-        floatingByPlayer={floatingByPlayer}
-        assigningSlot={nomination?.phase === "assigning" && currentPlayerId === nomination.currentBidder}
-        onAssignSlot={handlePickPosition}
-      />
+      {!isAssigningAsWinner && (
+        <RosterGrid
+          room={room}
+          currentPlayerId={currentPlayerId}
+          socket={socket}
+          nominatingId={draft?.currentNominatorId}
+          floatingByPlayer={floatingByPlayer}
+          assigningSlot={false}
+          onAssignSlot={handlePickPosition}
+        />
+      )}
       </div>
 
       <ChatPanel socket={socket} room={room} currentPlayerId={currentPlayerId} messages={chatMessages} />
