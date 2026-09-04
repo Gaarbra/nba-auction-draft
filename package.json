@@ -3,10 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently -n server,client,stats -c blue,orange,green \"npm run dev --prefix server\" \"npm run dev --prefix client\" \"python stats-service/app.py\"",
+    "dev": "concurrently -n server,client,stats -c blue,orange,green \"cross-env PORT=4000 npm run dev --prefix server\" \"npm run dev --prefix client\" \"cross-env PORT=5001 python stats-service/app.py\"",
     "install:all": "npm install --prefix server && npm install --prefix client && python -m pip install -r stats-service/requirements.txt"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0"
   }
 }
