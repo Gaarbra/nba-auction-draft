@@ -1,6 +1,9 @@
 import { motion } from "motion/react";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
+import StatHighlightRow from "./StatHighlightRow.jsx";
+import StatRadarChart from "./StatRadarChart.jsx";
+import { getTeamColors } from "../teamColors.js";
 
 /* The focused "you won a player — now place them" screen, matching the
    Stitch "Assign Player to Roster Slot" mock: a hero banner for the won
@@ -33,6 +36,15 @@ export default function AssignBoard({
   const player = nomination.player;
   const cost = nomination.currentBid;
   const filledCount = POSITIONS.filter((pos) => roster[pos]).length;
+  const stats = player.stats;
+  const hasStats = stats && !stats.unavailable;
+  const seasonRange =
+    hasStats && stats.firstSeason === stats.lastSeason
+      ? stats.firstSeason
+      : hasStats
+        ? `${stats.firstSeason}–${stats.lastSeason}`
+        : null;
+  const teamColor = getTeamColors(player.team?.abbreviation).primary;
 
   return (
     <div className="assign-screen">
@@ -62,22 +74,34 @@ export default function AssignBoard({
               {player.draftYear ? `Drafted ${player.draftYear}` : "Undrafted"}
             </p>
             <p className="won-banner-sub">
-              {player.stats?.unavailable ? "Stats unavailable for this player." : null}
-              {player.stats?.unavailable ? <span className="won-banner-dot">•</span> : null}
+              {stats?.unavailable ? "Stats unavailable for this player." : null}
+              {stats?.unavailable ? <span className="won-banner-dot">•</span> : null}
               Nominated by <span className="won-banner-meta-strong">{nominatedByName || "a rival"}</span>
             </p>
+
+            {hasStats && (
+              <>
+                <p className="won-banner-season">
+                  Career avg, {stats.seasonsPlayed} season{stats.seasonsPlayed === 1 ? "" : "s"} · {seasonRange}
+                </p>
+                <StatHighlightRow stats={stats} />
+              </>
+            )}
           </div>
         </div>
 
-        <div className="won-banner-bid">
-          <span className="won-banner-bid-label">Winning bid</span>
-          <div className="won-banner-bid-value">
-            <span className="won-banner-bid-num">{cost}</span>
-            <span className="won-banner-bid-unit">
-              <span className="won-banner-bid-coin">{cost === 1 ? "Coin" : "Coins"}</span>
-              <span className="won-banner-bid-tier">Standard pick</span>
-            </span>
+        <div className="won-banner-aside">
+          <div className="won-banner-bid">
+            <span className="won-banner-bid-label">Winning bid</span>
+            <div className="won-banner-bid-value">
+              <span className="won-banner-bid-num">{cost}</span>
+              <span className="won-banner-bid-unit">
+                <span className="won-banner-bid-coin">{cost === 1 ? "Coin" : "Coins"}</span>
+                <span className="won-banner-bid-tier">Standard pick</span>
+              </span>
+            </div>
           </div>
+          {hasStats && <StatRadarChart stats={stats} color={teamColor} />}
         </div>
 
         <div className="won-banner-prompt">
