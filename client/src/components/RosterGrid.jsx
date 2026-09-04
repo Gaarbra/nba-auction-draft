@@ -13,12 +13,29 @@ function formatStat(value) {
   return value === null || value === undefined ? "N/A" : value;
 }
 
-export default function RosterGrid({ room, currentPlayerId, socket, nominatingId, floatingByPlayer = {} }) {
+export default function RosterGrid({
+  room,
+  currentPlayerId,
+  socket,
+  nominatingId,
+  floatingByPlayer = {},
+  assigningSlot = false,
+  onAssignSlot,
+}) {
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   const canSwap = Boolean(room.allowPositionSwaps) && room.status === "drafting";
 
-  function handleSlotClick(pos) {
+  // Right after winning a bid, the open slot the player taps IS the pick —
+  // no separate row of position buttons duplicating the same five labels
+  // already shown here. Swapping (after the roster's built out) stays a
+  // distinct flow below; the two never overlap in practice.
+  function handleSlotClick(pos, isMine, occupant) {
+    if (isMine && assigningSlot && !occupant) {
+      onAssignSlot?.(pos);
+      return;
+    }
+
     if (!canSwap) return;
 
     if (selectedSlot === null) {
@@ -76,30 +93,34 @@ export default function RosterGrid({ room, currentPlayerId, socket, nominatingId
             <div className="roster-slots">
               {POSITIONS.map((pos) => {
                 const occupant = roster[pos];
-                const interactive = isMine && canSwap;
+                const assignable = isMine && assigningSlot && !occupant;
+                const interactive = assignable || (isMine && canSwap);
                 const colors = occupant ? getTeamColors(occupant.team?.abbreviation) : null;
                 // A plain div, not a <button> — the hover tooltip nests a
                 // real <a> (the NBA.com stats link) inside it, and a link
                 // inside a <button> is invalid HTML that browsers handle
                 // inconsistently. role/tabIndex/onKeyDown restore the
-                // button-like keyboard behavior only when swaps are on.
+                // button-like keyboard behavior whenever a tap here does
+                // something (assigning a fresh pick, or swapping later).
                 return (
                   <div
                     key={pos}
                     role={interactive ? "button" : undefined}
                     tabIndex={interactive ? 0 : undefined}
-                    onClick={() => handleSlotClick(pos)}
+                    aria-label={assignable ? `Add to ${pos}` : undefined}
+                    onClick={() => handleSlotClick(pos, isMine, occupant)}
                     onKeyDown={(e) => {
                       if (!interactive) return;
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        handleSlotClick(pos);
+                        handleSlotClick(pos, isMine, occupant);
                       }
                     }}
                     className={[
                       "roster-slot",
                       occupant ? "filled" : "open",
                       interactive ? "interactive" : "",
+                      assignable ? "assignable" : "",
                       selectedSlot === pos ? "selected" : "",
                     ]
                       .filter(Boolean)

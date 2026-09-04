@@ -501,22 +501,9 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               {currentPlayerId === nomination.currentBidder ? (
                 <>
                   <p>
-                    You won {nomination.player.fullName} for {nomination.currentBid} coins. Choose a slot:
+                    You won {nomination.player.fullName} for {nomination.currentBid} coins — tap an open slot in
+                    your roster below to add them.
                   </p>
-                  <div className="position-picker">
-                    {myOpenSlots.map((pos) => (
-                      <motion.button
-                        key={pos}
-                        type="button"
-                        onClick={() => handlePickPosition(pos)}
-                        className="secondary-btn"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.94 }}
-                      >
-                        {pos}
-                      </motion.button>
-                    ))}
-                  </div>
 
                   {pendingAssignment && (
                     <div className="budget-warning">
@@ -562,6 +549,8 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         socket={socket}
         nominatingId={draft?.currentNominatorId}
         floatingByPlayer={floatingByPlayer}
+        assigningSlot={nomination?.phase === "assigning" && currentPlayerId === nomination.currentBidder}
+        onAssignSlot={handlePickPosition}
       />
       </div>
 
