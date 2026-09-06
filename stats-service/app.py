@@ -998,6 +998,51 @@ def get_notable_players():
     return jsonify({"playerIds": ids, "count": len(ids)})
 
 
+@app.get("/market-index")
+def get_market_index():
+    """A lightweight, browsable index of every player this service already
+    has real cached stats for -- the Market tab's era/team/player pickers
+    are built from this, not a live nba_api call. Two things make this
+    reliable on Render specifically: it only reads `_cache` (loaded once at
+    startup from the committed statsCache.json, never touches stats.nba.com
+    itself), and full names come from nba_api's *static* players module,
+    which ships as bundled data in the package -- not a network call -- so
+    this works even though Render's outbound IP is blocked from the live
+    API. `team` prefers mostPlayedTeam over the last-active team (see
+    fetch_player_bio's docstring on why "last team" is a worse identity for
+    a career-spanning browse than "the team you actually associate this
+    player with").
+
+    players.get_players() (the full static list) once, not
+    players.find_player_by_id() per player: that helper does a fresh linear
+    scan over the ~5,100-player static list on every call -- ~20ms each,
+    fine for the odd single lookup elsewhere in this file, but 5,000+ of
+    them back to back is minutes, not milliseconds. Confirmed by timing it
+    directly before landing this fix."""
+    identities_by_id = {p["id"]: p for p in players.get_players()}
+
+    index = []
+    for player_id, entry in _cache.items():
+        stats = entry.get("stats") or {}
+        team = stats.get("mostPlayedTeam") or stats.get("team")
+        if not team:
+            continue
+        identity = identities_by_id.get(player_id)
+        if not identity:
+            continue
+        index.append(
+            {
+                "id": player_id,
+                "fullName": identity["full_name"],
+                "team": team,
+                "position": stats.get("position"),
+                "draftYear": stats.get("draftYear"),
+            }
+        )
+
+    return jsonify({"players": index, "count": len(index)})
+
+
 @app.get("/stats")
 def get_stats():
     player = resolve_player(request)

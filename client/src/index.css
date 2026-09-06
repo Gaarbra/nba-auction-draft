@@ -2242,6 +2242,20 @@ form input {
   text-decoration: underline;
 }
 
+.similar-player-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.similar-player-link:hover {
+  color: var(--accent-bright);
+  text-decoration: underline;
+}
+
 .similar-player-sep {
   color: var(--text-faint);
   margin-left: 4px;
@@ -4448,5 +4462,105 @@ form input {
 
   .app-main {
     padding-bottom: 112px;
+  }
+}
+
+/* Market tab: the same era -> team -> player picker chain the draft's own
+   dropdowns use, then the exact card shape a live nomination shows
+   (.nominated-player-card, reused verbatim below) for whichever player is
+   picked. */
+.market-tab {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.market-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.market-filter {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.market-filter-label {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.market-empty-hint {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.market-player-card {
+  width: 100%;
+}
+
+.market-difficulty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0 2px;
+}
+
+.market-difficulty-row .market-filter-label {
+  margin-bottom: 0;
+}
+
+.market-difficulty-picker {
+  padding: 3px;
+}
+
+.market-difficulty-picker .difficulty-option {
+  padding: 5px 12px;
+  font-size: 11px;
+}
+
+.market-value-change {
+  margin: 8px 0 0;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.market-value-change.up {
+  color: var(--win);
+}
+
+.market-value-change.down {
+  color: var(--lose);
+}
+
+@media (max-width: 600px) {
+  .market-filters {
+    flex-direction: column;
+  }
+
+  .market-filter {
+    /* flex-basis applies to the column's main axis (height) once the row
+       above switches to flex-direction:column -- without overriding it,
+       the 180px meant as a desktop row's width basis instead stretches
+       every filter to a 180px-tall box, with flex-grow filling the rest of
+       the column's height on top of that. Verified live: this was the
+       exact cause of ~140px of dead space under each dropdown on mobile. */
+    flex: none;
+    min-width: 0;
   }
 }

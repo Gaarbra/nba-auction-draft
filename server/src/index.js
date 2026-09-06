@@ -8,7 +8,14 @@ import { getPlayers, getCacheInfo } from "./services/playerCache.js";
 import { filterPlayersByEra, summarizeEras } from "./services/era.js";
 import { httpRateLimit } from "./middleware/rateLimit.js";
 import { initSchema } from "./services/db.js";
-import { fetchPredictedPrice, fetchSimilarPlayers, fetchPhotoUrl, pingStatsService } from "./services/statsClient.js";
+import {
+  fetchPredictedPrice,
+  fetchSimilarPlayers,
+  fetchPhotoUrl,
+  fetchPlayerStats,
+  fetchMarketIndex,
+  pingStatsService,
+} from "./services/statsClient.js";
 
 initSchema(); // no-op if DATABASE_URL isn't set — see db.js
 
@@ -67,6 +74,23 @@ app.get("/api/players", async (req, res) => {
   } catch (err) {
     handleApiError(err, req, res);
   }
+});
+
+// The Market tab's era/team/player pickers — see fetchMarketIndex's own
+// comment for why this is safe to serve on Render (no live stats.nba.com
+// call anywhere in this path).
+app.get("/api/players/market-index", async (req, res) => {
+  const players = await fetchMarketIndex();
+  res.json({ players, count: players.length });
+});
+
+// Standalone per-player stats lookup for the Market tab, which browses a
+// player outside any room/nomination — everywhere else in the app this
+// data only ever arrives bundled into a room's nomination payload.
+app.get("/api/players/:id/stats", async (req, res) => {
+  const result = await fetchPlayerStats(req.params.id);
+  if (!result) return res.status(404).json({ error: "NO_STATS_AVAILABLE" });
+  res.json(result);
 });
 
 app.get("/api/players/eras", async (req, res) => {

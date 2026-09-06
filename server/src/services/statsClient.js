@@ -160,6 +160,40 @@ export async function fetchSimilarPlayers(playerId, k = 5) {
   }
 }
 
+let marketIndexCache = null; // { players, fetchedAt } | null
+const MARKET_INDEX_CACHE_TTL_MS = 60 * 60 * 1000; // an hour -- see fetchMarketIndex
+
+/**
+ * The Market tab's era/team/player picker data — every player stats-service
+ * already has real cached stats for, with team/position/draft year. Backed
+ * entirely by stats-service's own on-disk cache (see /market-index's own
+ * docstring for why that's what makes this Render-safe), so the only thing
+ * worth caching here is the network round-trip + JSON size (a few thousand
+ * small objects) itself. A stale-for-up-to-an-hour list is fine — this
+ * data changes on the order of "a new season starts", not per request —
+ * and returning the last good list on a transient failure beats a blank
+ * picker for something this static.
+ */
+export async function fetchMarketIndex() {
+  if (marketIndexCache && Date.now() - marketIndexCache.fetchedAt < MARKET_INDEX_CACHE_TTL_MS) {
+    return marketIndexCache.players;
+  }
+
+  try {
+    const res = await fetch(`${STATS_SERVICE_URL}/market-index`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const data = await res.json();
+    const list = Array.isArray(data.players) ? data.players : [];
+    marketIndexCache = { players: list, fetchedAt: Date.now() };
+    return list;
+  } catch (err) {
+    console.warn(`[statsClient] market-index fetch failed: ${err.message}`);
+    return marketIndexCache?.players ?? [];
+  }
+}
+
 /**
  * Standalone from fetchPlayerStats on purpose — this is only ever called
  * as a client-side retry a couple seconds after a nomination reveal that

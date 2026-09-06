@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSocket } from "./hooks/useSocket.js";
 import LandingPage from "./components/LandingPage.jsx";
 import RoomLobby from "./components/RoomLobby.jsx";
+import MarketTab from "./components/MarketTab.jsx";
 import RoomView from "./components/RoomView.jsx";
 import DraftBoard from "./components/DraftBoard.jsx";
 import Footer from "./components/Footer.jsx";
@@ -74,6 +75,11 @@ export default function App() {
   // page load (or tab) starts at the front door again since this isn't
   // persisted to storage.
   const [showLanding, setShowLanding] = useState(true);
+  // Which pre-room screen the top nav's tabs point at. Independent of
+  // showLanding -- Market is its own destination, not a step in the
+  // landing-page-to-lobby funnel, so switching to it shouldn't care whether
+  // the pitch screen was already dismissed.
+  const [activeTab, setActiveTab] = useState("lobby");
 
   const sessionRef = useRef(loadSession());
 
@@ -283,7 +289,7 @@ export default function App() {
           onLeaveRoom={handleLeaveRoom}
         />
       ) : (
-        <TopNav variant="lobby" connected={connected} />
+        <TopNav variant="lobby" connected={connected} activeTab={activeTab} onTabChange={setActiveTab} />
       )}
 
       <main className="app-main">
@@ -310,6 +316,8 @@ export default function App() {
               />
             )}
           </div>
+        ) : activeTab === "market" ? (
+          <MarketTab />
         ) : showLanding ? (
           <LandingPage onEnter={() => setShowLanding(false)} />
         ) : (
@@ -330,7 +338,7 @@ export default function App() {
       ) : (
         <>
           <Footer />
-          <BottomNav />
+          <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
         </>
       )}
     </div>

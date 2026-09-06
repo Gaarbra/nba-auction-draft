@@ -59,7 +59,16 @@ function HelpIcon() {
   );
 }
 
-const LOBBY_TABS = ["Lobby", "Market", "Roster", "Stats"];
+// "market" is the only one wired to a real screen so far (see MarketTab.jsx)
+// -- Roster/Stats stay disabled visual stubs until there's an actual screen
+// behind them, same reasoning as the notification/wallet icons below.
+const LOBBY_TABS = [
+  { id: "lobby", label: "Lobby" },
+  { id: "market", label: "Market" },
+  { id: "roster", label: "Roster" },
+  { id: "stats", label: "Stats" },
+];
+const ENABLED_TABS = new Set(["lobby", "market"]);
 
 export default function TopNav({
   variant = "lobby",
@@ -72,6 +81,8 @@ export default function TopNav({
   onClockName = null,
   coins = null,
   onLeaveRoom,
+  activeTab = "lobby",
+  onTabChange,
 }) {
   const [showHelp, setShowHelp] = useState(false);
   const [soundMuted, setSoundMutedState] = useState(() => isSoundMuted());
@@ -105,13 +116,14 @@ export default function TopNav({
           <nav className="topnav-tabs">
             {LOBBY_TABS.map((tab) => (
               <button
-                key={tab}
+                key={tab.id}
                 type="button"
-                className={`topnav-tab ${tab === "Lobby" ? "active" : ""}`}
-                aria-current={tab === "Lobby" ? "page" : undefined}
-                disabled={tab !== "Lobby"}
+                className={`topnav-tab ${tab.id === activeTab ? "active" : ""}`}
+                aria-current={tab.id === activeTab ? "page" : undefined}
+                disabled={!ENABLED_TABS.has(tab.id)}
+                onClick={() => onTabChange?.(tab.id)}
               >
-                {tab}
+                {tab.label}
               </button>
             ))}
           </nav>

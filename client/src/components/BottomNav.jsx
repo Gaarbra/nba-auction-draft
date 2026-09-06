@@ -1,6 +1,8 @@
-/* Mobile-only bottom tab bar for the lobby, mirroring the Stitch mock.
-   Draft / Roster / Account are visual stubs — the game is a single
-   pass-through flow, not a multi-section app — so only "Lobby" is live. */
+/* Mobile-only bottom tab bar for the lobby, mirroring TopNav's own lobby
+   tabs (client/src/components/TopNav.jsx) — this is the ONLY way to reach
+   Market on a phone, since TopNav's own tab row is desktop-only
+   (`hidden md:flex`). Roster / Account stay visual stubs until there's an
+   actual screen behind them. */
 
 function HomeIcon() {
   return (
@@ -39,22 +41,23 @@ function AccountIcon() {
 }
 
 const ITEMS = [
-  { label: "Lobby", Icon: HomeIcon, active: true },
-  { label: "Draft", Icon: GavelIcon },
-  { label: "Roster", Icon: RosterIcon },
-  { label: "Account", Icon: AccountIcon },
+  { id: "lobby", label: "Lobby", Icon: HomeIcon, enabled: true },
+  { id: "market", label: "Market", Icon: GavelIcon, enabled: true },
+  { id: "roster", label: "Roster", Icon: RosterIcon, enabled: false },
+  { id: "account", label: "Account", Icon: AccountIcon, enabled: false },
 ];
 
-export default function BottomNav() {
+export default function BottomNav({ activeTab = "lobby", onTabChange }) {
   return (
     <nav className="bottom-nav" aria-label="Sections">
-      {ITEMS.map(({ label, Icon, active }) => (
+      {ITEMS.map(({ id, label, Icon, enabled }) => (
         <button
-          key={label}
+          key={id}
           type="button"
-          className={`bottom-nav-item ${active ? "active" : ""}`}
-          aria-current={active ? "page" : undefined}
-          disabled={!active}
+          className={`bottom-nav-item ${id === activeTab ? "active" : ""}`}
+          aria-current={id === activeTab ? "page" : undefined}
+          disabled={!enabled}
+          onClick={() => onTabChange?.(id)}
         >
           <Icon />
           <span>{label}</span>

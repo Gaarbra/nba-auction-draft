@@ -12,7 +12,7 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
  * not trained yet, player has no cached stats, stats-service unreachable)
  * and this just renders nothing for that half rather than an error state,
  * matching how every other stats-dependent panel in this app degrades. */
-export default function PlayerInsights({ nbaPlayerId, era, difficulty }) {
+export default function PlayerInsights({ nbaPlayerId, era, difficulty, onPredictedPrice, onSimilarPlayerClick }) {
   const [predictedPrice, setPredictedPrice] = useState(null);
   const [explanation, setExplanation] = useState([]);
   const [similar, setSimilar] = useState([]);
@@ -32,7 +32,13 @@ export default function PlayerInsights({ nbaPlayerId, era, difficulty }) {
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
-        if (typeof data.predictedPrice === "number") setPredictedPrice(data.predictedPrice);
+        if (typeof data.predictedPrice === "number") {
+          setPredictedPrice(data.predictedPrice);
+          // Only for callers that want to track a value across context
+          // changes (the Market tab's era switcher) -- most callers (the
+          // live nomination card) have no use for it.
+          onPredictedPrice?.(data.predictedPrice);
+        }
         if (Array.isArray(data.explanation)) setExplanation(data.explanation);
       })
       .catch(() => {});
@@ -87,7 +93,17 @@ export default function PlayerInsights({ nbaPlayerId, era, difficulty }) {
           <div className="similar-players-list">
             {similar.map((p, i) => (
               <span key={p.id} className="similar-player-chip">
-                <PlayerNameLink nbaPlayerId={p.id} name={p.fullName} />
+                {onSimilarPlayerClick ? (
+                  // In-app navigation takes priority over the NBA.com link
+                  // in contexts that offer it (the Market tab) — jumping to
+                  // that player's own card is more useful there than
+                  // leaving the app.
+                  <button type="button" className="similar-player-link" onClick={() => onSimilarPlayerClick(p.id)}>
+                    {p.fullName}
+                  </button>
+                ) : (
+                  <PlayerNameLink nbaPlayerId={p.id} name={p.fullName} />
+                )}
                 {i < similar.length - 1 && <span className="similar-player-sep">·</span>}
               </span>
             ))}
