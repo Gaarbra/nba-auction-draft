@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSocket } from "./hooks/useSocket.js";
+import LandingPage from "./components/LandingPage.jsx";
 import RoomLobby from "./components/RoomLobby.jsx";
 import RoomView from "./components/RoomView.jsx";
 import DraftBoard from "./components/DraftBoard.jsx";
@@ -67,6 +68,12 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [kickedMessage, setKickedMessage] = useState("");
+  // Shown once per page load before the actual room lobby. Deliberately not
+  // reset by handleLeaveRoom -- once someone's clicked past the pitch, going
+  // back to the lobby to start another room shouldn't replay it. A fresh
+  // page load (or tab) starts at the front door again since this isn't
+  // persisted to storage.
+  const [showLanding, setShowLanding] = useState(true);
 
   const sessionRef = useRef(loadSession());
 
@@ -300,6 +307,8 @@ export default function App() {
               />
             )}
           </div>
+        ) : showLanding ? (
+          <LandingPage onEnter={() => setShowLanding(false)} />
         ) : (
           <RoomLobby
             onCreateRoom={handleCreateRoom}

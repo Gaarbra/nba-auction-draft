@@ -394,6 +394,152 @@ body {
   }
 }
 
+/* The screen shown before the room lobby -- a short, honest pitch, not a
+   marketing page. No background photography here on purpose: nothing in
+   the pool of usable court/hoop imagery was clean of baked-in team/league
+   branding, so the atmosphere comes from the same radial glow used behind
+   the lobby card instead. */
+.landing {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.landing-hero {
+  position: relative;
+  text-align: center;
+  padding: 24px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.landing-hero-glow {
+  position: absolute;
+  inset: -80px -40px auto;
+  height: 320px;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 138, 0, 0.14), transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.landing-badge {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  margin-bottom: 20px;
+}
+
+.landing-title {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--text);
+}
+
+.landing-subtitle {
+  margin: 0 0 24px;
+  max-width: 520px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.landing-facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.landing-fact {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+}
+
+.landing-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.landing-cta-primary,
+.landing-cta-secondary {
+  width: auto;
+  margin-top: 0;
+  padding: 13px 28px;
+}
+
+.landing-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.landing-step {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.landing-step-number {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-step-title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.landing-step-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+@media (max-width: 700px) {
+  .landing-title {
+    font-size: 38px;
+  }
+
+  .landing-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Segmented pill controls: one connected track, not separate boxed
    buttons. The active segment is a raised neutral surface with a soft
    shadow -- amber stays reserved for the CTA, live status, and price,
@@ -3961,11 +4107,16 @@ form input {
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
-  /* Legal links ride just above the tab bar instead of behind it. */
+  /* Legal links ride just above the tab bar instead of behind it. Keeps a
+     solid backing (not "none") -- this is a fixed-position overlay sitting
+     on top of whatever's scrolled underneath, and without an opaque
+     background the links and the page content behind them render on top of
+     each other, unreadable. */
   .site-footer {
     bottom: 58px;
-    background: none;
-    padding-block: 8px;
+    background: var(--bg-panel-raised);
+    border-top: 1px solid var(--line);
+    padding-block: 10px;
   }
 
   .app-main {
