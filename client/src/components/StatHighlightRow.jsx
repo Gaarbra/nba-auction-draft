@@ -52,7 +52,7 @@ function CountUpStat({ value, decimals }) {
     };
   }, [value]);
 
-  if (value === null || value === undefined) return <>—</>;
+  if (value === null || value === undefined) return <>N/A</>;
   return <>{display.toFixed(decimals)}</>;
 }
 

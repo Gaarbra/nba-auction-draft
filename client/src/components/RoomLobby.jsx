@@ -155,7 +155,7 @@ export default function RoomLobby({
 
       {mode === "public" && (
         <p className="hint-text lobby-mode-hint">
-          Open to anyone — create a room others can find and join without a code.
+          Open to anyone. Create a room others can find and join without a code.
         </p>
       )}
       {mode === "private" && privateSubMode === "create" && (
@@ -253,7 +253,7 @@ export default function RoomLobby({
           </div>
           {publicRooms.length === 0 ? (
             <p className="hint-text">
-              {publicRoomsLoading ? "Looking for open rooms…" : "No open public rooms right now — start one above."}
+              {publicRoomsLoading ? "Looking for open rooms…" : "No open public rooms right now. Start one above."}
             </p>
           ) : (
             <ul className="public-room-items">

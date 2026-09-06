@@ -29,8 +29,8 @@ const ERROR_MESSAGES = {
   INVALID_DIFFICULTY: "That's not a valid difficulty.",
   INVALID_BIDDING_MODE: "That's not a valid bidding mode.",
   NO_PLAYERS_LEFT: "No players left in this era's pool.",
-  RECONNECT_FAILED: "Your previous session couldn't be resumed — please rejoin.",
-  RATE_LIMITED: "Slow down a bit — try again in a few seconds.",
+  RECONNECT_FAILED: "Your previous session couldn't be resumed. Please rejoin.",
+  RATE_LIMITED: "Slow down a bit. Try again in a few seconds.",
   INVALID_LOCAL_PLAYERS: "Enter between 2 and 4 player names.",
 };
 
@@ -260,6 +260,14 @@ export default function App() {
     }
   }, [room?.draft?.currentNominatorId, room?.draft?.nomination?.phase, room?.draft?.nomination?.currentBidder, localPlayerIds]);
 
+  // The wordmark's own "go home" -- only offered outside an active room
+  // (leaving a live draft is what the explicit "Leave room" button is for;
+  // this never doubles as a sneaky way to desert one by accident).
+  function handleGoHome() {
+    setShowLanding(true);
+    setActiveTab("lobby");
+  }
+
   const draft = room?.draft;
   const inDraft = Boolean(room) && room.status !== "waiting" && room.status !== "complete";
   const onClockPlayer = draft ? room.players.find((p) => p.id === draft.currentNominatorId) : null;
@@ -271,9 +279,10 @@ export default function App() {
   return (
     <div className="app-shell">
       {/* The photo ticker is the lobby's ambient background -- the landing
-          page gets its own static hero photo instead (see LandingPage.jsx),
-          so the two never compete. */}
-      <InteractiveBackground ticker={!room && !showLanding} />
+          page gets its own background instead (see LandingPage.jsx) and the
+          Market tab wants a static backdrop (browsing/reading real stats
+          shouldn't compete with a moving background), so neither uses it. */}
+      <InteractiveBackground ticker={!room && !showLanding && activeTab !== "market"} />
 
       {room ? (
         <TopNav
@@ -289,7 +298,13 @@ export default function App() {
           onLeaveRoom={handleLeaveRoom}
         />
       ) : (
-        <TopNav variant="lobby" connected={connected} activeTab={activeTab} onTabChange={setActiveTab} />
+        <TopNav
+          variant="lobby"
+          connected={connected}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onGoHome={handleGoHome}
+        />
       )}
 
       <main className="app-main">

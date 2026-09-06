@@ -112,8 +112,8 @@ export default function AssignBoard({
             You won <strong>{player.fullName}</strong> for{" "}
             <span className="won-banner-prompt-cost">
               {cost} {cost === 1 ? "coin" : "coins"}
-            </span>{" "}
-            — pick an open slot below to add them.
+            </span>
+            . Pick an open slot below to add them.
           </p>
         </div>
       </section>
@@ -135,7 +135,7 @@ export default function AssignBoard({
                 <span
                   key={pos}
                   className={`assign-board-segment ${roster[pos] ? "filled" : "open"}`}
-                  title={`${pos} — ${roster[pos] ? "filled" : "open"}`}
+                  title={`${pos} · ${roster[pos] ? "filled" : "open"}`}
                 />
               ))}
             </div>
@@ -221,7 +221,7 @@ export default function AssignBoard({
             )}
             {pendingAssignment.budgetTight && (
               <p>
-                Locking this in leaves you {budget - cost} coins for the rest of your slots — that's tight, you'll want
+                Locking this in leaves you {budget - cost} coins for the rest of your slots. That's tight, you'll want
                 at least 1 per slot.
               </p>
             )}

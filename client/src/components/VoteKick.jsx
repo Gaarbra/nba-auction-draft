@@ -18,7 +18,7 @@ const ERROR_MESSAGES = {
   CANNOT_VOTE_ON_OWN_KICK: "You can't vote on your own removal.",
   NOT_INITIATOR: "Only the player who started the vote can cancel it.",
   NOT_IN_ROOM: "You're not in this room.",
-  RATE_LIMITED: "Slow down a bit — try again in a few seconds.",
+  RATE_LIMITED: "Slow down a bit. Try again in a few seconds.",
 };
 
 function friendlyError(code) {

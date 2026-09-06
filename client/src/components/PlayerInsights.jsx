@@ -81,7 +81,7 @@ export default function PlayerInsights({ nbaPlayerId, era, difficulty, onPredict
                 </span>
               ))}
               <span className="predicted-price-tooltip-footer">
-                From real past-draft prices — a rough guide, not a rule.
+                From real past-draft prices. A rough guide, not a rule.
               </span>
             </span>
           )}

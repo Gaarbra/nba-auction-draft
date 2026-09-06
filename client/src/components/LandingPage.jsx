@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import InfoModal from "./InfoModal.jsx";
 import { PAGES } from "../siteContent.jsx";
-import heroPhoto from "../assets/hero-silhouette.jpg";
 
 /** The screen shown before anyone creates or joins a room -- a scrollable,
  * Stitch-inspired multi-section pitch, but every claim in it is checked
@@ -11,10 +11,37 @@ import heroPhoto from "../assets/hero-silhouette.jpg";
  *     bidder passes (server/src/sockets/roomHandlers.js)
  *   - the synergy multiplier thresholds (<=105% / <=125% / above) and their
  *     0.85x/1.0x/1.1x values: server/src/scoring/scoring.js
- * No stock/AI background photography either -- see the comment on
+ * No background photography -- see CourtLines below and the comment on
  * .landing-hero-glow in index.css for why. */
 
 const SECTIONS = ["hero", "budget", "bidding", "roster", "scoring", "modes"];
+
+// A schematic half-court (paint, free-throw circle, restricted area,
+// three-point arc, rim) anchored to the bottom of the hero -- "something
+// about the game" that's honestly just line art, not a claim about any
+// real court's exact dimensions, and carries no team/league branding to
+// run into the same trademark problem the earlier photo attempts hit.
+function CourtLines() {
+  return (
+    <svg className="landing-court-lines" viewBox="0 0 500 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <path d="M 40,400 L 40,300 A 210,210 0 0 1 460,300 L 460,400" fill="none" />
+      <rect x="185" y="220" width="130" height="180" fill="none" />
+      <circle cx="250" cy="220" r="55" fill="none" />
+      <path d="M 215,400 A 35,35 0 0 1 285,400" fill="none" />
+      <rect x="234" y="396" width="32" height="4" fill="none" />
+      <circle cx="250" cy="386" r="9" fill="none" />
+    </svg>
+  );
+}
+
+// Fades each section in as it scrolls into view -- once, not on every
+// re-entry, so scrolling back up doesn't replay it.
+const revealMotion = {
+  initial: { opacity: 0, y: 28 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.35 },
+  transition: { duration: 0.6, ease: "easeOut" },
+};
 
 function ScrollDots({ active, onJump }) {
   return (
@@ -60,12 +87,13 @@ export default function LandingPage({ onEnter }) {
     <div className="landing">
       <ScrollDots active={activeSection} onJump={jumpTo} />
 
-      <section
+      <motion.section
         ref={(el) => (sectionRefs.current[0] = el)}
         data-index="0"
         className="landing-section landing-hero"
+        {...revealMotion}
       >
-        <div className="landing-hero-photo" style={{ "--hero-photo-url": `url(${heroPhoto})` }} aria-hidden="true" />
+        <CourtLines />
         <div className="landing-hero-glow" aria-hidden="true" />
         <span className="landing-badge">Real-time NBA auction draft</span>
         <h1 className="landing-title">The Coin Draft.</h1>
@@ -95,19 +123,20 @@ export default function LandingPage({ onEnter }) {
             <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-      </section>
+      </motion.section>
 
-      <section
+      <motion.section
         ref={(el) => (sectionRefs.current[1] = el)}
         data-index="1"
         className="landing-section landing-feature"
+        {...revealMotion}
       >
         <div className="landing-feature-copy">
           <span className="landing-kicker">01 · Core mechanic</span>
           <h2 className="landing-h2">20 coins. Countless ways to spend them.</h2>
           <p className="landing-body">
             Every manager gets the same 20-coin budget. Strict roster rules mean every coin spent on one slot is a
-            coin you can't spend on the next — load up on one star, or build balanced depth across all five.
+            coin you can't spend on the next. Load up on one star, or build balanced depth across all five.
           </p>
           <ul className="landing-list">
             <li>
@@ -134,18 +163,19 @@ export default function LandingPage({ onEnter }) {
             <span className="landing-preview-hint">7 of 20 coins left, 2 open slots</span>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section
+      <motion.section
         ref={(el) => (sectionRefs.current[2] = el)}
         data-index="2"
         className="landing-section landing-feature landing-feature-reverse"
+        {...revealMotion}
       >
         <div className="landing-feature-copy">
           <span className="landing-kicker">02 · Real-time tension</span>
           <h2 className="landing-h2">Live, open bidding.</h2>
           <p className="landing-body">
-            There's no countdown to beat — bidding on a player stays open until everyone but the high bidder passes.
+            There's no countdown to beat. Bidding on a player stays open until everyone but the high bidder passes.
             Raise by any amount above the current bid, or use the quick-bid buttons when you don't want to type.
           </p>
           <ul className="landing-list">
@@ -179,19 +209,20 @@ export default function LandingPage({ onEnter }) {
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section
+      <motion.section
         ref={(el) => (sectionRefs.current[3] = el)}
         data-index="3"
         className="landing-section landing-feature"
+        {...revealMotion}
       >
         <div className="landing-feature-copy">
           <span className="landing-kicker">03 · Roster construction</span>
           <h2 className="landing-h2">Assign your five-man roster.</h2>
           <p className="landing-body">
-            Winning a bid is only half the job. Every player has to land on an eligible court position —
-            <strong> PG, SG, SF, PF, C</strong> — and once you win, you assign them by tapping the open slot in your
+            Winning a bid is only half the job. Every player has to land on an eligible court position (
+            <strong>PG, SG, SF, PF, C</strong>), and once you win, you assign them by tapping the open slot in your
             own roster.
           </p>
         </div>
@@ -207,18 +238,19 @@ export default function LandingPage({ onEnter }) {
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section
+      <motion.section
         ref={(el) => (sectionRefs.current[4] = el)}
         data-index="4"
         className="landing-section landing-feature landing-feature-reverse"
+        {...revealMotion}
       >
         <div className="landing-feature-copy">
           <span className="landing-kicker">04 · Advanced scoring</span>
           <h2 className="landing-h2">Real stats decide the winner.</h2>
           <p className="landing-body">
-            Once every roster is full, Hoop Bids scores each team from real career per-game stats — no arbitrary
+            Once every roster is full, Hoop Bids scores each team from real career per-game stats, no arbitrary
             point totals. Roster balance matters as much as star power: your team's combined usage rate sets a
             synergy multiplier on your final score.
           </p>
@@ -240,12 +272,13 @@ export default function LandingPage({ onEnter }) {
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section
+      <motion.section
         ref={(el) => (sectionRefs.current[5] = el)}
         data-index="5"
         className="landing-section landing-finale"
+        {...revealMotion}
       >
         <div className="landing-hero-glow" aria-hidden="true" />
         <span className="landing-badge">Online or on the couch</span>
@@ -257,7 +290,7 @@ export default function LandingPage({ onEnter }) {
           </div>
           <div className="landing-mode-card">
             <h3>Local pass-and-play</h3>
-            <p>No accounts, no downloads — pass one device around the room and draft together on the couch.</p>
+            <p>No accounts, no downloads. Pass one device around the room and draft together on the couch.</p>
           </div>
         </div>
         <div className="landing-ctas">
@@ -265,7 +298,7 @@ export default function LandingPage({ onEnter }) {
             Start a Draft
           </button>
         </div>
-      </section>
+      </motion.section>
 
       {showHelp && (
         <InfoModal title={PAGES.howToPlay.title} body={PAGES.howToPlay.body} onClose={() => setShowHelp(false)} />

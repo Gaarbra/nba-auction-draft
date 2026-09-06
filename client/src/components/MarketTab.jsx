@@ -343,7 +343,7 @@ export default function MarketTab({ socket }) {
                     <TeamBadge abbreviation={p.team} size={24} />
                     <span className="market-result-name">{p.fullName}</span>
                     <span className="market-result-meta">
-                      {p.position || "—"}
+                      {p.position || "N/A"}
                       {p.pointsPerGame ? ` · ${p.pointsPerGame.toFixed(1)} PPG` : ""} ·{" "}
                       {p.draftYear ? `Drafted ${p.draftYear}` : "Undrafted"}
                     </span>
@@ -354,7 +354,7 @@ export default function MarketTab({ socket }) {
           )}
           {searchResults.length > SEARCH_RESULTS_LIMIT && (
             <p className="hint-text">
-              Showing {SEARCH_RESULTS_LIMIT} of {searchResults.length} — narrow your search to see more.
+              Showing {SEARCH_RESULTS_LIMIT} of {searchResults.length}. Narrow your search to see more.
             </p>
           )}
         </div>
@@ -362,7 +362,7 @@ export default function MarketTab({ socket }) {
         !playerId && (
           <div className="market-hotpicks">
             <span className="market-filter-label">
-              {indexLoading ? "Loading the player pool…" : "Hot picks — most proven player at each position"}
+              {indexLoading ? "Loading the player pool…" : "Hot picks: most proven player at each position"}
             </span>
             {!indexLoading && (
               <div className="market-hotpicks-grid">
@@ -372,7 +372,7 @@ export default function MarketTab({ socket }) {
                     <span className="market-hotpick-pos">{p.position}</span>
                     <span className="market-hotpick-name">{p.fullName}</span>
                     <span className="market-hotpick-meta">
-                      {p.gamesPlayed ? `${p.gamesPlayed.toLocaleString()} GP` : "—"}
+                      {p.gamesPlayed ? `${p.gamesPlayed.toLocaleString()} GP` : "N/A"}
                       {p.pointsPerGame ? ` · ${p.pointsPerGame.toFixed(1)} PPG` : ""}
                     </span>
                   </button>
@@ -408,7 +408,7 @@ export default function MarketTab({ socket }) {
                   <PlayerNameLink nbaPlayerId={selectedMeta.id} name={selectedMeta.fullName} />
                 </h3>
                 <p className="player-meta">
-                  {selectedMeta.position || "—"} · {selectedMeta.team} ·{" "}
+                  {selectedMeta.position || "N/A"} · {selectedMeta.team} ·{" "}
                   {selectedMeta.draftYear ? `Drafted ${selectedMeta.draftYear}` : "Undrafted"}
                 </p>
                 {stats?.teamHistory?.length > 1 && (
@@ -442,7 +442,7 @@ export default function MarketTab({ socket }) {
             <div className="market-metric-tile">
               <span className="market-metric-label">Suggested value</span>
               <span className="market-metric-value accent">
-                {valueHistory.length ? `~${valueHistory[valueHistory.length - 1].value.toFixed(1)}c` : "—"}
+                {valueHistory.length ? `~${valueHistory[valueHistory.length - 1].value.toFixed(1)}c` : "N/A"}
               </span>
               {valueChange && Math.abs(valueChange.delta) >= 0.05 && (
                 <span className={`market-value-change ${valueChange.delta > 0 ? "up" : "down"}`}>
@@ -453,14 +453,14 @@ export default function MarketTab({ socket }) {
             </div>
             <div className="market-metric-tile">
               <span className="market-metric-label">Highest real bid</span>
-              <span className="market-metric-value">{highestLiveBid != null ? `${highestLiveBid}c` : "—"}</span>
+              <span className="market-metric-value">{highestLiveBid != null ? `${highestLiveBid}c` : "N/A"}</span>
               <span className="market-metric-sub">
                 {salesForPlayer.length ? `${salesForPlayer.length} sale${salesForPlayer.length === 1 ? "" : "s"} this session` : "No sales yet this session"}
               </span>
             </div>
             <div className="market-metric-tile">
               <span className="market-metric-label">Usage rate</span>
-              <span className="market-metric-value">{usage.usagePct != null ? `${usage.usagePct.toFixed(1)}%` : "—"}</span>
+              <span className="market-metric-value">{usage.usagePct != null ? `${usage.usagePct.toFixed(1)}%` : "N/A"}</span>
               <span className="market-metric-sub">{usage.season ? `${usage.season} season` : "Not cached yet"}</span>
             </div>
           </div>
@@ -510,7 +510,7 @@ export default function MarketTab({ socket }) {
               <h4 className="market-panel-title">Live bids on this player</h4>
               {salesForPlayer.length === 0 ? (
                 <p className="hint-text">
-                  No completed bids on {selectedMeta.fullName} yet this session — this fills in live as any room,
+                  No completed bids on {selectedMeta.fullName} yet this session. This fills in live as any room,
                   anywhere, wins them.
                 </p>
               ) : (
@@ -583,7 +583,7 @@ function AlternativesPanel({ playerId, onJump }) {
           <button type="button" className="market-alt-row" onClick={() => onJump(p.id)}>
             <PlayerHeadshot nbaPlayerId={p.id} alt={p.fullName} className="market-alt-photo" allowRetry={false} />
             <span className="market-alt-name">{p.fullName}</span>
-            <span className="market-alt-value">{p.predictedPrice != null ? `~${p.predictedPrice.toFixed(1)}c` : "—"}</span>
+            <span className="market-alt-value">{p.predictedPrice != null ? `~${p.predictedPrice.toFixed(1)}c` : "N/A"}</span>
           </button>
         </li>
       ))}

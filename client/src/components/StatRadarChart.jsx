@@ -93,7 +93,7 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
         const [x, y] = pointAt(i * ANGLE_STEP, RADIUS + 18);
         return (
           <text key={`${p.key}-val`} x={x} y={y + 9} textAnchor="middle" className="stat-radar-value">
-            {p.raw === null || p.raw === undefined ? "—" : p.raw}
+            {p.raw === null || p.raw === undefined ? "N/A" : p.raw}
           </text>
         );
       })}

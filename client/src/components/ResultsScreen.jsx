@@ -8,7 +8,7 @@ const RANK_LABELS = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
 const ERROR_MESSAGES = {
   NOT_HOST: "Only the host can return everyone to the lobby.",
   DRAFT_NOT_COMPLETE: "The draft isn't finished yet.",
-  RATE_LIMITED: "Slow down a bit — try again in a few seconds.",
+  RATE_LIMITED: "Slow down a bit. Try again in a few seconds.",
 };
 
 function friendlyError(code) {
@@ -88,7 +88,7 @@ function TeamCard({ team, index, isYou }) {
                     <div className="results-player-slot">{p.slot}</div>
                     <PlayerNameLink
                       nbaPlayerId={p.nbaPlayerId}
-                      name={p.fullName || "—"}
+                      name={p.fullName || "N/A"}
                       className="results-player-name"
                     />
                   </div>
@@ -102,7 +102,7 @@ function TeamCard({ team, index, isYou }) {
                     <span className="lbl">DIR</span>
                     {formatScore(p.dir)}
                     {p.usagePctEstimated && (
-                      <span className="estimate-flag" title="USG%/DIR estimated for this era — see README">
+                      <span className="estimate-flag" title="USG%/DIR estimated for this era, see README">
                         *
                       </span>
                     )}
@@ -252,11 +252,11 @@ export default function ResultsScreen({ room, currentPlayerId, socket, onLeaveRo
                 return (
                   <div key={`${m.teamAId}-${m.teamBId}`} className="matchup-row">
                     <span className={`matchup-side ${aFavored ? "favored" : ""}`}>
-                      {teamA?.playerName} — {(m.probA * 100).toFixed(0)}%
+                      {teamA?.playerName}: {(m.probA * 100).toFixed(0)}%
                     </span>
                     <span className="matchup-vs">vs</span>
                     <span className={`matchup-side end ${!aFavored ? "favored" : ""}`}>
-                      {teamB?.playerName} — {(m.probB * 100).toFixed(0)}%
+                      {teamB?.playerName}: {(m.probB * 100).toFixed(0)}%
                     </span>
                   </div>
                 );

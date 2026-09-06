@@ -405,11 +405,13 @@ body {
 }
 
 /* The screen shown before the room lobby -- a scrollable, Stitch-inspired
-   multi-section pitch, but no background photography: nothing in the pool
-   of usable court/hoop imagery was clean of baked-in team/league branding
-   (the two candidates from the original mock had a Nike watermark and the
-   literal NBA logo respectively), so the atmosphere comes from the same
-   radial glow used behind the lobby card instead, repeated per section.
+   multi-section pitch. No background photography: nothing in the pool of
+   usable court/hoop imagery was clean of baked-in team/league branding (the
+   two AI-generated candidates tried earlier had a Nike watermark and the
+   literal NBA logo respectively), and a real photo risks the same problem
+   again the next time one gets swapped in. The hero instead gets its own
+   court-line motif (see the CourtLines component in LandingPage.jsx) plus
+   the same radial glow used behind the lobby card, repeated per section.
    `scroll-snap-type` lives on html (see near the top of this file) rather
    than a nested scroll container, so this rides the page's own scrollbar
    instead of fighting the fixed footer/bottom-nav for a second one. */
@@ -439,19 +441,22 @@ body {
   isolation: isolate;
 }
 
-/* A cropped, self-hosted still (see hero-silhouette.jpg's own history --
-   the original AI-generated photo had a Nike and NBA mark baked into the
-   bottom corner, sliced off before this ever shipped), not the lobby's
-   moving photo ticker -- the two would otherwise compete for attention on
-   the one screen meant to sell the game before either matters. */
-.landing-hero-photo {
+/* A schematic court (paint, free-throw circle, three-point arc, rim) rather
+   than a photo -- see CourtLines in LandingPage.jsx and the comment on
+   .landing above for why. Anchored to the bottom of the hero and faded out
+   toward the top with a mask, so it reads as ground beneath the text
+   instead of competing with it. */
+.landing-court-lines {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(180deg, rgba(11, 11, 13, 0.55) 0%, rgba(11, 11, 13, 0.88) 65%, var(--bg-void) 100%),
-    var(--hero-photo-url);
-  background-size: cover;
-  background-position: center 30%;
+  width: 100%;
+  height: 100%;
   z-index: -2;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  opacity: 0.16;
+  mask-image: linear-gradient(180deg, transparent 0%, transparent 35%, black 70%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 35%, black 70%);
 }
 
 .landing-hero-glow {
@@ -1956,9 +1961,31 @@ form input {
 .nominated-player-card {
   padding: 0;
   background: none;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+/* The live draft's background half of the reveal (DraftBoard.jsx only --
+   MarketTab reuses .nominated-player-card but never renders this element).
+   A wash of the player's own current team color, sliding in behind the
+   header/stats/insights content rather than the card itself moving. */
+.nomination-team-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--team-primary, transparent) 55%, transparent) 0%,
+    color-mix(in srgb, var(--team-primary, transparent) 18%, transparent) 42%,
+    transparent 72%
+  );
+  pointer-events: none;
 }
 
 .nominated-player-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 20px;
   align-items: center;
@@ -3464,6 +3491,23 @@ form input {
   flex-shrink: 0;
 }
 
+/* The clickable "go home" variant is a <button>, not the plain <span> --
+   reset it back to looking exactly like the non-clickable one. */
+button.topnav-brand-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+button.topnav-brand-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .topnav-logo {
   width: 30px;
   height: 30px;
@@ -4525,20 +4569,17 @@ form input {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
-/* The real-logo variant: most NBA marks are full-color art on a transparent
-   background, drawn for a light backing -- a plain dark circle would leave
-   navy/black logo strokes (Thunder, Nets, Spurs...) nearly invisible on this
-   app's dark theme, so this gets a light backing plate instead of the
-   initials badge's team-colored one. */
+/* The real-logo variant: no backing plate -- the logo's own real colors sit
+   directly on the page background. A few marks that lean heavily on black/
+   navy strokes read a little quieter on this dark theme as a result, but a
+   solid plate behind every team chip was a bigger visual cost than that. */
 .team-badge-logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border-radius: 50%;
-  background: #f4f2ef;
-  border: 1.5px solid var(--line-bright);
-  overflow: hidden;
+  background: transparent;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
   /* Padding is set inline (a pixel value derived from the badge's own
      size) -- see TeamBadge.jsx for why a CSS percentage doesn't work here. */
 }
@@ -4572,8 +4613,10 @@ form input {
 
 .market-value-change {
   margin: 8px 0 0;
+  padding: 2px 8px;
+  border-radius: 999px;
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -4583,10 +4626,12 @@ form input {
 
 .market-value-change.up {
   color: var(--win);
+  background: color-mix(in srgb, var(--win) 16%, transparent);
 }
 
 .market-value-change.down {
   color: var(--lose);
+  background: color-mix(in srgb, var(--lose) 16%, transparent);
 }
 
 /* The search box that replaced the old third "Player" dropdown -- styled to
@@ -4602,15 +4647,21 @@ form input {
   color: var(--text);
   font-family: var(--font-body);
   font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .market-search-input::placeholder {
   color: var(--text-faint);
 }
 
+.market-search-input:hover {
+  border-color: var(--line-bright);
+}
+
 .market-search-input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 /* The results list shown below the filters once a team is picked and/or a
@@ -4644,12 +4695,13 @@ form input {
   background: none;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
 .market-result-row:hover {
-  border-color: var(--line);
+  border-color: var(--line-bright);
   background: var(--bg-panel-raised);
+  transform: translateX(2px);
 }
 
 .market-result-name {
@@ -4691,14 +4743,16 @@ form input {
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--bg-panel-raised);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.2);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .market-hotpick-card:hover {
   border-color: var(--line-bright);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 18px rgba(0, 0, 0, 0.32);
 }
 
 .market-hotpick-pos {
@@ -4746,6 +4800,7 @@ form input {
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--bg-panel-raised);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .market-metric-label {
@@ -4782,6 +4837,7 @@ form input {
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--bg-panel-raised);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .market-panel-title {
@@ -4838,12 +4894,13 @@ form input {
   background: none;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
 .market-alt-row:hover {
-  border-color: var(--line);
+  border-color: var(--line-bright);
   background: var(--bg-panel);
+  transform: translateX(2px);
 }
 
 .market-alt-photo {

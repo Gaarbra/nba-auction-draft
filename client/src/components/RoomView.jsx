@@ -15,21 +15,21 @@ const DIFFICULTIES = [
 ];
 
 const BIDDING_MODES = [
-  { id: "open", label: "Open", hint: "First come, first served — anyone can raise or pass anytime" },
-  { id: "orderly", label: "Orderly", hint: "One at a time, in turn order — wait your turn to raise or pass" },
+  { id: "open", label: "Open", hint: "First come, first served, anyone can raise or pass anytime" },
+  { id: "orderly", label: "Orderly", hint: "One at a time, in turn order, wait your turn to raise or pass" },
 ];
 
 function getHintText(playerCount, isHost, isLocal) {
   if (isLocal) {
-    return isHost ? "Everyone's added — start whenever you're ready." : "Waiting for the host to start.";
+    return isHost ? "Everyone's added. Start whenever you're ready." : "Waiting for the host to start.";
   }
   if (playerCount === 1) {
     return isHost
-      ? "Playing solo — start whenever you're ready. You'll draft a full roster and get a score at the end."
+      ? "Playing solo. Start whenever you're ready. You'll draft a full roster and get a score at the end."
       : "Waiting for the host to start.";
   }
   if (playerCount === MAX_PLAYERS) {
-    return isHost ? "Room is full — ready to start!" : "Room is full. Waiting for the host to start.";
+    return isHost ? "Room is full. Ready to start!" : "Room is full. Waiting for the host to start.";
   }
   return isHost
     ? `You can start now with ${playerCount} players, or wait for up to ${MAX_PLAYERS}.`

@@ -34,13 +34,13 @@ const ERROR_MESSAGES = {
   ROSTER_FULL: "Your roster is already full.",
   BID_TOO_LOW: "Your bid must be higher than the current bid.",
   CANNOT_PASS_AS_HIGH_BIDDER: "You can't pass while you're the high bidder.",
-  NOT_YOUR_BID_TURN: "It's not your turn to bid yet — this room is using orderly bidding.",
+  NOT_YOUR_BID_TURN: "It's not your turn to bid yet. This room is using orderly bidding.",
   NOT_ASSIGNING: "Not currently assigning a position.",
   NOT_YOUR_ASSIGNMENT: "It's not your pick to assign.",
   INVALID_POSITION: "That's not a valid position.",
   SLOT_TAKEN: "That slot is already filled.",
   PLAYER_NOT_FOUND: "That player couldn't be found.",
-  RATE_LIMITED: "Slow down a bit — try again in a few seconds.",
+  RATE_LIMITED: "Slow down a bit. Try again in a few seconds.",
 };
 
 function friendlyError(code) {
@@ -280,7 +280,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
       {!room.isLocal && <VoteKickBanner room={room} currentPlayerId={currentPlayerId} socket={socket} />}
 
       {!isRolling && !nomination && (
-        <p className="turn-banner">{isMyTurn ? "It's your turn — rolling a player…" : `Waiting for ${nominator?.name || "…"} to nominate…`}</p>
+        <p className="turn-banner">{isMyTurn ? "It's your turn, rolling a player…" : `Waiting for ${nominator?.name || "…"} to nominate…`}</p>
       )}
 
       {!isRolling && !nomination && nominateError && <p className="error-text">{nominateError}</p>}
@@ -334,6 +334,19 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               return { "--team-primary": colors.primary, "--team-secondary": colors.secondary };
             })()}
           >
+            {/* The background half of the broadcast-style reveal: a wash of
+                the player's own current team color sweeping in behind the
+                card content, not just the card itself sliding in. Keyed
+                nomination -> remounts (and re-plays) every nomination, same
+                mechanism as the outer motion.div above. */}
+            <motion.div
+              className="nomination-team-wash"
+              aria-hidden="true"
+              style={{ transformOrigin: "left center" }}
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ type: "spring", stiffness: 220, damping: 30, delay: 0.08 }}
+            />
             <div className="nominated-player-header">
               <PlayerHeadshot
                 nbaPlayerId={nomination.player.nbaPlayerId}
@@ -347,7 +360,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                   <PlayerNameLink nbaPlayerId={nomination.player.nbaPlayerId} name={nomination.player.fullName} />
                 </h3>
                 <p className="player-meta">
-                  {nomination.player.position || "—"} ·{" "}
+                  {nomination.player.position || "N/A"} ·{" "}
                   {nomination.player.isActive ? "Currently" : "Played for"}{" "}
                   {nomination.player.team?.abbreviation || "Free Agent"} ·{" "}
                   {nomination.player.draftYear ? `Drafted ${nomination.player.draftYear}` : "Undrafted"}
@@ -417,7 +430,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
 
                   {currentPlayerId !== nomination.currentBidder &&
                     !nomination.passed.includes(currentPlayerId) &&
-                    myOpenSlots.length === 0 && <p className="hint-text">Your roster is full — spectating.</p>}
+                    myOpenSlots.length === 0 && <p className="hint-text">Your roster is full. Spectating.</p>}
 
                   {room.biddingMode === "orderly" &&
                     currentPlayerId !== nomination.currentBidder &&
@@ -475,7 +488,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               {currentPlayerId === nomination.currentBidder ? (
                 <>
                   <p>
-                    You won {nomination.player.fullName} for {nomination.currentBid} coins — tap an open slot in
+                    You won {nomination.player.fullName} for {nomination.currentBid} coins. Tap an open slot in
                     your roster below to add them.
                   </p>
 
@@ -491,7 +504,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                       {pendingAssignment.budgetTight && (
                         <p>
                           Locking this in leaves you {currentPlayer.budget - nomination.currentBid} coins for{" "}
-                          {myOpenSlots.length - 1} remaining slot(s). That's tight — you'll need at least 1 coin per slot.
+                          {myOpenSlots.length - 1} remaining slot(s). That's tight, you'll need at least 1 coin per slot.
                         </p>
                       )}
                       <button

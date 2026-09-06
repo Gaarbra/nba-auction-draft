@@ -83,6 +83,7 @@ export default function TopNav({
   onLeaveRoom,
   activeTab = "lobby",
   onTabChange,
+  onGoHome,
 }) {
   const [showHelp, setShowHelp] = useState(false);
   const [soundMuted, setSoundMutedState] = useState(() => isSoundMuted());
@@ -97,10 +98,17 @@ export default function TopNav({
     <header className={`topnav topnav-${variant}`}>
       <div className="topnav-inner">
         <div className="topnav-left">
-          <span className="topnav-brand">
-            <LogoMark className="topnav-logo" />
-            <span className="topnav-wordmark">Hoop Bids</span>
-          </span>
+          {onGoHome ? (
+            <button type="button" className="topnav-brand topnav-brand-link" onClick={onGoHome}>
+              <LogoMark className="topnav-logo" />
+              <span className="topnav-wordmark">Hoop Bids</span>
+            </button>
+          ) : (
+            <span className="topnav-brand">
+              <LogoMark className="topnav-logo" />
+              <span className="topnav-wordmark">Hoop Bids</span>
+            </span>
+          )}
 
           {variant === "room" && (
             <div className="topnav-roommeta">

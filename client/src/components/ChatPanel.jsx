@@ -43,7 +43,7 @@ export default function ChatPanel({ socket, room, currentPlayerId, messages }) {
       {!collapsed && (
         <>
           <div className="chat-panel-messages" ref={listRef}>
-            {messages.length === 0 && <p className="chat-panel-empty">No messages yet — say hi.</p>}
+            {messages.length === 0 && <p className="chat-panel-empty">No messages yet. Say hi.</p>}
             {messages.map((m) => (
               <p key={m.id} className="chat-panel-message">
                 <strong>{playerName(m.playerId)}:</strong> {m.text}
