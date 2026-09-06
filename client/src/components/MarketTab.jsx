@@ -55,6 +55,10 @@ const DIFFICULTY_OPTIONS = [
 // would be a fabricated distinction, not a real one.
 const POSITIONS = ["G", "F", "C"];
 const LIVE_SALE_HISTORY_LIMIT = 60;
+// A name search across every era can match a lot of players (e.g. common
+// surnames) -- capped so the results list stays a quick scan, not a second
+// dropdown's worth of scrolling in disguise.
+const SEARCH_RESULTS_LIMIT = 50;
 
 /** A small inline line chart of real suggested-value readings for the
  * player currently on screen — one point per time the price model actually
@@ -112,6 +116,7 @@ export default function MarketTab({ socket }) {
   const [indexLoading, setIndexLoading] = useState(true);
   const [era, setEra] = useState("all");
   const [team, setTeam] = useState("");
+  const [search, setSearch] = useState("");
   const [playerId, setPlayerId] = useState(null);
   const [difficulty, setDifficulty] = useState("normal");
 
@@ -176,15 +181,24 @@ export default function MarketTab({ socket }) {
     return eraFiltered.filter((p) => p.team === team).sort((a, b) => a.fullName.localeCompare(b.fullName));
   }, [eraFiltered, team]);
 
-  const playerOptions = teamPlayers.map((p) => ({
-    value: String(p.id),
-    label: p.position ? `${p.fullName} · ${p.position}` : p.fullName,
-  }));
-
   useEffect(() => {
-    if (playerId && !teamPlayers.some((p) => String(p.id) === String(playerId))) setPlayerId(null);
+    if (playerId && team && !teamPlayers.some((p) => String(p.id) === String(playerId))) setPlayerId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamPlayers]);
+
+  // Replaces the old third "Player" dropdown: pick a team and its roster
+  // just appears below, or type a name to search across every team in the
+  // selected era (or, with no team chosen, the whole era) -- no extra
+  // dropdown click required either way.
+  const isBrowsing = Boolean(team) || search.trim().length > 0;
+  const searchResults = useMemo(() => {
+    if (!isBrowsing) return [];
+    const q = search.trim().toLowerCase();
+    let pool = team ? teamPlayers : eraFiltered;
+    if (q) pool = pool.filter((p) => p.fullName.toLowerCase().includes(q));
+    return team ? pool : pool.slice().sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }, [isBrowsing, search, team, teamPlayers, eraFiltered]);
+  const shownResults = searchResults.slice(0, SEARCH_RESULTS_LIMIT);
 
   const selectedMeta = index.find((p) => String(p.id) === String(playerId));
 
@@ -261,6 +275,10 @@ export default function MarketTab({ socket }) {
       setEra(eraIdFor(entry.draftYear) || "all");
       setTeam(entry.team);
     }
+    // The search text did its job (finding this player); leaving it behind
+    // would otherwise keep filtering the now-shown team roster down to just
+    // this one name.
+    setSearch("");
     setPlayerId(String(id));
   }
 
@@ -285,37 +303,73 @@ export default function MarketTab({ socket }) {
           />
         </div>
         <div className="market-filter">
-          <span className="market-filter-label">Player</span>
-          <Dropdown
-            options={playerOptions}
-            value={playerId ?? ""}
-            onChange={setPlayerId}
-            placeholder={team ? "Choose a player" : "Pick a team first"}
+          <span className="market-filter-label">Search players</span>
+          <input
+            type="search"
+            className="market-search-input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={team ? `Search ${team} players…` : "Search any player by name…"}
           />
         </div>
       </div>
 
-      {!playerId && (
-        <div className="market-hotpicks">
+      {isBrowsing ? (
+        <div className="market-results">
           <span className="market-filter-label">
-            {indexLoading ? "Loading the player pool…" : "Hot picks — most proven player at each position"}
+            {indexLoading
+              ? "Loading the player pool…"
+              : `${searchResults.length} player${searchResults.length === 1 ? "" : "s"}${
+                  team ? ` on ${team}` : " match"
+                }`}
           </span>
-          {!indexLoading && (
-            <div className="market-hotpicks-grid">
-              {hotPicksByPosition.map((p) => (
-                <button key={p.id} type="button" className="market-hotpick-card" onClick={() => jumpToPlayer(p.id)}>
-                  <TeamBadge abbreviation={p.team} size={32} />
-                  <span className="market-hotpick-pos">{p.position}</span>
-                  <span className="market-hotpick-name">{p.fullName}</span>
-                  <span className="market-hotpick-meta">
-                    {p.gamesPlayed ? `${p.gamesPlayed.toLocaleString()} GP` : "—"}
-                    {p.pointsPerGame ? ` · ${p.pointsPerGame.toFixed(1)} PPG` : ""}
-                  </span>
-                </button>
+          {!indexLoading && searchResults.length === 0 && (
+            <p className="hint-text">No players match {search.trim() ? `"${search.trim()}"` : "that team"}.</p>
+          )}
+          {!indexLoading && shownResults.length > 0 && (
+            <ul className="market-results-list">
+              {shownResults.map((p) => (
+                <li key={p.id}>
+                  <button type="button" className="market-result-row" onClick={() => jumpToPlayer(p.id)}>
+                    <TeamBadge abbreviation={p.team} size={24} />
+                    <span className="market-result-name">{p.fullName}</span>
+                    <span className="market-result-meta">
+                      {p.position || "—"} · {p.draftYear ? `Drafted ${p.draftYear}` : "Undrafted"}
+                    </span>
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
+          )}
+          {searchResults.length > SEARCH_RESULTS_LIMIT && (
+            <p className="hint-text">
+              Showing {SEARCH_RESULTS_LIMIT} of {searchResults.length} — narrow your search to see more.
+            </p>
           )}
         </div>
+      ) : (
+        !playerId && (
+          <div className="market-hotpicks">
+            <span className="market-filter-label">
+              {indexLoading ? "Loading the player pool…" : "Hot picks — most proven player at each position"}
+            </span>
+            {!indexLoading && (
+              <div className="market-hotpicks-grid">
+                {hotPicksByPosition.map((p) => (
+                  <button key={p.id} type="button" className="market-hotpick-card" onClick={() => jumpToPlayer(p.id)}>
+                    <TeamBadge abbreviation={p.team} size={32} />
+                    <span className="market-hotpick-pos">{p.position}</span>
+                    <span className="market-hotpick-name">{p.fullName}</span>
+                    <span className="market-hotpick-meta">
+                      {p.gamesPlayed ? `${p.gamesPlayed.toLocaleString()} GP` : "—"}
+                      {p.pointsPerGame ? ` · ${p.pointsPerGame.toFixed(1)} PPG` : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {playerId && selectedMeta && (

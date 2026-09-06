@@ -4565,6 +4565,85 @@ form input {
   color: var(--lose);
 }
 
+/* The search box that replaced the old third "Player" dropdown -- styled to
+   match the dropdown triggers beside it (same height/radius/border) so the
+   filter row still reads as one control group. */
+.market-search-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--bg-panel-raised);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.market-search-input::placeholder {
+  color: var(--text-faint);
+}
+
+.market-search-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The results list shown below the filters once a team is picked and/or a
+   search is typed -- what used to require opening a third dropdown now
+   just appears here, no extra click. */
+.market-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.market-results-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.market-result-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.market-result-row:hover {
+  border-color: var(--line);
+  background: var(--bg-panel-raised);
+}
+
+.market-result-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.market-result-meta {
+  font-size: 12px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
 /* Hot picks: shown before any era/team/player is chosen -- one card per
    position, the most career-games-played real player at that slot. */
 .market-hotpicks {
