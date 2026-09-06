@@ -31,6 +31,15 @@ function eraIdFor(draftYear) {
   return bucket ? bucket.id : null;
 }
 
+// Ranks a team roster or a name search's matches by real career
+// points-per-game -- "top players" by the numbers, not alphabetically --
+// so a strong scorer surfaces above a bench player who just happens to
+// come first in the alphabet. A player with no cached pointsPerGame sorts
+// to the bottom rather than breaking the comparison.
+function byPointsPerGame(a, b) {
+  return (b.pointsPerGame ?? -1) - (a.pointsPerGame ?? -1);
+}
+
 const ERA_OPTIONS = [{ value: "all", label: "All eras" }, ...ERA_BUCKETS.map((b) => ({ value: b.id, label: b.label }))];
 
 // The suggested-value model takes difficulty as a real input (it's the same
@@ -178,7 +187,7 @@ export default function MarketTab({ socket }) {
 
   const teamPlayers = useMemo(() => {
     if (!team) return [];
-    return eraFiltered.filter((p) => p.team === team).sort((a, b) => a.fullName.localeCompare(b.fullName));
+    return eraFiltered.filter((p) => p.team === team).sort(byPointsPerGame);
   }, [eraFiltered, team]);
 
   useEffect(() => {
@@ -196,7 +205,7 @@ export default function MarketTab({ socket }) {
     const q = search.trim().toLowerCase();
     let pool = team ? teamPlayers : eraFiltered;
     if (q) pool = pool.filter((p) => p.fullName.toLowerCase().includes(q));
-    return team ? pool : pool.slice().sort((a, b) => a.fullName.localeCompare(b.fullName));
+    return team ? pool : pool.slice().sort(byPointsPerGame);
   }, [isBrowsing, search, team, teamPlayers, eraFiltered]);
   const shownResults = searchResults.slice(0, SEARCH_RESULTS_LIMIT);
 
@@ -334,7 +343,9 @@ export default function MarketTab({ socket }) {
                     <TeamBadge abbreviation={p.team} size={24} />
                     <span className="market-result-name">{p.fullName}</span>
                     <span className="market-result-meta">
-                      {p.position || "—"} · {p.draftYear ? `Drafted ${p.draftYear}` : "Undrafted"}
+                      {p.position || "—"}
+                      {p.pointsPerGame ? ` · ${p.pointsPerGame.toFixed(1)} PPG` : ""} ·{" "}
+                      {p.draftYear ? `Drafted ${p.draftYear}` : "Undrafted"}
                     </span>
                   </button>
                 </li>
