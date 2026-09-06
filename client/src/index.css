@@ -2019,7 +2019,12 @@ form input {
   background: none;
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-md);
+  /* --radius-md was never defined in :root (only -sm/-lg/-pill exist) --
+     an undefined custom property falls back to the property's own initial
+     value, which for border-radius is 0. That silently squared off this
+     card's corners (and, more visibly, the team-wash/watermark it clips)
+     since the day both were added. */
+  border-radius: var(--radius-lg);
 }
 
 /* The live draft's background half of the reveal (DraftBoard.jsx only --
@@ -2160,13 +2165,15 @@ form input {
 }
 
 .nominated-player-card h3 a,
-.results-player-name a {
+.results-player-name a,
+.market-dossier-name a {
   color: inherit;
   text-decoration: none;
 }
 
 .nominated-player-card h3 a:hover,
-.results-player-name a:hover {
+.results-player-name a:hover,
+.market-dossier-name a:hover {
   color: var(--accent-bright);
   text-decoration: underline;
 }
@@ -4568,27 +4575,17 @@ button.topnav-brand-link:focus-visible {
   }
 }
 
-/* Market tab: the same era -> team -> player picker chain the draft's own
-   dropdowns use, then the exact card shape a live nomination shows
-   (.nominated-player-card, reused verbatim below) for whichever player is
-   picked. */
+/* Market tab: a "luxury exchange" browse of the same real player pool the
+   draft nominates from, adapted from a Stitch mock ("Hoop Bids -- Luxury
+   Market & Player Marketplace"). See MarketTab.jsx's own top comment for
+   which of that mock's flourishes were dropped or replaced for having no
+   real data behind them. */
 .market-tab {
   width: 100%;
-  max-width: 880px;
+  max-width: 1180px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.market-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.market-filter {
-  flex: 1 1 180px;
-  min-width: 160px;
+  gap: 16px;
 }
 
 .market-filter-label {
@@ -4600,15 +4597,6 @@ button.topnav-brand-link:focus-visible {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-faint);
-}
-
-.market-empty-hint {
-  text-align: center;
-  padding: 32px 16px;
-}
-
-.market-player-card {
-  width: 100%;
 }
 
 .team-badge {
@@ -4698,63 +4686,164 @@ button.topnav-brand-link:focus-visible {
   white-space: nowrap;
 }
 
-.market-difficulty-row {
+/* Real-numbers-only ticker -- see MarketTab.jsx's own comment on why this
+   doesn't carry the Stitch mock's invented "24H volume"/"Market Index"
+   figures: only a static real fact (catalogue size) and things this
+   session has genuinely seen (its own live-sales feed). */
+.market-ticker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line);
+}
+
+.market-ticker-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin: 10px 0 2px;
-}
-
-.market-difficulty-row .market-filter-label {
-  margin-bottom: 0;
-}
-
-.market-difficulty-picker {
-  padding: 3px;
-}
-
-.market-difficulty-picker .difficulty-option {
-  padding: 5px 12px;
-  font-size: 11px;
-}
-
-.market-value-change {
-  margin: 8px 0 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-family: var(--font-display);
+  gap: 6px;
   font-size: 12px;
+}
+
+.market-ticker-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--win);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--win) 25%, transparent);
+}
+
+.market-ticker-label {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
   font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+}
+
+.market-ticker-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
-.market-value-change.up {
-  color: var(--win);
-  background: color-mix(in srgb, var(--win) 16%, transparent);
+.market-ticker-value.accent {
+  color: var(--accent);
 }
 
-.market-value-change.down {
-  color: var(--lose);
-  background: color-mix(in srgb, var(--lose) 16%, transparent);
+.market-ticker-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--line);
 }
 
-/* The search box that replaced the old third "Player" dropdown -- styled to
-   match the dropdown triggers beside it (same height/radius/border) so the
-   filter row still reads as one control group. */
+/* Cascading filter bar: era pills, then a colored franchise chip, then
+   search -- the Stitch mock's own "3-step" filter rhythm. */
+.market-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.market-era-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line);
+}
+
+.market-pill {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.market-pill:hover {
+  color: var(--text);
+}
+
+.market-pill.active {
+  background: var(--accent);
+  color: var(--bg-void);
+  font-weight: 700;
+}
+
+.market-franchise-chip {
+  min-width: 220px;
+}
+
+.market-search-input-wide {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.market-quicktags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.market-quicktags-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.market-tag {
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--bg-panel-raised);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.market-tag:hover {
+  border-color: var(--line-bright);
+  color: var(--text);
+}
+
+.market-tag.active {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-panel-raised));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* The search box -- styled to match the pills beside it (same pill
+   radius) so the filter row still reads as one control group. */
 .market-search-input {
   width: 100%;
-  height: 44px;
+  height: 40px;
   padding: 0 14px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   border: 1px solid var(--line);
   background: var(--bg-panel-raised);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 13px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -4772,9 +4861,9 @@ button.topnav-brand-link:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
-/* The results list shown below the filters once a team is picked and/or a
-   search is typed -- what used to require opening a third dropdown now
-   just appears here, no extra click. */
+/* The results list shown below the filters once a team, a search, or a
+   quick tag is active -- what used to require opening a third dropdown
+   now just appears here, no extra click. */
 .market-results {
   display: flex;
   flex-direction: column;
@@ -4828,42 +4917,66 @@ button.topnav-brand-link:focus-visible {
   flex-shrink: 0;
 }
 
-/* Hot picks: shown before any era/team/player is chosen -- one card per
-   position, the most career-games-played real player at that slot. */
-.market-hotpicks {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.market-hotpicks-grid {
+/* Main split stage: dossier + charts on the left, live bids on the right --
+   the Stitch mock's own 8/4-column split. */
+.market-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
 }
 
-.market-hotpick-card {
+.market-grid-main,
+.market-grid-side {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 14px;
-  border-radius: var(--radius-md);
+  gap: 16px;
+  min-width: 0;
+}
+
+/* The player dossier card -- the mock's central "lot" panel. */
+.market-dossier {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(165deg, var(--bg-panel-raised) 0%, var(--bg-panel) 100%);
   border: 1px solid var(--line);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.market-dossier-photo {
+  position: relative;
+  flex-shrink: 0;
+  width: 220px;
+  height: 280px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--team-primary, var(--line-bright)) 55%, var(--line-bright));
   background: var(--bg-panel-raised);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.2);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.market-hotpick-card:hover {
-  border-color: var(--line-bright);
-  transform: translateY(-2px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 18px rgba(0, 0, 0, 0.32);
+.market-dossier-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
 }
 
-.market-hotpick-pos {
+.market-dossier-featured {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(10, 10, 12, 0.75);
+  backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in srgb, var(--team-primary, var(--accent)) 45%, transparent);
   font-family: var(--font-display);
   font-size: 10px;
   font-weight: 700;
@@ -4872,90 +4985,224 @@ button.topnav-brand-link:focus-visible {
   color: var(--accent);
 }
 
-.market-hotpick-name {
+.market-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--win);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--win) 30%, transparent);
+}
+
+.market-dossier-photo-footer {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(10, 10, 12, 0.75);
+  backdrop-filter: blur(6px);
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text);
-  line-height: 1.2;
 }
 
-.market-hotpick-meta {
-  font-size: 12px;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-}
-
-.market-player-wrap {
+.market-dossier-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 6px;
 }
 
-/* Metric tiles: suggested value / highest real bid / usage rate, side by
-   side above the difficulty picker. */
-.market-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-}
-
-.market-metric-tile {
+.market-dossier-badges {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.market-badge {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-panel);
   border: 1px solid var(--line);
-  background: var(--bg-panel-raised);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.market-metric-label {
-  font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
 }
 
-.market-metric-value {
+.market-badge.accent {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.market-dossier-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 0;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--text);
+}
+
+.market-dossier-meta {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.market-dossier-archetype-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+.market-dossier-difficulty {
+  flex: 1;
+  min-width: 160px;
+}
+
+.market-difficulty-picker {
+  padding: 3px;
+}
+
+.market-difficulty-picker .difficulty-option {
+  padding: 5px 12px;
+  font-size: 11px;
+}
+
+.market-dossier-value-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.market-dossier-value-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.market-dossier-value {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
-.market-metric-value.accent {
-  color: var(--accent);
+.market-value-change {
+  margin: 2px 0 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  width: fit-content;
 }
 
-.market-metric-sub {
-  font-size: 11px;
-  color: var(--text-faint);
+.market-value-change.up {
+  color: var(--win);
+  background: color-mix(in srgb, var(--win) 16%, transparent);
 }
 
-/* Suggested-value-over-time chart, and the two-column alternatives/live-bid
-   panels below it. */
+.market-value-change.down {
+  color: var(--lose);
+  background: color-mix(in srgb, var(--lose) 16%, transparent);
+}
+
+.market-cta {
+  padding: 14px 22px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: var(--bg-void);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.market-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.market-cta:active {
+  transform: translateY(0);
+}
+
+/* Shared panel chrome (value chart, similar players, live bids). */
 .market-panel {
   padding: 16px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background: var(--bg-panel-raised);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
+.market-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
 .market-panel-title {
-  margin: 0 0 10px;
+  margin: 0;
   font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.market-panel-subtitle {
+  margin: 0;
   font-size: 12px;
+  color: var(--text-faint);
+  flex-basis: 100%;
+}
+
+.market-panel-kicker {
+  font-family: var(--font-display);
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--accent);
 }
 
 .market-chart {
@@ -4975,13 +5222,98 @@ button.topnav-brand-link:focus-visible {
   margin: 0;
 }
 
-.market-columns {
+/* Similar player assets grid. */
+.market-similar-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
 }
 
-.market-alt-list,
+.market-similar-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.market-similar-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.market-similar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.market-similar-pos {
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.market-similar-value {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-similar-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.market-similar-meta {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.market-similar-btn {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Live bids (right column). */
+.market-livebids-panel {
+  position: sticky;
+  top: 16px;
+}
+
+.market-live-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--win) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--win) 35%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--win);
+}
+
 .market-sale-list {
   list-style: none;
   margin: 0;
@@ -4989,63 +5321,41 @@ button.topnav-brand-link:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.market-alt-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: none;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.market-alt-row:hover {
-  border-color: var(--line-bright);
-  background: var(--bg-panel);
-  transform: translateX(2px);
-}
-
-.market-alt-photo {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  border-radius: 50%;
-  background: var(--bg-panel);
-  flex-shrink: 0;
-}
-
-.market-alt-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.market-alt-value {
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .market-sale-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+
+.market-sale-time-chip {
+  font-size: 11px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.market-sale-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   color: var(--text-dim);
+}
+
+.market-sale-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
 }
 
 .market-sale-price {
@@ -5056,37 +5366,52 @@ button.topnav-brand-link:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.market-sale-meta {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.market-sale-time {
+.market-sale-status {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
 }
 
-@media (max-width: 600px) {
-  .market-filters {
+.market-sale-summary {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.market-sale-summary strong {
+  color: var(--win);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1100px) {
+  .market-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .market-livebids-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 700px) {
+  .market-dossier {
     flex-direction: column;
   }
 
-  .market-filter {
-    /* flex-basis applies to the column's main axis (height) once the row
-       above switches to flex-direction:column -- without overriding it,
-       the 180px meant as a desktop row's width basis instead stretches
-       every filter to a 180px-tall box, with flex-grow filling the rest of
-       the column's height on top of that. Verified live: this was the
-       exact cause of ~140px of dead space under each dropdown on mobile. */
-    flex: none;
-    min-width: 0;
+  .market-dossier-photo {
+    width: 100%;
+    height: 220px;
   }
 
-  .market-columns {
-    grid-template-columns: 1fr;
+  .market-dossier-value-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .market-cta {
+    width: 100%;
+    text-align: center;
   }
 }
