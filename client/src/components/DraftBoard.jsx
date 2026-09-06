@@ -16,6 +16,7 @@ import PlayerInsights from "./PlayerInsights.jsx";
 import TeamBadge from "./TeamBadge.jsx";
 import { playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
+import { getTeamLogoUrl } from "../teamLogos.js";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -317,28 +318,27 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         // motion.div gets the same "new nomination pops in" effect just by
         // remounting on key change, with no exit-timing failure mode.
         <motion.div
-          className="active-nomination"
+          className="active-nomination active-nomination-cinematic"
           key={`${nomination.player.nbaPlayerId ?? nomination.player.fullName}-${nomination.nominatedBy}`}
-          // A broadcast-style lower-third slide (in from the side, not a
-          // centered fade/pop) for the reveal moment every nomination is
-          // built around -- same reasoning as the comment above about
-          // remounting on key change rather than an exit animation.
-          initial={{ opacity: 0, x: -48, scale: 0.98 }}
-          animate={{ opacity: 1, x: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          style={(() => {
+            const colors = getTeamColors(nomination.player.team?.abbreviation);
+            return { "--team-primary": colors.primary, "--team-secondary": colors.secondary };
+          })()}
+          // A cinematic left-to-right slide -- further off-stage and eased
+          // (not sprung/bouncy) than a UI panel normally would be, closer to
+          // a broadcast lower-third than a dropdown popping in. Remounting
+          // on key change (rather than an exit animation) for the same
+          // reason as always in this component: an exit transition that
+          // never resolves would leave this load-bearing panel stuck.
+          initial={{ opacity: 0, x: -120 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div
-            className="nominated-player-card"
-            style={(() => {
-              const colors = getTeamColors(nomination.player.team?.abbreviation);
-              return { "--team-primary": colors.primary, "--team-secondary": colors.secondary };
-            })()}
-          >
-            {/* The background half of the broadcast-style reveal: a wash of
-                the player's own current team color sweeping in behind the
-                card content, not just the card itself sliding in. Keyed
-                nomination -> remounts (and re-plays) every nomination, same
-                mechanism as the outer motion.div above. */}
+          <div className="nominated-player-card">
+            {/* The background half of the reveal: a wash of the player's own
+                current team color sweeping in behind the card content, plus
+                their real team logo as a large, quiet watermark -- not just
+                the card itself sliding in. */}
             <motion.div
               className="nomination-team-wash"
               aria-hidden="true"
@@ -347,12 +347,19 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               animate={{ scaleX: 1 }}
               transition={{ type: "spring", stiffness: 220, damping: 30, delay: 0.08 }}
             />
+            {getTeamLogoUrl(nomination.player.team?.abbreviation) && (
+              <div
+                className="nomination-logo-watermark"
+                aria-hidden="true"
+                style={{ backgroundImage: `url(${getTeamLogoUrl(nomination.player.team?.abbreviation)})` }}
+              />
+            )}
             <div className="nominated-player-header">
               <PlayerHeadshot
                 nbaPlayerId={nomination.player.nbaPlayerId}
                 photoUrl={nomination.player.stats?.photoUrl}
                 alt={nomination.player.fullName}
-                className="player-headshot"
+                className="player-headshot player-headshot-cinematic"
               />
               <div className="nominated-player-info">
                 <h3>

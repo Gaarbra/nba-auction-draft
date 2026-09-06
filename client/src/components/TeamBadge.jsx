@@ -23,13 +23,10 @@ export default function TeamBadge({ abbreviation, size = 28 }) {
   if (!abbreviation) return null;
 
   if (logoUrl && !imgFailed) {
-    // Padding as a pixel value derived from `size`, not a CSS percentage --
-    // percentage padding resolves against the *containing block's* width,
-    // not this badge's own (a badge sitting in a wide card would get a
-    // padding many times its own size, squeezing the logo down to nothing).
-    const inset = Math.round(size * 0.12);
+    // No inset -- the logo fills the whole circle now, cropped to it via
+    // the CSS class's overflow:hidden rather than padded/contained.
     return (
-      <span className="team-badge team-badge-logo" style={{ width: size, height: size, padding: inset }} title={abbreviation}>
+      <span className="team-badge team-badge-logo" style={{ width: size, height: size }} title={abbreviation}>
         <img src={logoUrl} alt={abbreviation} onError={() => setImgFailed(true)} />
       </span>
     );
@@ -44,7 +41,6 @@ export default function TeamBadge({ abbreviation, size = 28 }) {
         height: size,
         fontSize: Math.max(9, Math.round(size * 0.36)),
         background: `linear-gradient(160deg, ${colors.primary}, color-mix(in srgb, ${colors.primary} 55%, #000))`,
-        borderColor: colors.secondary,
       }}
       title={abbreviation}
     >

@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import InfoModal from "./InfoModal.jsx";
 import { PAGES } from "../siteContent.jsx";
+
+// three.js is a sizable dependency (~470KB minified) that nothing else in
+// this app needs -- lazy-loaded so it's only ever fetched by someone who
+// actually lands on this pre-room pitch, not bundled into the initial load
+// for a room-code link that skips straight past it.
+const CourtScene3D = lazy(() => import("./CourtScene3D.jsx"));
 
 /** The screen shown before anyone creates or joins a room -- a scrollable,
  * Stitch-inspired multi-section pitch, but every claim in it is checked
@@ -94,6 +100,9 @@ export default function LandingPage({ onEnter }) {
         {...revealMotion}
       >
         <CourtLines />
+        <Suspense fallback={null}>
+          <CourtScene3D />
+        </Suspense>
         <div className="landing-hero-glow" aria-hidden="true" />
         <span className="landing-badge">Real-time NBA auction draft</span>
         <h1 className="landing-title">The Coin Draft.</h1>

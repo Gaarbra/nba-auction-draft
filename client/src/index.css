@@ -459,6 +459,52 @@ body {
   -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 35%, black 70%);
 }
 
+/* A real, slowly-spinning 3D basketball (CourtScene3D.jsx, plain three.js)
+   pinned to the viewport -- not the page -- so it holds its spot on screen
+   as the hero scrolls past underneath it, fading out (see the component's
+   own scroll handler) by one viewport height of scroll rather than
+   trailing the whole page down. Sits behind the hero copy (z-index below
+   0) but above the flat void background and court lines. */
+.court-scene-3d {
+  position: fixed;
+  top: 50%;
+  right: 6%;
+  width: 340px;
+  height: 340px;
+  transform: translateY(-50%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.court-scene-3d canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: opacity 0.2s linear;
+}
+
+@media (max-width: 900px) {
+  .court-scene-3d {
+    width: 220px;
+    height: 220px;
+    right: 50%;
+    top: auto;
+    bottom: 6%;
+    transform: translateX(50%);
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The component itself skips the rotation tween, but the ball would
+     otherwise still sit there completely static and a little odd-looking
+     mid-page -- simplest to just not show a "3D flourish" that can't move
+     at all for these users. */
+  .court-scene-3d {
+    display: none;
+  }
+}
+
 .landing-hero-glow {
   position: absolute;
   inset: -80px -40px auto;
@@ -1956,6 +2002,56 @@ form input {
   padding: 24px;
   margin: 0 0 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* The cinematic nomination reveal: a deeper, near-black gradient instead of
+   the flat panel color, plus a thin ring of the player's own current team
+   color instead of the neutral line -- the "premium" half of the redesign
+   that isn't the headshot or the watermark. */
+.active-nomination-cinematic {
+  background: linear-gradient(165deg, #0a0a0d 0%, #16161b 55%, #0d0d10 100%);
+  border-color: color-mix(in srgb, var(--team-primary, var(--line)) 45%, var(--line));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* A large, quiet copy of the player's own real current-team logo sitting
+   behind the card content -- clipped by .nominated-player-card's own
+   overflow:hidden, so it never spills past the card's rounded corners. */
+.nomination-logo-watermark {
+  position: absolute;
+  top: 50%;
+  right: 2%;
+  transform: translateY(-50%);
+  width: 52%;
+  aspect-ratio: 1;
+  max-width: 300px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.08;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* The bidding screen's own bigger, more prominent headshot -- scoped to
+   .active-nomination so the Market tab's reuse of the same
+   .player-headshot class (a browsing context, not the live reveal moment)
+   is unaffected. */
+.active-nomination .player-headshot.player-headshot-cinematic {
+  width: 136px;
+  height: 136px;
+}
+
+@media (max-width: 600px) {
+  .active-nomination .player-headshot.player-headshot-cinematic {
+    width: 104px;
+    height: 104px;
+  }
+
+  .nomination-logo-watermark {
+    width: 70%;
+    opacity: 0.06;
+  }
 }
 
 .nominated-player-card {
@@ -4561,7 +4657,6 @@ button.topnav-brand-link:focus-visible {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 50%;
-  border: 1.5px solid;
   font-family: var(--font-display);
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -4572,22 +4667,75 @@ button.topnav-brand-link:focus-visible {
 /* The real-logo variant: no backing plate -- the logo's own real colors sit
    directly on the page background. A few marks that lean heavily on black/
    navy strokes read a little quieter on this dark theme as a result, but a
-   solid plate behind every team chip was a bigger visual cost than that. */
+   solid plate behind every team chip was a bigger visual cost than that.
+   No outline and no inset either -- the logo is cropped to fill the whole
+   circle (object-fit: cover, not contain), at the cost of a sliver of a
+   non-circular mark's edges on some teams. */
 .team-badge-logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
   background: transparent;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
-  /* Padding is set inline (a pixel value derived from the badge's own
-     size) -- see TeamBadge.jsx for why a CSS percentage doesn't work here. */
 }
 
 .team-badge-logo img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+}
+
+/* The Market tab's team filter: same dropdown shell as Dropdown.jsx, but
+   tinted with each team's own real colors and carrying their logo, both
+   closed and open -- "more of the team colors... with the logo on the
+   side" applies to the whole control, not just the option rows. */
+.team-dropdown-trigger {
+  border-color: color-mix(in srgb, var(--team-primary, var(--line)) 45%, var(--line));
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--team-primary, transparent) 20%, var(--bg-panel-raised)),
+    var(--bg-panel-raised) 65%
+  );
+}
+
+.team-dropdown-trigger:hover,
+.team-dropdown.open .team-dropdown-trigger {
+  border-color: color-mix(in srgb, var(--team-primary, var(--line-bright)) 70%, var(--line-bright));
+}
+
+.team-dropdown-selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.team-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-left: 3px solid transparent;
+  background: transparent;
+}
+
+.team-dropdown-option:hover {
+  border-left-color: var(--team-primary);
+  background: color-mix(in srgb, var(--team-primary) 16%, transparent);
+  color: var(--text);
+}
+
+.team-dropdown-option.selected {
+  border-left-color: var(--team-primary);
+  background: color-mix(in srgb, var(--team-primary) 22%, var(--bg-panel-raised));
+}
+
+.team-dropdown-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .market-difficulty-row {

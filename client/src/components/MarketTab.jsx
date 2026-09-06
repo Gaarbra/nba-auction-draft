@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import Dropdown from "./Dropdown.jsx";
+import TeamDropdown from "./TeamDropdown.jsx";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
 import StatHighlightRow from "./StatHighlightRow.jsx";
@@ -304,7 +305,7 @@ export default function MarketTab({ socket }) {
         </div>
         <div className="market-filter">
           <span className="market-filter-label">Team</span>
-          <Dropdown
+          <TeamDropdown
             options={teamOptions}
             value={team}
             onChange={setTeam}
