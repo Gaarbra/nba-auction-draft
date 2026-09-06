@@ -2067,6 +2067,9 @@ form input {
 
 .nominated-player-card h3 {
   margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-display);
   font-size: 26px;
   font-weight: 800;
@@ -4471,7 +4474,7 @@ form input {
    picked. */
 .market-tab {
   width: 100%;
-  max-width: 720px;
+  max-width: 880px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -4506,6 +4509,20 @@ form input {
 
 .market-player-card {
   width: 100%;
+}
+
+.team-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .market-difficulty-row {
@@ -4548,6 +4565,243 @@ form input {
   color: var(--lose);
 }
 
+/* Hot picks: shown before any era/team/player is chosen -- one card per
+   position, the most career-games-played real player at that slot. */
+.market-hotpicks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.market-hotpicks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.market-hotpick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--bg-panel-raised);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.market-hotpick-card:hover {
+  border-color: var(--line-bright);
+  transform: translateY(-1px);
+}
+
+.market-hotpick-pos {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.market-hotpick-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.market-hotpick-meta {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-player-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Metric tiles: suggested value / highest real bid / usage rate, side by
+   side above the difficulty picker. */
+.market-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.market-metric-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--bg-panel-raised);
+}
+
+.market-metric-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.market-metric-value {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-metric-value.accent {
+  color: var(--accent);
+}
+
+.market-metric-sub {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* Suggested-value-over-time chart, and the two-column alternatives/live-bid
+   panels below it. */
+.market-panel {
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--bg-panel-raised);
+}
+
+.market-panel-title {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.market-chart {
+  width: 100%;
+  height: 120px;
+  display: block;
+}
+
+.market-chart-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--accent);
+}
+
+.market-chart-empty {
+  margin: 0;
+}
+
+.market-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.market-alt-list,
+.market-sale-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.market-alt-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.market-alt-row:hover {
+  border-color: var(--line);
+  background: var(--bg-panel);
+}
+
+.market-alt-photo {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.market-alt-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.market-alt-value {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.market-sale-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.market-sale-price {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--win);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-sale-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-sale-time {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
 @media (max-width: 600px) {
   .market-filters {
     flex-direction: column;
@@ -4562,5 +4816,9 @@ form input {
        exact cause of ~140px of dead space under each dropdown on mobile. */
     flex: none;
     min-width: 0;
+  }
+
+  .market-columns {
+    grid-template-columns: 1fr;
   }
 }

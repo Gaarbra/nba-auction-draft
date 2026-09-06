@@ -13,6 +13,7 @@ import BidStepper from "./BidStepper.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import LocalBiddingRows from "./LocalBiddingRows.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
+import TeamBadge from "./TeamBadge.jsx";
 import { playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
 
@@ -318,9 +319,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         <motion.div
           className="active-nomination"
           key={`${nomination.player.nbaPlayerId ?? nomination.player.fullName}-${nomination.nominatedBy}`}
-          initial={{ opacity: 0, y: 14, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 260, damping: 24 }}
+          // A broadcast-style lower-third slide (in from the side, not a
+          // centered fade/pop) for the reveal moment every nomination is
+          // built around -- same reasoning as the comment above about
+          // remounting on key change rather than an exit animation.
+          initial={{ opacity: 0, x: -48, scale: 0.98 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 28 }}
         >
           <div
             className="nominated-player-card"
@@ -338,6 +343,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               />
               <div className="nominated-player-info">
                 <h3>
+                  <TeamBadge abbreviation={nomination.player.team?.abbreviation} size={22} />
                   <PlayerNameLink nbaPlayerId={nomination.player.nbaPlayerId} name={nomination.player.fullName} />
                 </h3>
                 <p className="player-meta">

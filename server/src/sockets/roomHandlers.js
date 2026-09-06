@@ -480,6 +480,15 @@ export function registerRoomHandlers(io, socket) {
 
     callback?.({ room: toPublicRoom(result.room) });
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+    // Global, not room-scoped — the Market tab (browsing outside any room)
+    // is the listener, showing real completed sale prices for whichever
+    // player it's looking at as they happen across every active draft.
+    // Deliberately carries no player-facing identity (no player name/id
+    // from this room, just the NBA player and price) beyond the room code,
+    // which is already public/joinable by anyone with it.
+    if (result.sale) {
+      io.emit("market:sale", { ...result.sale, roomCode, at: Date.now() });
+    }
     maybeComputeResults(io, result.room, roomCode);
   });
 

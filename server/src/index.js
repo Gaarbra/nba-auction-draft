@@ -14,6 +14,7 @@ import {
   fetchPhotoUrl,
   fetchPlayerStats,
   fetchMarketIndex,
+  fetchUsagePct,
   pingStatsService,
 } from "./services/statsClient.js";
 
@@ -122,6 +123,10 @@ app.get("/api/players/:id/similar", async (req, res) => {
   const k = Math.min(10, Math.max(1, Number(req.query.k) || 5));
   const similar = await fetchSimilarPlayers(req.params.id, k);
   res.json({ similar });
+});
+
+app.get("/api/players/:id/usage-pct", async (req, res) => {
+  res.json(await fetchUsagePct(req.params.id));
 });
 
 // Client-side retry target for a nomination that had no photo yet at

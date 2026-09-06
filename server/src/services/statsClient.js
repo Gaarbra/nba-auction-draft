@@ -160,6 +160,30 @@ export async function fetchSimilarPlayers(playerId, k = 5) {
   }
 }
 
+/**
+ * Real usage rate (USG%) for whichever cached season stats-service has for
+ * this player — see /usage-pct's own docstring for why this never falls
+ * back to a live lookup. Returns { usagePct: null, season: null } on any
+ * failure or when nothing's cached, same "just don't show it" contract as
+ * every other best-effort stats call in this file.
+ */
+export async function fetchUsagePct(playerId) {
+  try {
+    const res = await fetch(`${STATS_SERVICE_URL}/usage-pct?id=${encodeURIComponent(playerId)}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return { usagePct: null, season: null };
+    const data = await res.json();
+    return {
+      usagePct: typeof data.usagePct === "number" ? data.usagePct : null,
+      season: typeof data.season === "string" ? data.season : null,
+    };
+  } catch (err) {
+    console.warn(`[statsClient] usage-pct failed for id=${playerId}: ${err.message}`);
+    return { usagePct: null, season: null };
+  }
+}
+
 let marketIndexCache = null; // { players, fetchedAt } | null
 const MARKET_INDEX_CACHE_TTL_MS = 60 * 60 * 1000; // an hour -- see fetchMarketIndex
 

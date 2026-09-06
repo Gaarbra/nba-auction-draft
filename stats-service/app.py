@@ -1037,10 +1037,47 @@ def get_market_index():
                 "team": team,
                 "position": stats.get("position"),
                 "draftYear": stats.get("draftYear"),
+                # Real, already-cached career totals -- used client-side for
+                # the Market tab's "hot picks" panel (most career games
+                # played per position, a defensible real proxy for "a
+                # stable, proven player to get" rather than an invented
+                # trend score).
+                "gamesPlayed": stats.get("gamesPlayed"),
+                "pointsPerGame": stats.get("pointsPerGame"),
             }
         )
 
     return jsonify({"players": index, "count": len(index)})
+
+
+@app.get("/usage-pct")
+def get_usage_pct():
+    """The Market tab's "projected synergy" stat -- real usage rate (USG%)
+    for whichever of this player's seasons is already cached, picking the
+    most recent one. Read-only over `_usage_cache` (loaded once from the
+    committed usageCache.json), never a live stats.nba.com call: unlike
+    /predict-price and /stats, there's no per-player fallback fetch here on
+    purpose, since a live USG% lookup pulls that whole season's league-wide
+    table (see fetch_usage_pct's own docstring) and this endpoint is meant
+    for casual browsing, not worth paying that cost for on demand. A player
+    with no cached season at all just returns null, same as any other
+    "stats unavailable" case elsewhere in this app."""
+    id_param = (request.args.get("id") or "").strip()
+    try:
+        player_id = int(id_param)
+    except (TypeError, ValueError):
+        return jsonify({"error": "PLAYER_ID_REQUIRED"}), 400
+
+    best_season = None
+    best_value = None
+    for (pid, season), entry in _usage_cache.items():
+        if pid != player_id:
+            continue
+        if best_season is None or season > best_season:
+            best_season = season
+            best_value = entry.get("value")
+
+    return jsonify({"usagePct": best_value, "season": best_season})
 
 
 @app.get("/stats")

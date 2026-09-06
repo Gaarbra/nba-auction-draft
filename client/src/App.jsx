@@ -317,7 +317,7 @@ export default function App() {
             )}
           </div>
         ) : activeTab === "market" ? (
-          <MarketTab />
+          <MarketTab socket={socketRef.current} />
         ) : showLanding ? (
           <LandingPage onEnter={() => setShowLanding(false)} />
         ) : (

@@ -213,9 +213,11 @@ export function assignPosition(room, playerId, position) {
   if (roster[position] !== null) return { error: "SLOT_TAKEN" };
 
   const winner = getPlayer(room, playerId);
-  winner.budget -= nomination.currentBid;
-  roster[position] = { ...nomination.player, acquiredFor: nomination.currentBid };
-  draft.draftedPlayerIds.push(nomination.player.id);
+  const soldPlayer = nomination.player;
+  const finalPrice = nomination.currentBid;
+  winner.budget -= finalPrice;
+  roster[position] = { ...soldPlayer, acquiredFor: finalPrice };
+  draft.draftedPlayerIds.push(soldPlayer.id);
   draft.nomination = null;
 
   const allRostersFull = draft.turnOrder.every((id) => isRosterFull(draft.rosters[id]));
@@ -226,7 +228,11 @@ export function assignPosition(room, playerId, position) {
     draft.currentNominatorId = nextNominatorId(room, playerId);
   }
 
-  return { room };
+  // Surfaced to the caller so it can broadcast a room-independent "this
+  // player just sold for N coins" event — the Market tab's live bid feed
+  // (see roomHandlers.js's draft:assign handler) is the only consumer, and
+  // it has no room to be `io.to(roomCode)`-scoped into.
+  return { room, sale: { nbaPlayerId: soldPlayer.nbaPlayerId, fullName: soldPlayer.fullName, price: finalPrice } };
 }
 
 export function swapRosterPositions(room, playerId, slotA, slotB) {
