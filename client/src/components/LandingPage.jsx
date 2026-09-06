@@ -1,13 +1,7 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import InfoModal from "./InfoModal.jsx";
 import { PAGES } from "../siteContent.jsx";
-
-// three.js is a sizable dependency (~470KB minified) that nothing else in
-// this app needs -- lazy-loaded so it's only ever fetched by someone who
-// actually lands on this pre-room pitch, not bundled into the initial load
-// for a room-code link that skips straight past it.
-const CourtScene3D = lazy(() => import("./CourtScene3D.jsx"));
 
 /** The screen shown before anyone creates or joins a room -- a scrollable,
  * Stitch-inspired multi-section pitch, but every claim in it is checked
@@ -48,6 +42,31 @@ const revealMotion = {
   viewport: { once: true, amount: 0.35 },
   transition: { duration: 0.6, ease: "easeOut" },
 };
+
+// The 3D flourish now lives on the mockups themselves -- the bidding
+// stepper, the synergy "scoreboard", the budget meter, the roster slots --
+// instead of a decorative object with nothing to do with any of them. Each
+// card starts tilted away in real 3D space (rotateX/rotateY, not a 2D skew)
+// and swings flat as it scrolls into view; .landing-preview's `perspective`
+// gives that rotation actual depth instead of looking like a plain skew.
+// Reduced-motion users get a plain fade instead -- same reasoning as every
+// other motion check in this app (StatHighlightRow, RoomLobby's cursor
+// tilt, InteractiveBackground's spotlight).
+const prefersReducedMotion =
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+const preview3DReveal = prefersReducedMotion
+  ? {
+      initial: { opacity: 0 },
+      whileInView: { opacity: 1 },
+      viewport: { once: true, amount: 0.4 },
+      transition: { duration: 0.4 },
+    }
+  : {
+      initial: { opacity: 0, rotateY: -30, rotateX: 10, z: -60 },
+      whileInView: { opacity: 1, rotateY: 0, rotateX: 0, z: 0 },
+      viewport: { once: true, amount: 0.4 },
+      transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] },
+    };
 
 function ScrollDots({ active, onJump }) {
   return (
@@ -100,9 +119,6 @@ export default function LandingPage({ onEnter }) {
         {...revealMotion}
       >
         <CourtLines />
-        <Suspense fallback={null}>
-          <CourtScene3D />
-        </Suspense>
         <div className="landing-hero-glow" aria-hidden="true" />
         <span className="landing-badge">Real-time NBA auction draft</span>
         <h1 className="landing-title">The Coin Draft.</h1>
@@ -158,7 +174,7 @@ export default function LandingPage({ onEnter }) {
           </ul>
         </div>
         <div className="landing-preview">
-          <div className="landing-preview-card">
+          <motion.div className="landing-preview-card" {...preview3DReveal}>
             <span className="landing-preview-label">Example roster budget</span>
             <div className="landing-preview-meter">
               <span className="coin-meter-icon" aria-hidden="true">
@@ -170,7 +186,7 @@ export default function LandingPage({ onEnter }) {
               <span className="landing-preview-count">7</span>
             </div>
             <span className="landing-preview-hint">7 of 20 coins left, 2 open slots</span>
-          </div>
+          </motion.div>
         </div>
       </motion.section>
 
@@ -200,7 +216,7 @@ export default function LandingPage({ onEnter }) {
           </ul>
         </div>
         <div className="landing-preview">
-          <div className="landing-preview-card">
+          <motion.div className="landing-preview-card" {...preview3DReveal}>
             <span className="landing-preview-label">Example nomination</span>
             <p className="landing-preview-bid">
               Current bid: <strong>6 coins</strong> by Alice
@@ -216,7 +232,7 @@ export default function LandingPage({ onEnter }) {
                 <span className="bid-quick-jump-btn">Max</span>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </motion.section>
 
@@ -236,7 +252,7 @@ export default function LandingPage({ onEnter }) {
           </p>
         </div>
         <div className="landing-preview">
-          <div className="landing-preview-card">
+          <motion.div className="landing-preview-card" {...preview3DReveal}>
             <span className="landing-preview-label">Example roster</span>
             <div className="landing-preview-slots">
               {["PG", "SG", "SF", "PF", "C"].map((pos, i) => (
@@ -245,7 +261,7 @@ export default function LandingPage({ onEnter }) {
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       </motion.section>
 
@@ -265,7 +281,7 @@ export default function LandingPage({ onEnter }) {
           </p>
         </div>
         <div className="landing-preview">
-          <div className="landing-preview-card landing-preview-formula">
+          <motion.div className="landing-preview-card landing-preview-formula" {...preview3DReveal}>
             <span className="landing-preview-label">Synergy multiplier</span>
             <div className="landing-formula-row">
               <span>Combined usage ≤ 105%</span>
@@ -279,7 +295,7 @@ export default function LandingPage({ onEnter }) {
               <span>Combined usage &gt; 125%</span>
               <span className="landing-formula-value bad">0.85×</span>
             </div>
-          </div>
+          </motion.div>
         </div>
       </motion.section>
 

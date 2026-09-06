@@ -459,52 +459,6 @@ body {
   -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 35%, black 70%);
 }
 
-/* A real, slowly-spinning 3D basketball (CourtScene3D.jsx, plain three.js)
-   pinned to the viewport -- not the page -- so it holds its spot on screen
-   as the hero scrolls past underneath it, fading out (see the component's
-   own scroll handler) by one viewport height of scroll rather than
-   trailing the whole page down. Sits behind the hero copy (z-index below
-   0) but above the flat void background and court lines. */
-.court-scene-3d {
-  position: fixed;
-  top: 50%;
-  right: 6%;
-  width: 340px;
-  height: 340px;
-  transform: translateY(-50%);
-  z-index: -1;
-  pointer-events: none;
-}
-
-.court-scene-3d canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  transition: opacity 0.2s linear;
-}
-
-@media (max-width: 900px) {
-  .court-scene-3d {
-    width: 220px;
-    height: 220px;
-    right: 50%;
-    top: auto;
-    bottom: 6%;
-    transform: translateX(50%);
-    opacity: 0.7;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* The component itself skips the rotation tween, but the ball would
-     otherwise still sit there completely static and a little odd-looking
-     mid-page -- simplest to just not show a "3D flourish" that can't move
-     at all for these users. */
-  .court-scene-3d {
-    display: none;
-  }
-}
-
 .landing-hero-glow {
   position: absolute;
   inset: -80px -40px auto;
@@ -701,6 +655,11 @@ body {
 .landing-preview {
   display: flex;
   justify-content: center;
+  /* Gives the card's scroll-triggered rotateX/rotateY (LandingPage.jsx's
+     preview3DReveal) real depth instead of looking like a flat 2D skew --
+     perspective has to live on an ancestor of the rotated element, not the
+     element itself. */
+  perspective: 1400px;
 }
 
 .landing-preview-card {
@@ -711,6 +670,7 @@ body {
   border-radius: var(--radius-lg);
   padding: 24px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transform-style: preserve-3d;
 }
 
 .landing-preview-label {
