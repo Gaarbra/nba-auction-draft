@@ -432,6 +432,26 @@ body {
 .landing-hero {
   position: relative;
   text-align: center;
+  overflow: hidden;
+  /* Own stacking context, same reasoning as .app-shell above -- otherwise
+     the photo/glow layers' negative z-index can paint behind this
+     section's siblings instead of just behind its own content. */
+  isolation: isolate;
+}
+
+/* A cropped, self-hosted still (see hero-silhouette.jpg's own history --
+   the original AI-generated photo had a Nike and NBA mark baked into the
+   bottom corner, sliced off before this ever shipped), not the lobby's
+   moving photo ticker -- the two would otherwise compete for attention on
+   the one screen meant to sell the game before either matters. */
+.landing-hero-photo {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(180deg, rgba(11, 11, 13, 0.55) 0%, rgba(11, 11, 13, 0.88) 65%, var(--bg-void) 100%),
+    var(--hero-photo-url);
+  background-size: cover;
+  background-position: center 30%;
+  z-index: -2;
 }
 
 .landing-hero-glow {

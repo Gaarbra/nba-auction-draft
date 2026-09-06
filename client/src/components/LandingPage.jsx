@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import InfoModal from "./InfoModal.jsx";
 import { PAGES } from "../siteContent.jsx";
+import heroPhoto from "../assets/hero-silhouette.jpg";
 
 /** The screen shown before anyone creates or joins a room -- a scrollable,
  * Stitch-inspired multi-section pitch, but every claim in it is checked
@@ -64,6 +65,7 @@ export default function LandingPage({ onEnter }) {
         data-index="0"
         className="landing-section landing-hero"
       >
+        <div className="landing-hero-photo" style={{ "--hero-photo-url": `url(${heroPhoto})` }} aria-hidden="true" />
         <div className="landing-hero-glow" aria-hidden="true" />
         <span className="landing-badge">Real-time NBA auction draft</span>
         <h1 className="landing-title">The Coin Draft.</h1>

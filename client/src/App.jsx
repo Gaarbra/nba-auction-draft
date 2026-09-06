@@ -264,7 +264,10 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <InteractiveBackground ticker={!room} />
+      {/* The photo ticker is the lobby's ambient background -- the landing
+          page gets its own static hero photo instead (see LandingPage.jsx),
+          so the two never compete. */}
+      <InteractiveBackground ticker={!room && !showLanding} />
 
       {room ? (
         <TopNav
