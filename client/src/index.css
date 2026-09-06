@@ -41,6 +41,16 @@
   box-sizing: border-box;
 }
 
+html {
+  /* "proximity", not "mandatory": it only pulls the page toward a snap
+     point when one is already close, and never fights the browser's own
+     scroll on pages with no scroll-snap-align children (every screen but
+     the landing page). Lives here rather than on a nested scroll container
+     since .app-shell can't take overflow without breaking the sticky
+     TopNav -- see body's own comment just below. */
+  scroll-snap-type: y proximity;
+}
+
 body {
   margin: 0;
   background: var(--bg-void);
@@ -394,26 +404,34 @@ body {
   }
 }
 
-/* The screen shown before the room lobby -- a short, honest pitch, not a
-   marketing page. No background photography here on purpose: nothing in
-   the pool of usable court/hoop imagery was clean of baked-in team/league
-   branding, so the atmosphere comes from the same radial glow used behind
-   the lobby card instead. */
+/* The screen shown before the room lobby -- a scrollable, Stitch-inspired
+   multi-section pitch, but no background photography: nothing in the pool
+   of usable court/hoop imagery was clean of baked-in team/league branding
+   (the two candidates from the original mock had a Nike watermark and the
+   literal NBA logo respectively), so the atmosphere comes from the same
+   radial glow used behind the lobby card instead, repeated per section.
+   `scroll-snap-type` lives on html (see near the top of this file) rather
+   than a nested scroll container, so this rides the page's own scrollbar
+   instead of fighting the fixed footer/bottom-nav for a second one. */
 .landing {
   width: 100%;
-  max-width: 720px;
+  max-width: 1040px;
+  position: relative;
+}
+
+.landing-section {
+  min-height: calc(100svh - 64px);
   display: flex;
   flex-direction: column;
-  gap: 48px;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: start;
+  padding: 48px 16px;
 }
 
 .landing-hero {
   position: relative;
   text-align: center;
-  padding: 24px 16px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
 .landing-hero-glow {
@@ -449,8 +467,13 @@ body {
   color: var(--text);
 }
 
+.landing-title-sm {
+  font-size: 40px;
+  margin-bottom: 32px;
+}
+
 .landing-subtitle {
-  margin: 0 0 24px;
+  margin: 0 auto 24px;
   max-width: 520px;
   font-size: 16px;
   line-height: 1.6;
@@ -490,44 +513,328 @@ body {
   padding: 13px 28px;
 }
 
-.landing-steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+.landing-scroll-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 48px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  cursor: pointer;
 }
 
-.landing-step {
+.landing-scroll-hint svg {
+  width: 16px;
+  height: 16px;
+  animation: landing-hint-fade 2s ease-in-out infinite;
+}
+
+@keyframes landing-hint-fade {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Feature sections: copy on one side, a small illustrative preview built
+   from the app's own real component classes (coin-meter, bid-stepper,
+   roster slots) on the other -- never a fabricated screenshot standing in
+   for the product. */
+.landing-feature {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.landing-feature-reverse .landing-feature-copy {
+  order: 2;
+}
+
+.landing-feature-reverse .landing-preview {
+  order: 1;
+}
+
+.landing-kicker {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.landing-h2 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.landing-body {
+  margin: 0 0 18px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.landing-body strong {
+  color: var(--text);
+}
+
+.landing-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.landing-list li {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  padding-left: 18px;
+  position: relative;
+}
+
+.landing-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.landing-list strong {
+  color: var(--text);
+}
+
+.landing-preview {
+  display: flex;
+  justify-content: center;
+}
+
+.landing-preview-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.landing-preview-label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 16px;
+}
+
+.landing-preview-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.landing-preview-count {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-preview-hint {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.landing-preview-bid {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.landing-preview-bid strong {
+  color: var(--accent-bright);
+  font-size: 18px;
+  margin: 0 4px;
+}
+
+.landing-preview-stepper {
+  justify-content: center;
+}
+
+.landing-preview-slots {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.landing-preview-slot {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--line);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+}
+
+.landing-preview-slot.filled {
+  border-style: solid;
+  border-color: var(--line-bright);
+  background: var(--bg-inset);
+  color: var(--text);
+}
+
+.landing-preview-slot.open {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
+
+.landing-formula-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.landing-formula-row:first-of-type {
+  border-top: none;
+}
+
+.landing-formula-value {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-formula-value.good {
+  color: var(--win);
+}
+
+.landing-formula-value.bad {
+  color: var(--lose);
+}
+
+.landing-finale {
+  position: relative;
+  text-align: center;
+}
+
+.landing-modes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.landing-mode-card {
+  width: 260px;
   background: var(--bg-panel-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: 20px;
+  text-align: left;
 }
 
-.landing-step-number {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-faint);
-  margin-bottom: 10px;
-  font-variant-numeric: tabular-nums;
-}
-
-.landing-step-title {
+.landing-mode-card h3 {
   margin: 0 0 8px;
   font-family: var(--font-display);
   font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.01em;
   color: var(--text);
 }
 
-.landing-step-body {
+.landing-mode-card p {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;
   color: var(--text-dim);
+}
+
+/* Right-edge scroll indicator -- a wayfinding aid for a page that's now
+   several viewport-heights tall, not a fake nav. */
+.landing-dots {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 20;
+}
+
+.landing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: var(--line-bright);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.landing-dot.active {
+  background: var(--accent);
+  transform: scale(1.3);
+}
+
+@media (max-width: 860px) {
+  .landing-feature {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .landing-feature-reverse .landing-feature-copy,
+  .landing-feature-reverse .landing-preview {
+    order: initial;
+  }
+
+  .landing-list {
+    text-align: left;
+  }
+
+  .landing-dots {
+    display: none;
+  }
 }
 
 @media (max-width: 700px) {
@@ -535,8 +842,8 @@ body {
     font-size: 38px;
   }
 
-  .landing-steps {
-    grid-template-columns: 1fr;
+  .landing-h2 {
+    font-size: 26px;
   }
 }
 
