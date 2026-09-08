@@ -8,6 +8,16 @@ const SCHEMA_PATH = path.join(__dirname, "..", "..", "..", "db", "schema.sql");
 
 const DATABASE_URL = process.env.DATABASE_URL || null;
 
+// Off by default so this stays a no-op for Render's own Postgres, reached
+// over an internal same-region connection that never needed TLS. Once
+// DATABASE_URL points at AWS RDS — reached from Render over the public
+// internet — set DATABASE_SSL=require. rejectUnauthorized:false accepts
+// RDS's cert chain without bundling AWS's root CA locally; that's the one
+// corner this cuts versus a fully verified connection (verify-full with the
+// real CA bundle), acceptable for a learning project, worth naming as a
+// known simplification in anything more production-grade.
+const DATABASE_SSL = process.env.DATABASE_SSL === "require";
+
 // Entirely optional, same philosophy as stats-service/db.py: with no
 // DATABASE_URL, `pool` stays null and every exported function becomes a
 // no-op — the app plays exactly as it did before there was a database at
@@ -15,7 +25,13 @@ const DATABASE_URL = process.env.DATABASE_URL || null;
 // generated-data tables (drafts/draft_teams/draft_picks — see
 // db/schema.sql) build up organically from real games instead of needing a
 // separate import step.
-const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 5000 }) : null;
+const pool = DATABASE_URL
+  ? new pg.Pool({
+      connectionString: DATABASE_URL,
+      connectionTimeoutMillis: 5000,
+      ssl: DATABASE_SSL ? { rejectUnauthorized: false } : undefined,
+    })
+  : null;
 
 export async function initSchema() {
   if (!pool) return;

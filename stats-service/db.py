@@ -18,6 +18,16 @@ except ImportError:
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# Same flag, same default, as server/src/services/db.js's DATABASE_SSL —
+# off for Render's own internal Postgres connection, set to "require" once
+# DATABASE_URL points at AWS RDS (reached over the public internet from
+# here). psycopg follows libpq conventions, so sslmode="require" encrypts
+# the connection but does not verify RDS's certificate against a CA
+# bundle — the same "not fully verified, but real TLS" tradeoff the Node
+# side makes with rejectUnauthorized:false, for the same reason (no local
+# AWS CA bundle to point at yet).
+DATABASE_SSL = os.environ.get("DATABASE_SSL") == "require"
+
 _pool_warned = False
 
 
@@ -37,7 +47,10 @@ def _connect():
             _pool_warned = True
         return None
     try:
-        return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=5)
+        connect_kwargs = {"row_factory": dict_row, "connect_timeout": 5}
+        if DATABASE_SSL:
+            connect_kwargs["sslmode"] = "require"
+        return psycopg.connect(DATABASE_URL, **connect_kwargs)
     except Exception as e:
         print(f"[db] connection failed, skipping this write: {e.__class__.__name__}: {e}")
         return None
