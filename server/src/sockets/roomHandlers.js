@@ -30,6 +30,7 @@ import {
 } from "../rooms/draftStore.js";
 import { getPlayers } from "../services/playerCache.js";
 import { getNotablePlayerIds } from "../services/notablePlayers.js";
+import { getTopTeamPlayerIds } from "../services/topTeamPlayers.js";
 import { filterPlayersByEra } from "../services/era.js";
 import { fetchPlayerStats } from "../services/statsClient.js";
 import { saveDraftResults } from "../services/db.js";
@@ -115,14 +116,18 @@ async function drawPlayerWithStats(candidates) {
 }
 
 // The whole difficulty system, shared by draft:nominate and draft:reroll:
-// narrow to the data-driven "notable" pool (all-time leaders, see
-// notablePlayers.js) with odds set by difficulty, then one random draw from
-// whichever pool that leaves. Only one stats-service call per roll, not
-// several in parallel -- keeps rolls fast and resilient to stats.nba.com's
-// rate limiting. Falls back to the full pool if the notable list is empty
-// (fetch failure, or this era just has none). `excludeIds` is extra IDs to
-// treat as unavailable beyond what's already drafted -- a reroll needs this
-// to rule out drawing the exact same player it's trying to get away from.
+// narrow to the data-driven "notable" pool (all-time per-game leaders, see
+// notablePlayers.js, UNIONed with this season's #1 team's current roster,
+// see topTeamPlayers.js -- that second pool is what catches a recognizable
+// breakout player this season who hasn't built enough of a career track
+// record to crack an all-time list yet) with odds set by difficulty, then
+// one random draw from whichever pool that leaves. Only one stats-service
+// call per roll, not several in parallel -- keeps rolls fast and resilient
+// to stats.nba.com's rate limiting. Falls back to the full pool if both
+// lists are empty (fetch failure, or this era just has none).
+// `excludeIds` is extra IDs to treat as unavailable beyond what's already
+// drafted -- a reroll needs this to rule out drawing the exact same player
+// it's trying to get away from.
 async function rollPlayerForRoom(room, excludeIds = []) {
   const allPlayers = await getPlayers();
   const eraPool = filterPlayersByEra(allPlayers, room.draftEra);
@@ -131,8 +136,8 @@ async function rollPlayerForRoom(room, excludeIds = []) {
 
   if (available.length === 0) return { error: "NO_PLAYERS_LEFT" };
 
-  const notableIds = await getNotablePlayerIds();
-  const notableSet = new Set(notableIds);
+  const [notableIds, topTeamIds] = await Promise.all([getNotablePlayerIds(), getTopTeamPlayerIds()]);
+  const notableSet = new Set([...notableIds, ...topTeamIds]);
   const notablePool = notableSet.size > 0 ? available.filter((p) => notableSet.has(p.id)) : [];
 
   // Threshold math lives in computeNotablePoolOdds (roomStore.js). Both

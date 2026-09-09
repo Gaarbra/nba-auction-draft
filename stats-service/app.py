@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, jsonify, request
-from nba_api.stats.static import players
+from nba_api.stats.static import players, teams
 from nba_api.stats.endpoints import (
     playercareerstats,
     leaguedashplayerstats,
@@ -22,6 +22,8 @@ from nba_api.stats.endpoints import (
     commonplayerinfo,
     alltimeleadersgrids,
     playerawards,
+    leaguestandingsv3,
+    commonteamroster,
 )
 
 import db
@@ -77,6 +79,7 @@ CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 BIO_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # position/draft year never change
 POOL_CACHE_TTL_SECONDS = 60 * 60
 NOTABLE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # all-time leaderboards barely move week to week
+TOP_TEAM_CACHE_TTL_SECONDS = 24 * 60 * 60  # standings shift some game to game, not hour to hour
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 STATS_CACHE_FILE = os.path.join(DATA_DIR, "statsCache.json")
@@ -101,6 +104,7 @@ _photo_cache = {}
 _awards_cache = {}
 _pool_cache = {"players": None, "fetchedAt": 0}
 _notable_cache = {"ids": None, "fetchedAt": 0}
+_top_team_cache = {"teamAbbreviation": None, "playerIds": None, "fetchedAt": 0}
 _warmup_status = {"running": False, "processed": 0, "total": 0, "warmed": 0, "startedAt": None, "finishedAt": None}
 
 # How deep into each career-totals leaderboard to pull ids from, and which
@@ -811,6 +815,46 @@ def fetch_notable_player_ids():
     return ids
 
 
+def fetch_top_team_player_ids():
+    """This season's #1 team by win percentage, and its current roster --
+    a second, complementary "easy mode" pool alongside the all-time
+    per-game leaderboard above (see fetch_notable_player_ids). That one is
+    deliberately career-quality-based, which means a breakout player on a
+    great team this season (not yet enough of a track record to crack an
+    all-time list) never shows up there; this pool exists specifically to
+    catch that player, from a team a casual fan is likely to recognize
+    right now regardless of career totals.
+
+    Two calls: standings (ranked already, so this is just "sort by
+    WinPct, take the top row"), then that team's current roster. Cached
+    together as one unit since a wrong or stale team id would make the
+    roster meaningless on its own."""
+    cached = _top_team_cache["playerIds"]
+    if cached is not None and (time.time() - _top_team_cache["fetchedAt"]) < TOP_TEAM_CACHE_TTL_SECONDS:
+        return _top_team_cache["teamAbbreviation"], cached
+
+    standings = leaguestandingsv3.LeagueStandingsV3(timeout=15)
+    df = standings.get_data_frames()[0]
+    if df.empty:
+        return None, set()
+    top_row = df.sort_values("WinPCT", ascending=False).iloc[0]
+    team_id = int(top_row["TeamID"])
+    # Standings only carries TeamSlug ("thunder"), not the real
+    # abbreviation ("OKC") the rest of this app uses -- static.teams ships
+    # bundled with nba_api (no network call) and has the real one.
+    team_identity = teams.find_team_name_by_id(team_id)
+    team_abbreviation = team_identity["abbreviation"] if team_identity else None
+
+    roster = commonteamroster.CommonTeamRoster(team_id=team_id, timeout=15)
+    roster_df = roster.get_data_frames()[0]
+    ids = {int(pid) for pid in roster_df["PLAYER_ID"].tolist()}
+
+    _top_team_cache["teamAbbreviation"] = team_abbreviation
+    _top_team_cache["playerIds"] = ids
+    _top_team_cache["fetchedAt"] = time.time()
+    return team_abbreviation, ids
+
+
 def _broad_position(position):
     """Collapses a possibly-hyphenated position ('F-C', 'G-F') down to its
     primary (first-listed) component. NBA's own convention lists the
@@ -1140,7 +1184,31 @@ def get_notable_players():
         print(f"[notable players fetch failed] ({e.__class__.__name__}: {e})")
         return jsonify({"error": "NOTABLE_PLAYERS_FETCH_FAILED"}), 502
 
-    return jsonify({"playerIds": ids, "count": len(ids)})
+    # ids is a set when freshly computed (cold cache) but a list when loaded
+    # back from the disk cache (round-tripped through JSON) -- list() here
+    # makes both paths actually serializable instead of only working by
+    # accident whenever the disk cache happens to be warm.
+    return jsonify({"playerIds": list(ids), "count": len(ids)})
+
+
+@app.get("/top-team-players")
+def get_top_team_players():
+    """See fetch_top_team_player_ids's own docstring. Same best-effort
+    contract as /notable-players and /awards: a lookup failure just means
+    the easy-mode pool this feeds doesn't get the extra boost this draft,
+    not a broken roll."""
+    try:
+        team_abbreviation, ids = fetch_top_team_player_ids()
+    except Exception as e:
+        print(f"[top team players fetch failed] ({e.__class__.__name__}: {e})")
+        return jsonify({"error": "TOP_TEAM_PLAYERS_FETCH_FAILED"}), 502
+
+    # ids is a set (see fetch_top_team_player_ids) -- unlike /notable-players,
+    # this one has no disk-cache round trip masking the same issue, so it
+    # fails jsonify outright without this list() conversion. Verified live:
+    # this route 500'd with "Object of type set is not JSON serializable"
+    # before this fix.
+    return jsonify({"teamAbbreviation": team_abbreviation, "playerIds": list(ids), "count": len(ids)})
 
 
 @app.get("/market-index")

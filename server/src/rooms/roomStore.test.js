@@ -2,13 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { computeNotablePoolOdds, DIFFICULTY_STATIC_ODDS } from "./roomStore.js";
 
-test("computeNotablePoolOdds: a large notable pool gets the difficulty's full base odds", () => {
+test("computeNotablePoolOdds: a large notable pool (e.g. All Eras' ~1,160) gets the difficulty's full base odds", () => {
   assert.strictEqual(computeNotablePoolOdds("easy", 1161), DIFFICULTY_STATIC_ODDS.easy);
-  assert.strictEqual(computeNotablePoolOdds("easy", 205), DIFFICULTY_STATIC_ODDS.easy);
+  assert.strictEqual(computeNotablePoolOdds("easy", 500), DIFFICULTY_STATIC_ODDS.easy);
 });
 
-test("computeNotablePoolOdds: exactly at the 30-player threshold still gets full odds", () => {
-  assert.strictEqual(computeNotablePoolOdds("easy", 30), DIFFICULTY_STATIC_ODDS.easy);
+test("computeNotablePoolOdds: exactly at the 400-player threshold still gets full odds", () => {
+  assert.strictEqual(computeNotablePoolOdds("easy", 400), DIFFICULTY_STATIC_ODDS.easy);
+});
+
+// The actual bug this threshold exists to fix: every single-era bucket
+// ("active" ~140, a typical decade ~60-205) sits nowhere near All Eras'
+// ~1,160, but the old threshold (30) was low enough that all of them still
+// got the exact same full, unscaled odds -- players correctly reported
+// easy+active nominating the same names constantly, since 92% of every
+// roll was coming from the same ~140-player list. Both should land on the
+// floor now, not full odds.
+test("computeNotablePoolOdds: single-era-sized pools (active ~140, a decade ~200) now scale down to the floor", () => {
+  const active = computeNotablePoolOdds("easy", 140);
+  const decade = computeNotablePoolOdds("easy", 200);
+  assert.ok(Math.abs(active - DIFFICULTY_STATIC_ODDS.easy * 0.7) < 1e-9, `expected ~${DIFFICULTY_STATIC_ODDS.easy * 0.7}, got ${active}`);
+  assert.ok(Math.abs(decade - DIFFICULTY_STATIC_ODDS.easy * 0.7) < 1e-9, `expected ~${DIFFICULTY_STATIC_ODDS.easy * 0.7}, got ${decade}`);
 });
 
 test("computeNotablePoolOdds: a narrow pool (e.g. 2020s' 10 notable players) scales down but never below the 0.7 floor", () => {
@@ -32,11 +46,11 @@ test("computeNotablePoolOdds: an unrecognized difficulty falls back to normal's 
 });
 
 test("computeNotablePoolOdds: scales smoothly between the floor and full odds", () => {
-  const at15 = computeNotablePoolOdds("normal", 15); // 15/30 = 0.5, above the 0.7 floor's threshold (0.7*30=21)... actually below it
-  const at25 = computeNotablePoolOdds("normal", 25); // 25/30 ≈ 0.833, above the floor
-  // 15/30=0.5 is below the 0.7 floor, so it should be clamped to the floor,
-  // same as 10/30 would be. The floor kicks in for anything below 21/30.
-  assert.ok(Math.abs(at15 - DIFFICULTY_STATIC_ODDS.normal * 0.7) < 1e-9);
-  // 25/30 ≈ 0.833 is above the floor, so it should reflect the real ratio.
-  assert.ok(Math.abs(at25 - DIFFICULTY_STATIC_ODDS.normal * (25 / 30)) < 1e-9);
+  // 140/400 = 0.35, below the 0.7 floor's threshold (0.7*400=280), so it
+  // clamps to the floor, same as any smaller pool would.
+  const at140 = computeNotablePoolOdds("normal", 140);
+  // 350/400 = 0.875, above the floor, so it should reflect the real ratio.
+  const at350 = computeNotablePoolOdds("normal", 350);
+  assert.ok(Math.abs(at140 - DIFFICULTY_STATIC_ODDS.normal * 0.7) < 1e-9);
+  assert.ok(Math.abs(at350 - DIFFICULTY_STATIC_ODDS.normal * (350 / 400)) < 1e-9);
 });

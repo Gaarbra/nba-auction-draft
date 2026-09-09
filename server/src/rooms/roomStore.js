@@ -12,13 +12,24 @@ const VALID_ERA_IDS = new Set(["all", "active", ...ERA_BUCKETS.map((b) => b.id)]
 export const DIFFICULTY_STATIC_ODDS = { easy: 0.92, normal: 0.55, hard: 0 };
 const VALID_DIFFICULTIES = new Set(Object.keys(DIFFICULTY_STATIC_ODDS));
 
-// A narrow era (e.g. "2020s", notable pool ~10 players) shouldn't dominate
-// every roll with the same handful of names, but a young decade with few
-// all-time-caliber players yet shouldn't lose the "well-known players show
-// up a lot" feel either. Every other era clears this floor comfortably, so
-// it only ever engages for that one outlier: scale down for real variety
-// as the pool shrinks, but never below POOL_SIZE_SCALE_FLOOR.
-const MIN_NOTABLE_POOL_FOR_FULL_ODDS = 30;
+// A narrow era shouldn't dominate every roll with the same handful of
+// names, but shouldn't lose the "well-known players show up a lot" feel
+// either: scale down for real variety as the pool shrinks, but never below
+// POOL_SIZE_SCALE_FLOOR.
+//
+// 30 was the original threshold here, sized for the one obvious outlier
+// ("2020s", notable pool ~10). It turned out every OTHER single-era bucket
+// clears 30 too, just not by nearly as much as it looks: "active" sits at
+// ~140 and a typical decade at ~60-205, all comfortably above 30 but a
+// small fraction of "All Eras"'s ~1,160. Real players reported easy+active
+// nominating the same names constantly, and the math backs that up -- at
+// the old threshold every one of those eras got the SAME full, unscaled
+// odds as "All Eras" despite a notable pool roughly a tenth the size. 400
+// is comfortably below "All Eras" (still full odds there) and comfortably
+// above every single-era bucket (all now land on the floor below), which
+// is what actually fixes it: not a bigger number for its own sake, a
+// threshold that only "All Eras" can realistically clear.
+const MIN_NOTABLE_POOL_FOR_FULL_ODDS = 400;
 const POOL_SIZE_SCALE_FLOOR = 0.7;
 
 /**
