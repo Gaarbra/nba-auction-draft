@@ -13,10 +13,13 @@ import BidStepper from "./BidStepper.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import LocalBiddingRows from "./LocalBiddingRows.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
+import PlayerAccolades from "./PlayerAccolades.jsx";
 import TeamBadge from "./TeamBadge.jsx";
 import { playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
 import { getTeamLogoUrl } from "../teamLogos.js";
+import { countryFlag } from "../countryFlags.js";
+import useMediaQuery from "../hooks/useMediaQuery.js";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -42,6 +45,8 @@ const ERROR_MESSAGES = {
   SLOT_TAKEN: "That slot is already filled.",
   PLAYER_NOT_FOUND: "That player couldn't be found.",
   RATE_LIMITED: "Slow down a bit. Try again in a few seconds.",
+  REROLL_SOLO_ONLY: "Rerolling is only available in solo drafts.",
+  REROLL_ALREADY_USED: "You've already used your reroll for this draft.",
 };
 
 function friendlyError(code) {
@@ -65,12 +70,25 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   const [bidError, setBidError] = useState("");
   const [pendingAssignment, setPendingAssignment] = useState(null);
   const [assignError, setAssignError] = useState("");
+  const [rerollError, setRerollError] = useState("");
   const [isRolling, setIsRolling] = useState(false);
   const [rollDisplayName, setRollDisplayName] = useState("");
 
   const rollSampleRef = useRef([]);
   const rollIntervalRef = useRef(null);
   const autoNominatedForRef = useRef(null);
+
+  // A reroll keeps `nomination` populated the whole time (it swaps who's in
+  // it, never goes back to null the way a fresh nominate does), so the
+  // belt-and-suspenders effect below can't just check "nomination is
+  // truthy" to know a roll finished -- for a reroll that's true from the
+  // very first frame, before the new player has even been drawn. This ref
+  // snapshots which player was showing when a roll started, so that effect
+  // can tell "still the old player" apart from "the new one actually
+  // landed" in both cases. (currentNominationIdRef is kept in sync with
+  // `nomination` further down, once that's actually in scope.)
+  const rollingAwayFromIdRef = useRef(null);
+  const currentNominationIdRef = useRef(null);
 
   // Chat/reactions are ephemeral (see roomHandlers.js). chatMessages is just
   // a session-local scrollback for the panel, and floatingByPlayer tracks at
@@ -119,8 +137,20 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   );
 
   const draft = room.draft;
+  const prefersReducedMotion =
+    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  // Matches the .room-drafting mobile breakpoint in index.css. A real,
+  // resize-reactive check (see useMediaQuery) rather than a one-off read
+  // like prefersReducedMotion above -- this gates an actual interaction
+  // change (see the simplified mobile bid controls below), not just
+  // styling, so a stale value from before a window resize or phone
+  // rotation would leave the wrong bid UI wired up rather than just
+  // looking briefly outdated.
+  const isMobileViewport = useMediaQuery("(max-width: 640px)");
+
   const isComplete = room.status === "complete";
   const nomination = draft?.nomination || null;
+  currentNominationIdRef.current = nomination?.player?.nbaPlayerId ?? nomination?.player?.fullName ?? null;
   const currentPlayer = room.players.find((p) => p.id === currentPlayerId);
   const myRoster = draft?.rosters?.[currentPlayerId] || {};
   const myOpenSlots = POSITIONS.filter((pos) => !myRoster[pos]);
@@ -150,6 +180,8 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   useEffect(() => {
     function startRolling() {
       setNominateError("");
+      setRerollError("");
+      rollingAwayFromIdRef.current = currentNominationIdRef.current;
       setIsRolling(true);
       setRollDisplayName("");
       ensureRollSample().then(() => {
@@ -183,9 +215,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
 
   // Belt-and-suspenders: once a real nomination shows up in room state, the
   // roll is definitely over, regardless of whether draft:rolling-cancelled
-  // fired (it only fires on error paths, not on success).
+  // fired (it only fires on error paths, not on success). Checks the
+  // player's identity actually changed, not just that `nomination` is
+  // truthy -- a reroll never sets it back to null in between (it swaps who's
+  // in an already-populated nomination), so "truthy" alone would fire this
+  // the instant a reroll starts, before the new player's even been drawn.
   useEffect(() => {
-    if (nomination && isRolling) {
+    if (nomination && isRolling && currentNominationIdRef.current !== rollingAwayFromIdRef.current) {
       clearInterval(rollIntervalRef.current);
       setIsRolling(false);
       playRollSelectChime();
@@ -247,6 +283,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
     setPendingAssignment(null);
   }
 
+  function handleReroll() {
+    setRerollError("");
+    socket.emit("draft:reroll", { playerId: currentPlayerId }, (res) => {
+      if (res?.error) setRerollError(friendlyError(res.error));
+    });
+  }
+
   function handlePickPosition(position) {
     if (!nomination || !currentPlayer) return;
     const remainingAfterBid = currentPlayer.budget - nomination.currentBid;
@@ -267,6 +310,11 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
 
   const isAssigningAsWinner =
     nomination?.phase === "assigning" && currentPlayerId === nomination.currentBidder;
+  // Solo never bids -- every pick lands at the same flat starting price, so
+  // there's no real "worth" to show per player (see AssignBoard/RosterGrid's
+  // own use of this: they hide the per-pick coin readouts rather than
+  // repeat a number that's identical for every single pick).
+  const isSolo = draft?.turnOrder?.length === 1;
 
   return (
     <div className="draft-layout">
@@ -295,13 +343,23 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         </div>
       )}
 
-      {isAssigningAsWinner && (
+      {/* !isRolling matters here specifically for a reroll: it keeps
+          nomination.phase === "assigning" (and isAssigningAsWinner true)
+          the whole time a new player's being drawn, since it's swapping who
+          this same nomination points at rather than clearing it. Without
+          this guard the old player's assign screen would render right on
+          top of the rolling panel instead of stepping aside for it. */}
+      {isAssigningAsWinner && !isRolling && (
         <AssignBoard
           ownerName={currentPlayer?.name || "Your"}
           roster={myRoster}
           budget={currentPlayer?.budget ?? 0}
           nomination={nomination}
           nominatedByName={playerName(nomination.nominatedBy)}
+          isSolo={isSolo}
+          rerollAvailable={isSolo && !draft?.soloRerollUsed}
+          onReroll={handleReroll}
+          rerollError={rerollError}
           pendingAssignment={pendingAssignment}
           assignError={assignError}
           onPickPosition={handlePickPosition}
@@ -324,95 +382,192 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
             const colors = getTeamColors(nomination.player.team?.abbreviation);
             return { "--team-primary": colors.primary, "--team-secondary": colors.secondary };
           })()}
-          // A cinematic left-to-right slide -- further off-stage and eased
-          // (not sprung/bouncy) than a UI panel normally would be, closer to
-          // a broadcast lower-third than a dropdown popping in. Remounting
-          // on key change (rather than an exit animation) for the same
-          // reason as always in this component: an exit transition that
-          // never resolves would leave this load-bearing panel stuck.
-          initial={{ opacity: 0, x: -120 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+          // The card itself just fades in now -- the slide lives solely on
+          // the photo and logo below, not the whole panel (see
+          // .nomination-photo-wrap). Remounting on key change (rather than
+          // an exit animation) for the usual reason in this component: an
+          // exit transition that never resolves would leave this
+          // load-bearing panel stuck.
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
         >
-          <div className="nominated-player-card">
-            {/* The background half of the reveal: a wash of the player's own
-                current team color sweeping in behind the card content, plus
-                their real team logo as a large, quiet watermark -- not just
-                the card itself sliding in. */}
-            <motion.div
-              className="nomination-team-wash"
-              aria-hidden="true"
-              style={{ transformOrigin: "left center" }}
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: 1 }}
-              transition={{ type: "spring", stiffness: 220, damping: 30, delay: 0.08 }}
-            />
-            {getTeamLogoUrl(nomination.player.team?.abbreviation) && (
-              <div
-                className="nomination-logo-watermark"
-                aria-hidden="true"
-                style={{ backgroundImage: `url(${getTeamLogoUrl(nomination.player.team?.abbreviation)})` }}
-              />
-            )}
-            <div className="nominated-player-header">
-              <PlayerHeadshot
-                nbaPlayerId={nomination.player.nbaPlayerId}
-                photoUrl={nomination.player.stats?.photoUrl}
-                alt={nomination.player.fullName}
-                className="player-headshot player-headshot-cinematic"
-              />
-              <div className="nominated-player-info">
-                <h3>
-                  <TeamBadge abbreviation={nomination.player.team?.abbreviation} size={22} />
-                  <PlayerNameLink nbaPlayerId={nomination.player.nbaPlayerId} name={nomination.player.fullName} />
-                </h3>
-                <p className="player-meta">
-                  {nomination.player.position || "N/A"} ·{" "}
-                  {nomination.player.isActive ? "Currently" : "Played for"}{" "}
-                  {nomination.player.team?.abbreviation || "Free Agent"} ·{" "}
-                  {nomination.player.draftYear ? `Drafted ${nomination.player.draftYear}` : "Undrafted"}
-                </p>
-                {nomination.player.teamHistory?.length > 1 && (
-                  <p className="player-meta player-team-history">
-                    Career teams: {nomination.player.teamHistory.map((t) => t.abbreviation).join(", ")}
-                  </p>
-                )}
-                {nomination.player.stats?.unavailable && (
-                  <p className="player-stats loading">Stats unavailable for this player.</p>
-                )}
-                {nomination.player.stats && !nomination.player.stats.unavailable && (
-                  <>
-                    <p className="stats-season">
-                      Career avg, {nomination.player.stats.seasonsPlayed} season
-                      {nomination.player.stats.seasonsPlayed === 1 ? "" : "s"}:{" "}
-                      {nomination.player.stats.firstSeason === nomination.player.stats.lastSeason
-                        ? nomination.player.stats.firstSeason
-                        : `${nomination.player.stats.firstSeason}–${nomination.player.stats.lastSeason}`}
-                    </p>
-                    <StatHighlightRow stats={nomination.player.stats} />
-                  </>
-                )}
-                <PlayerInsights
-                  nbaPlayerId={nomination.player.nbaPlayerId}
-                  era={room.draftEra}
-                  difficulty={room.difficulty}
-                />
-                <p className="nominated-by">
-                  Nominated by {playerName(nomination.nominatedBy)}
-                  {(() => {
-                    const p = room.players.find((pl) => pl.id === nomination.nominatedBy);
-                    return p ? <PlayerStatusBadge player={p} reconnectGraceMs={room.reconnectGraceMs} /> : null;
-                  })()}
-                </p>
-              </div>
-              {nomination.player.stats && !nomination.player.stats.unavailable && (
-                <StatRadarChart
-                  stats={nomination.player.stats}
-                  color={getTeamColors(nomination.player.team?.abbreviation).primary}
-                />
-              )}
-            </div>
-          </div>
+          {(() => {
+            const logoUrl = getTeamLogoUrl(nomination.player.team?.abbreviation);
+            // The official NBA CDN headshot is a transparent cutout -- the
+            // team logo can sit directly behind the player and show
+            // through around them, big and confident, like a real
+            // broadcast graphic. stats.photoUrl only gets set when that
+            // CDN image doesn't exist for this player (see PlayerHeadshot's
+            // own doc comment) and a Wikipedia/fallback photo is standing
+            // in instead -- a flat rectangular photo, not a cutout, so a
+            // giant logo behind it would just be hidden. Badge it small in
+            // the corner there instead.
+            const isOfficialPhoto = Boolean(nomination.player.nbaPlayerId) && !nomination.player.stats?.photoUrl;
+            const slideFrom = prefersReducedMotion ? "translateX(0px)" : "translateX(-36px)";
+            // A premium, slightly overshooting ease-out -- deliberately
+            // distinct from the rest of the app's standard entrance curve
+            // (see the animate skill's --ease-out token) for this one
+            // specific "big logo slides into place" moment.
+            const logoEase = [0.25, 1, 0.5, 1];
+            // Same slide as the headshot's own -- bottom-anchored via CSS
+            // (see .nomination-big-logo), so unlike the earlier vertically-
+            // centered version this doesn't need a translateY baked into
+            // every animated frame, just the horizontal slide.
+            const bigLogoFrom = prefersReducedMotion ? "translateX(0px)" : "translateX(-40px)";
+
+            return (
+              <>
+                <div className="nominated-player-card">
+                  {/* The background half of the reveal: a wash of the
+                      player's own current team color sweeping in behind the
+                      card content. */}
+                  <motion.div
+                    className="nomination-team-wash"
+                    aria-hidden="true"
+                    style={{ transformOrigin: "left center" }}
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 30, delay: 0.08 }}
+                  />
+                  {/* Back inside .nominated-player-card (not a sibling of it)
+                      so its position is anchored to THIS box's own edges --
+                      specifically bottom:0, matching the photo's own anchor --
+                      rather than the outer card's, which also includes the
+                      separate bidding/assign panel below and let the logo
+                      drift down behind that too. .nominated-player-card
+                      itself now allows overflow (see that rule) so the logo
+                      can still bleed out past ITS edges; only the true outer
+                      card (.active-nomination-cinematic) clips it for real. */}
+                  {logoUrl && isOfficialPhoto && (
+                    <motion.img
+                      src={logoUrl}
+                      alt=""
+                      aria-hidden="true"
+                      className="nomination-big-logo"
+                      initial={{ opacity: 0, transform: bigLogoFrom }}
+                      animate={{ opacity: 1, transform: "translateX(0px)" }}
+                      transition={{ duration: 0.6, ease: logoEase }}
+                    />
+                  )}
+                  <div className="nominated-player-header">
+                    <div className="nomination-photo-wrap">
+                      <motion.div
+                        // Masked only when there's the big logo actually
+                        // sitting behind it (see .nomination-photo-slide.masked)
+                        // -- softening a photo's edges toward transparent
+                        // with nothing behind it would just look like an
+                        // unexplained vignette against the card.
+                        className={`nomination-photo-slide ${logoUrl && isOfficialPhoto ? "masked" : ""}`}
+                        initial={{ opacity: 0, transform: slideFrom }}
+                        animate={{ opacity: 1, transform: "translateX(0px)" }}
+                        transition={{ duration: 0.6, ease: logoEase, delay: 0.05 }}
+                      >
+                        <PlayerHeadshot
+                          nbaPlayerId={nomination.player.nbaPlayerId}
+                          photoUrl={nomination.player.stats?.photoUrl}
+                          alt={nomination.player.fullName}
+                          className="player-headshot player-headshot-cinematic"
+                        />
+                      </motion.div>
+                      {logoUrl && !isOfficialPhoto && (
+                        <motion.img
+                          src={logoUrl}
+                          alt=""
+                          aria-hidden="true"
+                          className="nomination-photo-logo badge"
+                          initial={{ opacity: 0, transform: slideFrom }}
+                          animate={{ opacity: 1, transform: "translateX(0px)" }}
+                          transition={{ duration: 0.5, ease: logoEase, delay: 0.2 }}
+                        />
+                      )}
+                    </div>
+                    {/* Everything that isn't the photo/logo rises into place
+                        together instead of sliding with the card -- a
+                        separate, gentler beat from the photo's slide. */}
+                    <motion.div
+                      className="nomination-content-fade"
+                      initial={{ opacity: 0, transform: prefersReducedMotion ? "translateY(0px)" : "translateY(16px)" }}
+                      animate={{ opacity: 1, transform: "translateY(0px)" }}
+                      transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1], delay: 0.2 }}
+                    >
+                      <div className="nominated-player-info">
+                        <h3>
+                          <TeamBadge abbreviation={nomination.player.team?.abbreviation} size={22} />
+                          <PlayerNameLink
+                            nbaPlayerId={nomination.player.nbaPlayerId}
+                            name={nomination.player.fullName}
+                          />
+                        </h3>
+                        <p className="player-meta">
+                          {countryFlag(nomination.player.stats?.country) && (
+                            <span className="player-meta-flag" title={nomination.player.stats.country}>
+                              {countryFlag(nomination.player.stats.country)}
+                            </span>
+                          )}
+                          {nomination.player.position || "N/A"} ·{" "}
+                          {nomination.player.isActive ? "Currently" : "Played for"}{" "}
+                          {nomination.player.team?.abbreviation || "Free Agent"} ·{" "}
+                          {nomination.player.draftYear ? `Drafted ${nomination.player.draftYear}` : "Undrafted"}
+                        </p>
+                        <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} />
+                        {nomination.player.teamHistory?.length > 1 && (
+                          <p className="player-meta player-team-history">
+                            Career teams: {nomination.player.teamHistory.map((t) => t.abbreviation).join(", ")}
+                          </p>
+                        )}
+                        {nomination.player.stats?.unavailable && (
+                          <p className="player-stats loading">Stats unavailable for this player.</p>
+                        )}
+                        {nomination.player.stats && !nomination.player.stats.unavailable && (
+                          <>
+                            <p className="stats-season">
+                              Career avg, {nomination.player.stats.seasonsPlayed} season
+                              {nomination.player.stats.seasonsPlayed === 1 ? "" : "s"}:{" "}
+                              {nomination.player.stats.firstSeason === nomination.player.stats.lastSeason
+                                ? nomination.player.stats.firstSeason
+                                : `${nomination.player.stats.firstSeason}–${nomination.player.stats.lastSeason}`}
+                            </p>
+                            <StatHighlightRow stats={nomination.player.stats} />
+                          </>
+                        )}
+                        {/* Similar Players dropped from this card specifically (still
+                            shown in the Market tab's own use of this component) --
+                            a nice-to-have next to the reveal, not worth the room it
+                            takes. Suggested Value also skips mobile entirely: with
+                            the room a phone screen has, one predicted number isn't
+                            worth crowding out the essentials (photo, name, real
+                            stats, bid controls). */}
+                        {!isSolo && !isMobileViewport && (
+                          <PlayerInsights
+                            nbaPlayerId={nomination.player.nbaPlayerId}
+                            era={room.draftEra}
+                            difficulty={room.difficulty}
+                            showSimilar={false}
+                          />
+                        )}
+                        <p className="nominated-by">
+                          Nominated by {playerName(nomination.nominatedBy)}
+                          {(() => {
+                            const p = room.players.find((pl) => pl.id === nomination.nominatedBy);
+                            return p ? (
+                              <PlayerStatusBadge player={p} reconnectGraceMs={room.reconnectGraceMs} />
+                            ) : null;
+                          })()}
+                        </p>
+                      </div>
+                      {nomination.player.stats && !nomination.player.stats.unavailable && (
+                        <StatRadarChart
+                          stats={nomination.player.stats}
+                          color={getTeamColors(nomination.player.team?.abbreviation).primary}
+                        />
+                      )}
+                    </motion.div>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
 
           {nomination.phase === "bidding" && (
             <div className="bidding-panel">
@@ -546,6 +701,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           floatingByPlayer={floatingByPlayer}
           assigningSlot={false}
           onAssignSlot={handlePickPosition}
+          hideCost={isSolo}
         />
       )}
       </div>

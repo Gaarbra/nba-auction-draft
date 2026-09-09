@@ -79,6 +79,16 @@ def load_training_data():
         JOIN players p ON p.id = dp.player_id
         JOIN player_stats ps ON ps.player_id = p.id
         WHERE dp.acquired_for IS NOT NULL
+          -- Solo drafts skip bidding entirely and auto-win every pick at a
+          -- flat starting price (see rerollNomination's comment in
+          -- draftStore.js) -- there's no one to bid against, so
+          -- acquired_for there isn't a real market price, just a constant.
+          -- Training on that would teach the model "this is what a fair
+          -- price looks like" from picks that never actually had one.
+          -- draft_teams has exactly one row per real participant, so this
+          -- counts the room's actual size directly rather than trusting a
+          -- separately-stored flag that could drift out of sync with it.
+          AND (SELECT COUNT(*) FROM draft_teams dt2 WHERE dt2.draft_id = d.id) > 1
     """
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:

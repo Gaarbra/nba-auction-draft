@@ -5,30 +5,12 @@ import { PAGES } from "../siteContent.jsx";
 import { isSoundMuted, setSoundMuted } from "../rollSound.js";
 
 /* The persistent app-shell header. Two variants:
-   - "lobby": wordmark + section tabs (Market/Roster/Stats are visual-only
-     stubs; the app is a single-sitting draft, there are no such pages) +
-     notification/wallet glyphs.
+   - "lobby": wordmark + section tabs (Lobby/Market/How to Play).
    - "room": wordmark + room code/difficulty + live turn/coins status +
-     sound, help, leave, and a connection dot. */
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function WalletIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+     sound, help, leave, and a connection dot.
+   The wordmark itself is clickable in both variants whenever a caller
+   passes onGoHome -- from inside a room that leaves it, same as the
+   dedicated "Leave room" button (see App.jsx's handleGoHome). */
 
 function SoundIcon({ muted }) {
   return (
@@ -59,16 +41,11 @@ function HelpIcon() {
   );
 }
 
-// "market" is the only one wired to a real screen so far (see MarketTab.jsx)
-// -- Roster/Stats stay disabled visual stubs until there's an actual screen
-// behind them, same reasoning as the notification/wallet icons below.
 const LOBBY_TABS = [
   { id: "lobby", label: "Lobby" },
   { id: "market", label: "Market" },
-  { id: "roster", label: "Roster" },
-  { id: "stats", label: "Stats" },
+  { id: "how-to-play", label: "How to Play" },
 ];
-const ENABLED_TABS = new Set(["lobby", "market"]);
 
 export default function TopNav({
   variant = "lobby",
@@ -80,6 +57,7 @@ export default function TopNav({
   isLocal = false,
   onClockName = null,
   coins = null,
+  maxCoins = null,
   onLeaveRoom,
   activeTab = "lobby",
   onTabChange,
@@ -128,7 +106,6 @@ export default function TopNav({
                 type="button"
                 className={`topnav-tab ${tab.id === activeTab ? "active" : ""}`}
                 aria-current={tab.id === activeTab ? "page" : undefined}
-                disabled={!ENABLED_TABS.has(tab.id)}
                 onClick={() => onTabChange?.(tab.id)}
               >
                 {tab.label}
@@ -138,17 +115,6 @@ export default function TopNav({
         )}
 
         <div className="topnav-right">
-          {variant === "lobby" && (
-            <>
-              <button type="button" className="topnav-icon-btn" aria-label="Notifications" disabled>
-                <BellIcon />
-              </button>
-              <button type="button" className="topnav-icon-btn" aria-label="Wallet" disabled>
-                <WalletIcon />
-              </button>
-            </>
-          )}
-
           {variant === "room" && (
             <>
               {onClockName && (
@@ -164,8 +130,24 @@ export default function TopNav({
                   <span className="topnav-coins-icon" aria-hidden="true">
                     ¢
                   </span>
-                  <span className="topnav-coins-value">{coins}</span>
-                  <span className="topnav-coins-unit">coins</span>
+                  <span className="topnav-coins-text">
+                    <span className="topnav-coins-value">{coins}</span>
+                    <span className="topnav-coins-unit">{maxCoins != null ? `/ ${maxCoins}c` : "coins"}</span>
+                  </span>
+                  {/* Only meaningful once .room-drafting's instrument-panel
+                      styling is in scope (see index.css) -- outside a live
+                      draft, maxCoins is never passed, so this never renders. */}
+                  {maxCoins != null && (
+                    <span className="topnav-coins-bar" aria-hidden="true">
+                      <span
+                        className="topnav-coins-bar-fill"
+                        // transform, not width -- see index.css's comment on
+                        // .topnav-coins-bar-fill for why this one's a real
+                        // substitute rather than a layout property in disguise.
+                        style={{ transform: `scaleX(${Math.max(0, Math.min(1, coins / maxCoins))})` }}
+                      />
+                    </span>
+                  )}
                 </div>
               )}
 

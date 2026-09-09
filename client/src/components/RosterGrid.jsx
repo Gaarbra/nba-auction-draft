@@ -21,6 +21,7 @@ export default function RosterGrid({
   floatingByPlayer = {},
   assigningSlot = false,
   onAssignSlot,
+  hideCost = false,
 }) {
   const [selectedSlot, setSelectedSlot] = useState(null);
 
@@ -154,7 +155,10 @@ export default function RosterGrid({
                       </AnimatePresence>
                     </div>
                     <span className="slot-label">{pos}</span>
-                    {occupant && <span className="slot-cost">{occupant.acquiredFor}c</span>}
+                    {/* Solo prices every pick the same flat amount -- a cost
+                        tag that never varies isn't telling you anything, so
+                        it's dropped rather than repeated five times over. */}
+                    {occupant && !hideCost && <span className="slot-cost">{occupant.acquiredFor}c</span>}
                     {occupant && (
                       <div className="slot-tooltip">
                         <span className="slot-tooltip-name">
@@ -163,7 +167,7 @@ export default function RosterGrid({
                         <span className="slot-tooltip-meta">
                           {occupant.team?.abbreviation || "Free Agent"}
                           {occupant.position ? ` · ${occupant.position}` : ""}
-                          {occupant.acquiredFor != null ? ` · ${occupant.acquiredFor}c` : ""}
+                          {!hideCost && occupant.acquiredFor != null ? ` · ${occupant.acquiredFor}c` : ""}
                         </span>
                         {occupant.stats && !occupant.stats.unavailable && (
                           <span className="slot-tooltip-stats">

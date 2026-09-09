@@ -27,6 +27,10 @@ export default function AssignBoard({
   budget,
   nomination,
   nominatedByName,
+  isSolo,
+  rerollAvailable,
+  onReroll,
+  rerollError,
   pendingAssignment,
   assignError,
   onPickPosition,
@@ -91,16 +95,21 @@ export default function AssignBoard({
         </div>
 
         <div className="won-banner-aside">
-          <div className="won-banner-bid">
-            <span className="won-banner-bid-label">Winning bid</span>
-            <div className="won-banner-bid-value">
-              <span className="won-banner-bid-num">{cost}</span>
-              <span className="won-banner-bid-unit">
-                <span className="won-banner-bid-coin">{cost === 1 ? "Coin" : "Coins"}</span>
-                <span className="won-banner-bid-tier">Standard pick</span>
-              </span>
+          {/* Solo prices every pick the same flat 1 coin -- a "winning bid"
+              readout that never changes isn't telling you anything, so it's
+              dropped here rather than repeated on every single nomination. */}
+          {!isSolo && (
+            <div className="won-banner-bid">
+              <span className="won-banner-bid-label">Winning bid</span>
+              <div className="won-banner-bid-value">
+                <span className="won-banner-bid-num">{cost}</span>
+                <span className="won-banner-bid-unit">
+                  <span className="won-banner-bid-coin">{cost === 1 ? "Coin" : "Coins"}</span>
+                  <span className="won-banner-bid-tier">Standard pick</span>
+                </span>
+              </div>
             </div>
-          </div>
+          )}
           {hasStats && <StatRadarChart stats={stats} color={teamColor} />}
         </div>
 
@@ -108,14 +117,41 @@ export default function AssignBoard({
           <span className="won-banner-prompt-icon" aria-hidden="true">
             ↓
           </span>
-          <p>
-            You won <strong>{player.fullName}</strong> for{" "}
-            <span className="won-banner-prompt-cost">
-              {cost} {cost === 1 ? "coin" : "coins"}
-            </span>
-            . Pick an open slot below to add them.
-          </p>
+          {isSolo ? (
+            <p>
+              You picked <strong>{player.fullName}</strong>. Pick an open slot below to add them.
+            </p>
+          ) : (
+            <p>
+              You won <strong>{player.fullName}</strong> for{" "}
+              <span className="won-banner-prompt-cost">
+                {cost} {cost === 1 ? "coin" : "coins"}
+              </span>
+              . Pick an open slot below to add them.
+            </p>
+          )}
         </div>
+
+        {/* Solo-only: there's no one to bid against, so the price never
+            changes -- rerolling is the one real decision a solo draft can
+            offer instead. One per whole draft, not per pick, so it stays a
+            "save it for the pick that matters" choice rather than a way to
+            filter every nomination down to your favorites. */}
+        {isSolo && (
+          <div className="won-banner-reroll">
+            {rerollAvailable ? (
+              <>
+                <p className="hint-text">Not feeling this one? You've got one reroll for the whole draft.</p>
+                <button type="button" onClick={onReroll} className="secondary-btn">
+                  Reroll {player.fullName}
+                </button>
+              </>
+            ) : (
+              <p className="hint-text">Reroll already used for this draft.</p>
+            )}
+            {rerollError && <p className="error-text">{rerollError}</p>}
+          </div>
+        )}
       </section>
 
       {/* ---- Roster slot board ---- */}
@@ -163,10 +199,10 @@ export default function AssignBoard({
                         alt={occupant.fullName}
                         className="assign-slot-headshot"
                       />
-                      <span className="assign-slot-cost">{occupant.acquiredFor}c</span>
+                      {!isSolo && <span className="assign-slot-cost">{occupant.acquiredFor}c</span>}
                     </div>
                     <span className="assign-slot-name">{occupant.fullName}</span>
-                    <span className="assign-slot-sub">Acquired for {occupant.acquiredFor}c</span>
+                    {!isSolo && <span className="assign-slot-sub">Acquired for {occupant.acquiredFor}c</span>}
                   </div>
                   <div className="assign-slot-foot">
                     <span>Roster lock</span>

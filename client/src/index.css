@@ -41,16 +41,6 @@
   box-sizing: border-box;
 }
 
-html {
-  /* "proximity", not "mandatory": it only pulls the page toward a snap
-     point when one is already close, and never fights the browser's own
-     scroll on pages with no scroll-snap-align children (every screen but
-     the landing page). Lives here rather than on a nested scroll container
-     since .app-shell can't take overflow without breaking the sticky
-     TopNav -- see body's own comment just below. */
-  scroll-snap-type: y proximity;
-}
-
 body {
   margin: 0;
   background: var(--bg-void);
@@ -404,474 +394,390 @@ body {
   }
 }
 
-/* The screen shown before the room lobby -- a scrollable, Stitch-inspired
-   multi-section pitch. No background photography: two earlier AI-generated
-   candidates both had real trademarks baked in (a Nike watermark, the NBA
-   logo). The hero instead gets its own court-line motif (CourtLines in
-   LandingPage.jsx) plus the same radial glow behind the lobby card,
-   repeated per section. `scroll-snap-type` lives on html (near the top of
-   this file), not a nested scroll container, so this rides the page's own
-   scrollbar instead of fighting the fixed footer/bottom-nav for a second one. */
-.landing {
-  width: 100%;
-  max-width: 1040px;
-  position: relative;
-}
+/* The old scrolling marketing pitch that used to live here (LandingPage.jsx,
+   ~50 .landing-* classes) is gone -- replaced by Landing.jsx, a single
+   screen combining the hero and the room-creation console directly (see
+   that file's own doc comment for the reasoning). Its styles live further
+   down under the "Landing + lobby console" heading. */
 
-.landing-section {
-  min-height: calc(100svh - 64px);
+/* ============ Landing + lobby console ============
+   A scoped restyle, not a global one -- .landing-lobby carries its own
+   token set (a darker, more instrument-panel palette than the rest of the
+   app) and everything below lives under that selector or under
+   .lobby-console specifically, so the plain .lobby-card/.mode-toggle/etc.
+   look everywhere else (App.jsx's reconnecting screen, RoomView's
+   difficulty picker) is untouched. Only the first Paper-designed screen;
+   the draft board and market tab still use the base tokens above. */
+.landing-lobby {
+  --ll-ground: #0b0c0f;
+  --ll-surface: #17191d;
+  --ll-surface-raised: #1f2126;
+  --ll-border: #2a2d33;
+  --ll-text: #f2eee4;
+  --ll-text-muted: #8b8d93;
+  --ll-accent: #ffb020;
+  --ll-accent-dim: #8a5c14;
+  --ll-success: #3ecf6e;
+  --ll-font-display: "Space Grotesk", var(--font-display);
+  --ll-font-mono: "Space Mono", "SFMono-Regular", monospace;
+
+  width: 100%;
+  max-width: 1180px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  scroll-snap-align: start;
-  padding: 48px 16px;
+  gap: 28px;
 }
 
-.landing-hero {
-  position: relative;
-  text-align: center;
-  overflow: hidden;
-  /* Own stacking context, same reasoning as .app-shell above -- otherwise
-     the photo/glow layers' negative z-index can paint behind this
-     section's siblings instead of just behind its own content. */
-  isolation: isolate;
-}
-
-/* A schematic court (paint, free-throw circle, three-point arc, rim) rather
-   than a photo -- see CourtLines in LandingPage.jsx and the comment on
-   .landing above for why. Anchored to the bottom of the hero and faded out
-   toward the top with a mask, so it reads as ground beneath the text
-   instead of competing with it. */
-.landing-court-lines {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -2;
-  stroke: var(--accent);
-  stroke-width: 1.5;
-  opacity: 0.16;
-  mask-image: linear-gradient(180deg, transparent 0%, transparent 35%, black 70%);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 35%, black 70%);
-}
-
-.landing-hero-glow {
-  position: absolute;
-  inset: -80px -40px auto;
-  height: 320px;
-  background: radial-gradient(circle at 50% 0%, rgba(255, 138, 0, 0.14), transparent 70%);
-  pointer-events: none;
-  z-index: -1;
-}
-
-.landing-badge {
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  background: var(--bg-inset);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 6px 14px;
-  margin-bottom: 20px;
-}
-
-.landing-title {
-  margin: 0 0 16px;
-  font-family: var(--font-display);
-  font-size: 56px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  color: var(--text);
-}
-
-.landing-title-sm {
-  font-size: 40px;
-  margin-bottom: 32px;
-}
-
-.landing-subtitle {
-  margin: 0 auto 24px;
-  max-width: 520px;
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--text-dim);
-}
-
-.landing-facts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 32px;
-}
-
-.landing-fact {
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  background: var(--bg-panel-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 7px 14px;
-}
-
-.landing-ctas {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-}
-
-.landing-cta-primary,
-.landing-cta-secondary {
-  width: auto;
-  margin-top: 0;
-  padding: 13px 28px;
-}
-
-.landing-scroll-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-top: 48px;
-  background: none;
-  border: none;
-  color: var(--text-faint);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.landing-scroll-hint svg {
-  width: 16px;
-  height: 16px;
-  animation: landing-hint-fade 2s ease-in-out infinite;
-}
-
-@keyframes landing-hint-fade {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
-/* Feature sections: copy on one side, a small illustrative preview built
-   from the app's own real component classes (coin-meter, bid-stepper,
-   roster slots) on the other -- never a fabricated screenshot standing in
-   for the product. */
-.landing-feature {
+.landing-lobby-main {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
+  grid-template-columns: 1fr;
+  gap: 40px;
   align-items: center;
-  max-width: 960px;
-  margin: 0 auto;
 }
 
-.landing-feature-reverse .landing-feature-copy {
-  order: 2;
+@media (min-width: 900px) {
+  .landing-lobby-main {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 56px;
+  }
 }
 
-.landing-feature-reverse .landing-preview {
-  order: 1;
+.landing-lobby-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
 }
 
-.landing-kicker {
-  display: block;
-  font-family: var(--font-display);
+@media (min-width: 900px) {
+  .landing-lobby-hero {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+.landing-lobby-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--ll-surface-raised);
+  border: 1px solid var(--ll-border);
+  color: var(--ll-accent);
+  font-family: var(--ll-font-mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: 12px;
 }
 
-.landing-h2 {
-  margin: 0 0 14px;
-  font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -0.015em;
-  line-height: 1.15;
-  color: var(--text);
-}
-
-.landing-body {
-  margin: 0 0 18px;
-  font-size: 15px;
-  line-height: 1.65;
-  color: var(--text-dim);
-}
-
-.landing-body strong {
-  color: var(--text);
-}
-
-.landing-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.landing-list li {
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text-dim);
-  padding-left: 18px;
-  position: relative;
-}
-
-.landing-list li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 8px;
+.landing-lobby-eyebrow-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--ll-success);
+  box-shadow: 0 0 0 3px rgba(62, 207, 110, 0.2);
 }
 
-.landing-list strong {
-  color: var(--text);
+.landing-lobby-title {
+  margin: 0;
+  max-width: 16ch;
+  font-family: var(--ll-font-display);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  color: var(--ll-text);
 }
 
-.landing-preview {
+@media (min-width: 900px) {
+  .landing-lobby-title {
+    font-size: 52px;
+  }
+}
+
+.landing-lobby-subtitle {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ll-text-muted);
+}
+
+.landing-lobby-stats {
   display: flex;
   justify-content: center;
-  /* Gives the card's scroll-triggered rotateX/rotateY (LandingPage.jsx's
-     preview3DReveal) real depth instead of looking like a flat 2D skew --
-     perspective has to live on an ancestor of the rotated element, not the
-     element itself. */
-  perspective: 1400px;
+  gap: 28px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ll-border);
 }
 
-.landing-preview-card {
+@media (min-width: 900px) {
+  .landing-lobby-stats {
+    justify-content: flex-start;
+    gap: 36px;
+  }
+}
+
+.landing-lobby-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.landing-lobby-stat-value {
+  font-family: var(--ll-font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ll-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-lobby-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ll-text-muted);
+}
+
+/* Lobby console: same functional markup RoomLobby renders everywhere
+   (App.jsx's reconnecting screen still uses a bare .lobby-card), restyled
+   here through the second class its root now carries. Every rule below is
+   scoped under .lobby-console so that plain look elsewhere is untouched. */
+.lobby-console {
+  background: var(--ll-surface-raised);
+  border: 1px solid var(--ll-border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lobby-console h1 {
+  color: var(--ll-text);
+}
+
+.lobby-console .mode-toggle,
+.lobby-console .private-submode-toggle {
+  background: var(--ll-surface);
+  border-color: var(--ll-border);
+}
+
+.lobby-console .mode-toggle button,
+.lobby-console .private-submode-toggle button {
+  font-family: var(--ll-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ll-text-muted);
+}
+
+.lobby-console .mode-toggle button:hover:not(.active),
+.lobby-console .private-submode-toggle button:hover:not(.active) {
+  color: var(--ll-text);
+}
+
+.lobby-console .mode-toggle button.active,
+.lobby-console .private-submode-toggle button.active {
+  background: var(--ll-surface-raised);
+  color: var(--ll-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--ll-border);
+}
+
+.lobby-console .hint-text,
+.lobby-console form label {
+  color: var(--ll-text-muted);
+}
+
+.lobby-console form input {
+  background: var(--ll-surface);
+  border-color: var(--ll-border);
+  color: var(--ll-text);
+}
+
+.lobby-console form input:focus-visible {
+  outline: none;
+  border-color: var(--ll-accent-dim);
+}
+
+/* Big Space Grotesk letters as you type a room code -- matches the Paper
+   mockup's display-type scale rather than reading like an ordinary form
+   field. Letter-spacing this open only reads well on a handful of
+   characters, which is exactly what a 5-letter code is. */
+.lobby-console form input.room-code-input {
+  font-family: var(--ll-font-display);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 14px 12px 14px 18px; /* extra left padding optically re-centers the text against the letter-spacing trailing off the right edge */
+  color: var(--ll-accent);
+}
+
+.lobby-console form input.room-code-input::placeholder {
+  color: var(--ll-border);
+  -webkit-text-fill-color: var(--ll-border);
+}
+
+@media (max-width: 480px) {
+  .lobby-console form input.room-code-input {
+    font-size: 30px;
+    letter-spacing: 0.16em;
+  }
+}
+
+.lobby-console .primary-btn {
+  background: var(--ll-accent);
+  color: #1a0e04;
+}
+
+.lobby-console .primary-btn:hover:not(:disabled) {
+  background: #ffc352;
+}
+
+.lobby-console .secondary-btn {
+  background: var(--ll-surface);
+  border-color: var(--ll-border);
+  color: var(--ll-text);
+}
+
+.lobby-console .public-room-list,
+.lobby-console .public-room-item {
+  border-color: var(--ll-border);
+}
+
+.lobby-console .public-room-item-info {
+  color: var(--ll-text-muted);
+}
+
+.lobby-console .public-room-item-info strong {
+  color: var(--ll-text);
+}
+
+@media (max-width: 480px) {
+  .landing-lobby-title {
+    font-size: 30px;
+  }
+}
+
+/* Market ticker: a compact instrument readout, not a decorative floating
+   layer (see PriceTicker.jsx for that treatment, still used behind the
+   results screen). Real active players, seeded (not predicted) prices --
+   see MarketTicker.jsx's own doc comment for why. */
+.market-ticker-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   width: 100%;
-  max-width: 360px;
-  background: var(--bg-panel-raised);
-  border: 1px solid var(--line);
+  padding: 12px 20px;
   border-radius: var(--radius-lg);
-  padding: 24px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  transform-style: preserve-3d;
+  background: var(--ll-surface);
+  border: 1px solid var(--ll-border);
+  overflow: hidden;
 }
 
-.landing-preview-label {
-  display: block;
-  font-family: var(--font-display);
+.market-ticker-bar-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-family: var(--ll-font-mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-faint);
-  margin-bottom: 16px;
+  color: var(--ll-text-muted);
 }
 
-.landing-preview-meter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.landing-preview-count {
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.landing-preview-hint {
-  display: block;
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--text-faint);
-}
-
-.landing-preview-bid {
-  margin: 0 0 16px;
-  font-size: 14px;
-  color: var(--text-dim);
-}
-
-.landing-preview-bid strong {
-  color: var(--accent-bright);
-  font-size: 18px;
-  margin: 0 4px;
-}
-
-.landing-preview-stepper {
-  justify-content: center;
-}
-
-.landing-preview-slots {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-}
-
-.landing-preview-slot {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  border: 1px dashed var(--line);
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-faint);
-}
-
-.landing-preview-slot.filled {
-  border-style: solid;
-  border-color: var(--line-bright);
-  background: var(--bg-inset);
-  color: var(--text);
-}
-
-.landing-preview-slot.open {
-  border-color: var(--accent);
-  color: var(--accent-bright);
-}
-
-.landing-formula-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.landing-formula-row:first-of-type {
-  border-top: none;
-}
-
-.landing-formula-value {
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.landing-formula-value.good {
-  color: var(--win);
-}
-
-.landing-formula-value.bad {
-  color: var(--lose);
-}
-
-.landing-finale {
-  position: relative;
-  text-align: center;
-}
-
-.landing-modes {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.landing-mode-card {
-  width: 260px;
-  background: var(--bg-panel-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  text-align: left;
-}
-
-.landing-mode-card h3 {
-  margin: 0 0 8px;
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.landing-mode-card p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--text-dim);
-}
-
-/* Right-edge scroll indicator -- a wayfinding aid for a page that's now
-   several viewport-heights tall, not a fake nav. */
-.landing-dots {
-  position: fixed;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 20;
-}
-
-.landing-dot {
-  width: 8px;
-  height: 8px;
+.market-ticker-bar-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  border: none;
-  background: var(--line-bright);
-  cursor: pointer;
-  padding: 0;
-  transition: background 0.15s ease, transform 0.15s ease;
+  background: var(--ll-accent);
+  box-shadow: 0 0 0 3px rgba(255, 176, 32, 0.18);
 }
 
-.landing-dot.active {
-  background: var(--accent);
-  transform: scale(1.3);
+.market-ticker-bar-divider {
+  flex-shrink: 0;
+  width: 1px;
+  align-self: stretch;
+  background: var(--ll-border);
 }
 
-@media (max-width: 860px) {
-  .landing-feature {
-    grid-template-columns: 1fr;
-    text-align: center;
+.market-ticker-bar-rows {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  /* A soft fade at both edges instead of a hard clip -- rows scroll out
+     from under something, not off a visible cliff. */
+  mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+}
+
+/* Two copies of the same rows back to back (see MarketTicker.jsx), sliding
+   left by exactly half the track's width -- the instant the first copy has
+   scrolled fully offscreen, the second is sitting exactly where the first
+   started, so the loop point is invisible. CSS animation, not JS/Motion:
+   this is predetermined, always-on motion, and CSS keeps it smooth even
+   while the rest of the page is busy loading (see the animate skill). */
+.market-ticker-bar-track {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  width: max-content;
+  animation: market-ticker-scroll 32s linear infinite;
+}
+
+@keyframes market-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .market-ticker-bar-rows:hover .market-ticker-bar-track {
+    animation-play-state: paused;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-ticker-bar-track {
+    animation: none;
+  }
+}
+
+.market-ticker-bar-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+  font-family: var(--ll-font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.market-ticker-bar-name {
+  color: var(--ll-text-muted);
+}
+
+.market-ticker-bar-price {
+  color: var(--ll-accent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .market-ticker-bar {
+    padding: 10px 14px;
   }
 
-  .landing-feature-reverse .landing-feature-copy,
-  .landing-feature-reverse .landing-preview {
-    order: initial;
-  }
-
-  .landing-list {
-    text-align: left;
-  }
-
-  .landing-dots {
+  .market-ticker-bar-tag,
+  .market-ticker-bar-divider {
     display: none;
-  }
-}
-
-@media (max-width: 700px) {
-  .landing-title {
-    font-size: 38px;
-  }
-
-  .landing-h2 {
-    font-size: 26px;
   }
 }
 
@@ -1310,14 +1216,25 @@ form input {
   color: var(--win);
 }
 
+/* Big enough to read across a room, like the Paper mockup's large display
+   type -- Space Grotesk specifically (not the site-wide --font-display,
+   which is still Inter outside the two redesigned screens), since this is
+   the one place on this screen borrowing that treatment on purpose. */
 .room-code {
-  font-family: var(--font-display);
-  font-size: 34px;
+  font-family: "Space Grotesk", var(--font-display);
+  font-size: 56px;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  margin: 2px 0 0;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  margin: 4px 0 0;
   color: var(--accent-bright);
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .room-code {
+    font-size: 42px;
+  }
 }
 
 .room-code-btn {
@@ -1725,7 +1642,11 @@ form input {
 
 .rolling-panel {
   /* Accent stays out of the border (a live moment, not a card), and lives
-     only in the soft inset glow -- the "something's live right now" cue. */
+     only in the soft inset glow -- the "something's live right now" cue.
+     It breathes slowly for the length of the roll (suspense-pulse below)
+     rather than sitting at one fixed intensity, so the anticipation builds
+     while the outcome is still unknown instead of only paying off once the
+     real reveal lands. */
   background: var(--bg-inset);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -1734,6 +1655,25 @@ form input {
   text-align: center;
   overflow: hidden;
   box-shadow: 0 0 30px rgba(255, 138, 0, 0.1) inset;
+  animation: suspense-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes suspense-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 30px rgba(255, 138, 0, 0.1) inset;
+  }
+  50% {
+    box-shadow: 0 0 46px rgba(255, 138, 0, 0.22) inset;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rolling-panel {
+    /* Keep the glow, drop the breathing -- a held intensity still reads as
+       "something's live" without the ongoing back-and-forth motion. */
+    animation: none;
+  }
 }
 
 .rolling-name {
@@ -1964,50 +1904,175 @@ form input {
 /* The cinematic nomination reveal: a deeper, near-black gradient instead of
    the flat panel color, plus a thin ring of the player's own current team
    color instead of the neutral line -- the "premium" half of the redesign
-   that isn't the headshot or the watermark. */
+   that isn't the headshot or the watermark. The gradient itself is tinted
+   with the team's SECONDARY color, not primary -- primary stays reserved
+   for the border ring and the diagonal wash sweep (.nomination-team-wash),
+   so the two colors each get their own distinct job on the card instead of
+   fighting for the same one. Only ever mixed in at 20-38%, kept dark: this
+   is a muted tone the card sits in, not a bright team-colored panel. */
 .active-nomination-cinematic {
-  background: linear-gradient(165deg, #0a0a0d 0%, #16161b 55%, #0d0d10 100%);
+  position: relative;
+  /* .nomination-big-logo now lives directly in this outer card (not nested
+     in the inner .nominated-player-card, which used to clip it short of
+     this card's own edges) -- this is what it bleeds out to and clips
+     against instead, reaching this card's actual rounded corners. */
+  overflow: hidden;
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--team-secondary, #0a0a0d) 50%, #0a0a0d) 0%,
+    color-mix(in srgb, var(--team-secondary, #16161b) 34%, #16161b) 55%,
+    color-mix(in srgb, var(--team-secondary, #0d0d10) 22%, #0d0d10) 100%
+  );
   border-color: color-mix(in srgb, var(--team-primary, var(--line)) 45%, var(--line));
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-/* A large, quiet copy of the player's own real current-team logo sitting
-   behind the card content -- clipped by .nominated-player-card's own
-   overflow:hidden, so it never spills past the card's rounded corners. */
-.nomination-logo-watermark {
-  position: absolute;
-  top: 50%;
-  right: 2%;
-  transform: translateY(-50%);
-  width: 52%;
-  aspect-ratio: 1;
-  max-width: 300px;
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  opacity: 0.08;
-  z-index: 0;
-  pointer-events: none;
 }
 
 /* The bidding screen's own bigger, more prominent headshot -- scoped to
    .active-nomination so the Market tab's reuse of the same
    .player-headshot class (a browsing context, not the live reveal moment)
-   is unaffected. */
+   is unaffected. Portrait, not square -- a real player photo (see the NBA.com
+   reference this was matched to) reads as a person standing in frame, not
+   an avatar tile. */
 .active-nomination .player-headshot.player-headshot-cinematic {
-  width: 136px;
-  height: 136px;
+  width: 168px;
+  height: 224px;
+}
+
+/* The photo + team logo, sized to match the headshot above so the two
+   logo placements below can position themselves against it. This is the
+   ONLY part of the reveal that slides (see DraftBoard.jsx) -- everything
+   else fades up separately in .nomination-content-fade.
+   position:absolute against .nominated-player-header (its nearest
+   positioned ancestor -- see that rule's own position:relative) instead of
+   sitting in the row's normal flex flow: flex cross-axis alignment sizes a
+   row to its TALLEST item and anchors within THAT box, so as more content
+   (accolades, stats, Suggested Value, Nominated by) stacked up beside it
+   over the life of this feature, flex-end kept anchoring to an
+   ever-taller row instead of the card's actual bottom edge. Absolute,
+   pinned straight to bottom:0, is what makes "flush with the card" true
+   regardless of how tall the text column next to it happens to be. */
+.nomination-photo-wrap {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 168px;
+  height: 224px;
+  flex-shrink: 0;
+}
+
+.nomination-photo-wrap > div {
+  width: 100%;
+  height: 100%;
+}
+
+/* Feathers the headshot's own edges toward transparent (independent of
+   whatever alpha channel the source photo actually has) so the logo sitting
+   behind it in z-index reads as genuinely peeking out around the player,
+   not just "an image next to a logo." Center-weighted so the face/torso
+   stay fully opaque and only the crop's outer edge softens. */
+.nomination-photo-slide.masked .player-headshot-cinematic {
+  mask-image: radial-gradient(ellipse 78% 85% at 50% 42%, #000 60%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 78% 85% at 50% 42%, #000 60%, transparent 100%);
+  /* Only the official transparent-cutout case (see isOfficialPhoto in
+     DraftBoard.jsx, the only time this class is applied) gets this
+     treatment; the fallback (Wikipedia) photo case keeps the base
+     .player-headshot's normal cover/border/background, since that one
+     really is a plain rectangular photo. cover, not contain: the source
+     (1040x760, landscape) is wider than this box is tall, so covering a
+     portrait box crops the LEFT/RIGHT margin around the player, not the
+     top of the head -- exactly what fills the frame edge to edge instead
+     of floating with visible headroom above and below. */
+  object-fit: cover;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* Official NBA CDN headshots are transparent cutouts -- the logo can sit
+   directly behind the player, with the headshot's own edges (see
+   .nomination-photo-slide.masked) blending into it rather than reading as
+   a separate sticker. bottom:0 matches the photo's own anchor exactly
+   (both are positioned against .nominated-player-card, see that rule) --
+   confined to the photo's own zone rather than centered across the whole
+   card, which used to drift up into the name/accolades text above it or
+   down into the bidding panel below, depending on how tall either
+   happened to be that draft. Bleeds out past .nominated-player-card's own
+   edges (that box no longer clips, see its own rule) into the true outer
+   card, which does. */
+.nomination-big-logo {
+  position: absolute;
+  left: -4%;
+  bottom: 0;
+  width: 40%;
+  max-width: 280px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  opacity: 0.8;
+  z-index: 0;
+  pointer-events: none;
+  /* A soft dark halo behind the mark itself -- keeps it reading as a
+     distinct shape now that the card background sits at a stronger team-color
+     mix (see .active-nomination-cinematic), instead of a light-colored logo
+     start blending into a similarly-colored background. */
+  filter: drop-shadow(0 0 24px rgba(0, 0, 0, 0.55));
 }
 
 @media (max-width: 600px) {
+  /* The mobile layout stacks the photo above the text/stats (see
+     .nominated-player-header's own mobile flex-direction:column) instead
+     of sitting beside it, so bottom:0 here would anchor to the bottom of
+     that WHOLE stacked column -- behind the stat grid, not the photo. top:0
+     with a height matching the photo's own mobile size (see
+     .nomination-photo-wrap's matching mobile override) keeps it confined
+     to just the photo's zone instead. */
+  .nomination-big-logo {
+    left: -8%;
+    top: 0;
+    bottom: auto;
+    width: 62%;
+    max-width: 210px;
+    opacity: 0.32;
+  }
+}
+
+/* A Wikipedia/fallback photo is a flat rectangle, not a cutout -- a logo
+   behind it would just be hidden, so it badges the corner instead. */
+.nomination-photo-logo.badge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  padding: 5px;
+  border-radius: 50%;
+  background: var(--bg-panel-raised);
+  border: 2px solid var(--bg-panel);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
   .active-nomination .player-headshot.player-headshot-cinematic {
-    width: 104px;
-    height: 104px;
+    width: 128px;
+    height: 168px;
   }
 
-  .nomination-logo-watermark {
-    width: 70%;
-    opacity: 0.06;
+  /* The "bleeds to the card's bottom edge" treatment (see the desktop rule
+     above) is a wide-hero flourish that doesn't have room to work on a
+     phone -- back in normal flow here, stacked above the text instead
+     (see the header's own flex-direction:column below), same as before
+     that treatment existed. */
+  .nomination-photo-wrap {
+    position: static;
+    width: 128px;
+    height: 168px;
+  }
+
+  .nomination-photo-logo.badge {
+    width: 28px;
+    height: 28px;
   }
 }
 
@@ -2015,12 +2080,14 @@ form input {
   padding: 0;
   background: none;
   position: relative;
-  overflow: hidden;
-  /* --radius-md was never defined in :root (only -sm/-lg/-pill exist) --
-     an undefined custom property falls back to the property's own initial
-     value, which for border-radius is 0. That silently squared off this
-     card's corners (and, more visibly, the team-wash/watermark it clips)
-     since the day both were added. */
+  /* visible, not hidden: .nomination-big-logo lives in here (so its
+     bottom:0 lines up with the photo's own anchor, not the outer card's,
+     which also includes the separate bidding/assign panel below) but is
+     meant to bleed out past THIS box's edges into the real outer card
+     (.active-nomination-cinematic, which does clip -- see that rule).
+     .nomination-team-wash below gets its own border-radius to compensate,
+     since it can no longer rely on this box clipping its corners round. */
+  overflow: visible;
   border-radius: var(--radius-lg);
 }
 
@@ -2032,6 +2099,10 @@ form input {
   position: absolute;
   inset: 0;
   z-index: 0;
+  /* .nominated-player-card no longer clips its own corners round (see that
+     rule's comment) so this fills it exactly and needs its own rounding to
+     match instead of relying on the parent to crop it there. */
+  border-radius: inherit;
   background: linear-gradient(
     100deg,
     color-mix(in srgb, var(--team-primary, transparent) 55%, transparent) 0%,
@@ -2048,6 +2119,36 @@ form input {
   gap: 20px;
   align-items: center;
   flex-wrap: wrap;
+  /* Reserves the horizontal room .nomination-photo-wrap used to claim as a
+     flex item, now that it's absolutely positioned (168px width + the
+     row's own 20px gap) and no longer in flow to claim it itself. */
+  padding-left: 188px;
+}
+
+/* Everything except the photo (name, meta, stats, insights, radar chart)
+   lives in here so it can fade up as one group, separately from the
+   photo's own slide -- see DraftBoard.jsx. Mirrors the flex layout
+   .nominated-player-info/.stat-radar relied on as direct header children
+   before this wrapper existed (.stat-radar's own margin-left:auto still
+   pushes it to the far edge of this row, same as before). */
+.nomination-content-fade {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  /* Contrast insurance: .nomination-big-logo is confined close to the photo
+     now (see that rule), but a capped max-width still lets it reach a
+     little into this column's left edge on a wide card. A left-to-right
+     fade to solid keeps the name/stats readable right at that seam
+     regardless, without drawing a visible hard edge. */
+  margin-left: -24px;
+  padding-left: 24px;
+  background: linear-gradient(90deg, transparent 0%, rgba(11, 12, 15, 0.55) 12%, rgba(11, 12, 15, 0.7) 100%);
+  border-radius: var(--radius-sm);
 }
 
 /* The radar chart is a desktop-only flourish. On a phone it just eats
@@ -2181,8 +2282,67 @@ form input {
   margin: 0 0 4px;
 }
 
+.player-meta-flag {
+  margin-right: 4px;
+}
+
 .player-team-history {
   font-size: 12px;
+}
+
+/* Real career accolades, tier-classified and sorted server-side (see
+   stats-service/app.py's AWARD_TIERS) -- this only has to turn a tier
+   string into a color. Ordered gold (individual, the single biggest
+   individual honor) down through a muted gray "notable" tier for
+   weekly/monthly honors, so the most impactful award is also, literally,
+   the brightest chip in the row. */
+.player-accolades {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.accolade-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.accolade-mvp {
+  color: #2a1b00;
+  background: linear-gradient(135deg, #ffe27a, #ffb020);
+  box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.5), 0 0 12px rgba(255, 176, 32, 0.35);
+}
+
+.accolade-champion {
+  color: #fff;
+  background: linear-gradient(135deg, #ff6a5c, #c0392b);
+  box-shadow: 0 0 0 1px rgba(255, 92, 77, 0.4);
+}
+
+.accolade-allnba {
+  color: #eaf0ff;
+  background: linear-gradient(135deg, #7c93e0, #4a5fc1);
+  box-shadow: 0 0 0 1px rgba(124, 147, 224, 0.4);
+}
+
+.accolade-allstar {
+  color: #3a220a;
+  background: linear-gradient(135deg, #e0a96d, #b97a3d);
+  box-shadow: 0 0 0 1px rgba(185, 122, 61, 0.4);
+}
+
+.accolade-notable {
+  color: var(--text-dim);
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
 }
 
 .player-insights {
@@ -2522,6 +2682,26 @@ form input {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* The mobile stepper: same track/button styling as the desktop one (see
+   .bid-stepper above), just the −/value/+ trio with no typed-in field, no
+   +5, no Max -- see BidStepper.jsx. */
+.bid-stepper-mobile {
+  width: auto;
+}
+
+.bid-stepper-mobile-value {
+  min-width: 40px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .bid-quick-jumps {
@@ -3386,7 +3566,7 @@ form input {
      itself has no cap, so "stretch to match" was stretching to an
      unbounded height too. */
   max-height: calc(100vh - 32px);
-  transition: width 0.18s ease;
+  transition: width 0.18s ease; /* impeccable-disable-line layout-transition -- real flex sibling, width must actually change so .draft-board reclaims the space on collapse; transform can't do that */
 }
 
 .chat-panel.collapsed {
@@ -3769,6 +3949,12 @@ button.topnav-brand-link:focus-visible {
   line-height: 1;
 }
 
+.topnav-coins-text {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
 .topnav-coins-value {
   font-family: var(--font-display);
   font-size: 14px;
@@ -3781,6 +3967,36 @@ button.topnav-brand-link:focus-visible {
   font-size: 11px;
   font-weight: 500;
   color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The budget gauge -- only rendered when TopNav gets a maxCoins prop,
+   which in practice is only during a live draft (see App.jsx). A plain
+   track + fill, not a <progress> element: this is a status readout wired
+   to socket state, not a form control, and a native <progress> brings
+   default browser chrome that's awkward to restyle consistently. */
+.topnav-coins-bar {
+  display: block;
+  width: 56px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.topnav-coins-bar-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  /* transform, not width -- the track has a fixed size, so there's no
+     sibling that needs to reclaim space the way .chat-panel's collapse
+     does. scaleX from a fixed full-width element is a direct substitute
+     here, not a layout property in disguise. */
+  transform-origin: left center;
+  transition: transform 0.25s ease;
 }
 
 .topnav-leave-btn {
@@ -4152,6 +4368,17 @@ button.topnav-brand-link:focus-visible {
 .won-banner-prompt-cost {
   color: var(--accent-bright);
   font-weight: 600;
+}
+
+.won-banner-reroll {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 /* ---- Roster slot board ---- */
@@ -5410,5 +5637,394 @@ button.topnav-brand-link:focus-visible {
   .market-cta {
     width: 100%;
     text-align: center;
+  }
+}
+
+/* ============ Draft Board console (room-drafting scope) ============
+   The second Paper-redesigned screen (see .landing-lobby for the first and
+   the same reasoning). Scoped, not global: .room-drafting only goes on
+   .app-shell while a draft is actually live (see App.jsx), so the pre-draft
+   waiting room (RoomView) and the results screen keep their current look --
+   neither is part of this redesign pass.
+
+   Nearly every draft-board / topnav-room / roster-grid / chat-panel /
+   assign-screen rule already reads its colors and display font through the
+   site-wide tokens (--bg-panel, --accent, --font-display, etc.) instead of
+   hardcoded values, so redefining those SAME token names in this scope
+   re-skins the whole screen without rewriting every selector. What's below
+   is only the handful of rules that need more than a palette swap: numeric
+   readouts wanting the mono face, a couple of glow colors baked into
+   keyframes rather than tokens, and the stat/bid consoles wanting an actual
+   boxed treatment instead of a plain divider. */
+.room-drafting {
+  --bg-void: #0b0c0f;
+  --bg-panel: #17191d;
+  --bg-panel-raised: #1f2126;
+  --bg-inset: #101114;
+  --line: #2a2d33;
+  --text: #f2eee4;
+  /* Paper's system has one muted tier, not two -- collapsing --text-dim and
+     --text-faint onto it (same move as .landing-lobby's --ll-text-muted)
+     rather than inventing a second shade with no source in the mockup. */
+  --text-dim: #8b8d93;
+  --text-faint: #8b8d93;
+  --accent: #ffb020;
+  --accent-bright: #ffc352;
+  --accent-dim: #8a5c14;
+  --win: #3ecf6e;
+  --lose: #ff5c4d;
+  --font-display: "Space Grotesk", "Inter", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Space Mono", "SFMono-Regular", monospace;
+}
+
+/* Numeric readouts: the mono face, everywhere a number is the point. */
+.room-drafting .stat-highlight-value,
+.room-drafting .current-bid strong,
+.room-drafting .bid-stepper-input,
+.room-drafting .topnav-coins-value,
+.room-drafting .topnav-roommeta-code,
+.room-drafting .slot-cost,
+.room-drafting .won-banner-bid-num,
+.room-drafting .assign-slot-cost,
+.room-drafting .assign-board-left {
+  font-family: var(--font-mono);
+}
+
+/* Stat readouts as actual instrument-panel boxes, not bare flex text --
+   matches the mockup's bordered PPG/RPG/APG/SPG/BPG tiles. */
+.room-drafting .stat-highlight {
+  padding: 14px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  min-width: 76px;
+  flex: 1 1 76px;
+}
+
+/* On the live nomination card specifically (not AssignBoard's won-banner,
+   which sits on a plain panel with no team tint behind it), the tiles go
+   glass instead of solid -- translucent + blurred so the team-secondary
+   card background underneath (see .active-nomination-cinematic) shows
+   through instead of being hidden behind another opaque layer. Three
+   classes deep on purpose: needs to beat .room-drafting .stat-highlight's
+   own two-class background/border on specificity, not just source order. */
+.room-drafting .active-nomination-cinematic .stat-highlight {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Text sizing/spacing tightened on this specific card only (NOT the base
+   rules -- MarketTab reuses .nominated-player-card/.player-meta/etc. for
+   its own, differently-sized dossier view, so a global change here would
+   have shrunk that too). A soft text-shadow rides along on every line as
+   contrast insurance now that the card's background sits at a stronger,
+   more clearly team-colored mix (see .active-nomination-cinematic) --
+   legible against light backgrounds and dark ones alike, not just
+   whichever team happened to get tuned by eye. */
+.room-drafting .active-nomination-cinematic .nominated-player-card h3 {
+  font-size: 21px;
+  margin-bottom: 2px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.room-drafting .active-nomination-cinematic .player-meta {
+  font-size: 12px;
+  margin-bottom: 3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.room-drafting .active-nomination-cinematic .player-accolades {
+  margin-bottom: 6px;
+}
+
+.room-drafting .active-nomination-cinematic .stats-season {
+  font-size: 11px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.room-drafting .active-nomination-cinematic .nominated-by {
+  font-size: 11px;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* 76px/box is fine once the nomination card has real desktop width to
+   spend, but at phone widths five of them (plus gaps) don't fit even one
+   per row without forcing the whole card wider than the viewport -- a
+   regression the original 44px-min plain-text version never had. Shrink
+   the box and its number to something that still reads as a tile without
+   blowing out the layout. */
+@media (max-width: 640px) {
+  .room-drafting .stat-highlight {
+    min-width: 58px;
+    flex: 1 1 58px;
+    padding: 10px 6px;
+  }
+
+  .room-drafting .stat-highlight-value {
+    font-size: 28px;
+  }
+
+  /* Explicitly requested: on a phone this card boils down to the photo,
+     the name, and the stat grid -- bold and readable without a scroll --
+     not also accolades, the career-teams/career-seasons lines, and
+     "Nominated by". Those stay fully present on desktop, where there's
+     room for them; here they'd just push the bid controls below the fold. */
+  .room-drafting .active-nomination-cinematic .player-accolades,
+  .room-drafting .active-nomination-cinematic .player-team-history,
+  .room-drafting .active-nomination-cinematic .stats-season,
+  .room-drafting .active-nomination-cinematic .nominated-by {
+    display: none;
+  }
+
+  .room-drafting .active-nomination-cinematic .stat-highlight-value {
+    font-size: 32px;
+    font-weight: 900;
+  }
+
+  /* A touch darker than the desktop glass tiles (rgba(0,0,0,0.3), see
+     above) -- the big logo behind everything on this card sits closer to
+     the stat grid on a narrow layout than it does on desktop, so the
+     numbers get a bit more backing to stay the clearest thing in that
+     area regardless of which team's colors/linework land behind them. */
+  .room-drafting .active-nomination-cinematic .stat-highlight {
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  /* The stat boxes above sit inside a headshot-plus-text row that's flex
+     (not flex-wrap) at the header level -- .nominated-player-info /
+     .won-banner-bio shrink to fit beside the fixed-size headshot instead of
+     dropping below it, which squeezed the boxed stats into a single-column
+     sliver next to the photo. Stacking the headshot above the text on
+     narrow screens gives the row (and the boxes in it) the full card width
+     to lay out in instead. */
+  .room-drafting .nominated-player-header,
+  .room-drafting .won-banner-main {
+    flex-direction: column;
+    align-items: flex-start;
+    /* Only meaningful on desktop, where the photo is pulled out of flow
+       into an absolute, bottom-anchored position (see .nomination-photo-wrap)
+       and this reserves the horizontal room it used to claim as a flex
+       item. Back in normal flow here (position:static, stacked above the
+       text), it doesn't need the reservation. */
+    padding-left: 0;
+  }
+
+  .room-drafting .nominated-player-info,
+  .room-drafting .won-banner-bio {
+    width: 100%;
+  }
+}
+
+/* Bid console: a bordered sub-panel instead of a plain top divider, echoing
+   the mockup's boxed "CURRENT BID" readout. Scoped to .bidding-panel only
+   (not the shared .assign-panel hint text other players see while waiting
+   on the winner) -- that one stays a plain divider, it's a sentence, not a
+   console. */
+.room-drafting .bidding-panel {
+  padding: 22px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-inset);
+}
+
+/* Reruns of .rolling-panel's suspense-pulse, .roster-slot.assignable's
+   assignable-pulse, and .topnav-clock-dot's ping under the new accent hue.
+   A keyframe's colors live inside the @keyframes rule itself, not behind a
+   token, so scoping them means pointing at a second keyframe by name rather
+   than overriding a custom property. */
+@keyframes room-suspense-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 30px rgba(255, 176, 32, 0.12) inset;
+  }
+  50% {
+    box-shadow: 0 0 46px rgba(255, 176, 32, 0.26) inset;
+  }
+}
+
+.room-drafting .rolling-panel {
+  animation-name: room-suspense-pulse;
+}
+
+/* Without this, .room-drafting .rolling-panel's higher specificity would
+   beat the reduced-motion "animation: none" rule further up the file and
+   silently re-enable the pulse for anyone who's asked the OS to turn
+   motion down. */
+@media (prefers-reduced-motion: reduce) {
+  .room-drafting .rolling-panel {
+    animation: none;
+  }
+}
+
+@keyframes room-assignable-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 176, 32, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 176, 32, 0);
+  }
+}
+
+.room-drafting .roster-slot.assignable {
+  animation-name: room-assignable-pulse;
+}
+
+@keyframes room-topnav-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 176, 32, 0.5);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px rgba(255, 176, 32, 0);
+  }
+}
+
+.room-drafting .topnav-clock-dot {
+  animation-name: room-topnav-ping;
+}
+
+/* ============ How to Play (Paper-designed, third screen) ============
+   Same scoping approach as .landing-lobby / .room-drafting: its own token
+   set under .how-to-play, not a change to the site-wide ones, since the
+   rest of the app (RoomView, Footer, modals) hasn't moved to this look. */
+.how-to-play {
+  --htp-surface-raised: #1f2126;
+  --htp-surface: #17191d;
+  --htp-border: #2a2d33;
+  --htp-text: #f2eee4;
+  --htp-text-muted: #8b8d93;
+  --htp-accent: #ffb020;
+  --htp-success: #3ecf6e;
+  --htp-font-display: "Space Grotesk", "Inter", -apple-system, "Segoe UI", sans-serif;
+  --htp-font-mono: "Space Mono", "SFMono-Regular", monospace;
+
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  color: var(--htp-text);
+}
+
+.how-to-play-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+  padding: 24px 12px 40px;
+}
+
+.how-to-play-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--htp-surface-raised);
+  border: 1px solid var(--htp-border);
+  color: var(--htp-accent);
+  font-family: var(--htp-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.how-to-play-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--htp-success);
+  box-shadow: 0 0 0 3px rgba(62, 207, 110, 0.2);
+}
+
+.how-to-play-hero h1 {
+  margin: 0;
+  max-width: 14ch;
+  font-family: var(--htp-font-display);
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  color: var(--htp-text);
+}
+
+.how-to-play-hero p {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.how-to-play-step {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 28px;
+  border-radius: var(--radius-lg);
+  background: var(--htp-surface-raised);
+  border: 1px solid var(--htp-border);
+}
+
+.how-to-play-step-n {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--htp-surface);
+  border: 1px solid var(--htp-border);
+  font-family: var(--htp-font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--htp-accent);
+}
+
+.how-to-play-step-copy h2 {
+  margin: 0 0 8px;
+  font-family: var(--htp-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--htp-text);
+}
+
+.how-to-play-step-copy p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--htp-text-muted);
+  max-width: 56ch;
+}
+
+.how-to-play-footnote {
+  margin: 40px 0 0;
+  padding: 0 12px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--htp-text-muted);
+}
+
+@media (max-width: 600px) {
+  .how-to-play-hero h1 {
+    font-size: 34px;
+  }
+
+  .how-to-play-step {
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px;
   }
 }

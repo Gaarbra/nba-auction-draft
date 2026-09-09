@@ -1,9 +1,9 @@
 """Fills in photoCache.json for players NBA's own CDN has no real headshot
-for. Confirmed empirically (not a guess): NBA's "latest" headshot set
-403s for a player it has no photo of, and there's no alternate NBA URL
-that secretly has it. An alternate CDN host just serves back a generic,
-byte-identical placeholder image under a 200 instead of erring. See
-photos.py's module docstring for the full story.
+for. Confirmed empirically (not a guess): NBA's transparent-cutout CDN
+serves back a generic, byte-identical ~12KB filler image under a 200 for a
+player it has no photo of, rather than erring, so "has a real photo" is
+told apart by Content-Length instead of status code. See photos.py's
+module docstring for the full story.
 
 This checks every player already in statsCache.json (real career stats,
 so a real person worth having a photo for) against NBA's CDN, and for

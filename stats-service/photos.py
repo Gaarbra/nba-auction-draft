@@ -1,8 +1,7 @@
 """Fallback player photos for players NBA's own CDN has no real headshot
 for. This is a confirmed, permanent gap for many older/short-career
-players, not fixable with a different NBA URL: the "latest" set 403s for
-players it lacks, and an alternate CDN host serves a byte-identical generic
-placeholder under a 200 instead of erring.
+players, not fixable with a different NBA URL: nothing anywhere has a real
+photo of them.
 
 Wikipedia/Wikimedia Commons is a genuinely independent source with real
 coverage for a meaningful slice of "old but still known" retired players
@@ -16,27 +15,37 @@ WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 REQUEST_HEADERS = {"User-Agent": "HoopBids/1.0 (https://github.com/Gaarbra/nba-auction-draft)"}
 REQUEST_TIMEOUT = 10
 
-# NBA's own CDN for real headshots. This app's original (and still primary,
-# fast, no-lookup-needed) source. 403 for a player it has no photo of; 200
-# with a real image otherwise. Deliberately NOT the alternate cdn.nba.com
-# host: that one returns 200 with a generic filler image for a missing
-# photo instead of erring, which would make "no photo" indistinguishable
-# from "has a photo" using just the HTTP status.
-NBA_HEADSHOT_URL = "https://ak-static.cms.nba.com/wp-content/uploads/headshots/nba/latest/260x190/{player_id}.png"
+# NBA's own transparent-cutout CDN -- a real floating headshot with no
+# background fill, not the small rectangular studio-photo-on-a-gray-box
+# version (ak-static.cms.nba.com's 260x190 set, used here until this was
+# swapped). 200 with a real photo when NBA has one; 200 with a generic
+# filler image otherwise -- unlike the old host, it never 403s for a player
+# it lacks, so "has a real photo" can't be read off the status code alone.
+# It CAN be read off Content-Length: verified live, every filler response
+# for a made-up/missing id came back as the exact same 12,430-byte image,
+# while every real photo checked was 180KB+. HAS_PHOTO_MIN_BYTES sits
+# comfortably between the two with real margin on both sides.
+NBA_HEADSHOT_URL = "https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+HAS_PHOTO_MIN_BYTES = 30_000
 
 
 def has_nba_headshot(player_id):
-    """True if NBA's CDN actually has a real photo for this player. Just a
-    plain HEAD request, no image bytes downloaded. Only meant to be called
-    from an offline warm script (see warm_photos.py), never on a live
-    request path."""
+    """True if NBA's CDN actually has a real photo for this player (see
+    HAS_PHOTO_MIN_BYTES above for how that's told apart from the generic
+    filler). Just a plain HEAD request, no image bytes downloaded. Only
+    meant to be called from an offline warm script (see warm_photos.py),
+    never on a live request path."""
     try:
         resp = requests.head(NBA_HEADSHOT_URL.format(player_id=player_id), timeout=REQUEST_TIMEOUT, allow_redirects=True)
-        return resp.status_code == 200
-    except requests.RequestException:
-        # Treat a network hiccup as "unknown, assume it has one" rather
-        # than triggering an unnecessary Wikipedia lookup. A real 403
-        # will just get caught on a later warm run.
+        if resp.status_code != 200:
+            return False
+        content_length = resp.headers.get("content-length")
+        return content_length is not None and int(content_length) >= HAS_PHOTO_MIN_BYTES
+    except (requests.RequestException, ValueError):
+        # Treat a network hiccup (or a missing/unparseable header) as
+        # "unknown, assume it has one" rather than triggering an
+        # unnecessary Wikipedia lookup. A real miss will just get caught
+        # on a later warm run.
         return True
 
 

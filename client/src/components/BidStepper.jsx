@@ -1,15 +1,35 @@
+import { useEffect } from "react";
 import { motion } from "motion/react";
+import useMediaQuery from "../hooks/useMediaQuery.js";
 
 /** Up/down stepper for entering a bid, with the number field left directly
  * editable too. The arrows are a convenience for "one more coin", not a
  * replacement for typing a specific amount. Bounded to [min, max] on every
  * path (arrows, typing, and the clamp-on-blur below), so the same
  * currentBid+1..budget rule the server enforces is always visible in the UI
- * itself instead of only surfacing as a rejected bid after the fact. */
+ * itself instead of only surfacing as a rejected bid after the fact.
+ *
+ * On a phone this collapses to just the −/+ arrows and the current number
+ * between them -- no typed-in field, no +5, no Max. Still can't go below
+ * the minimum legal raise (the − arrow disables there, same canDecrement
+ * check as desktop); there's just no way to jump by 5 or straight to your
+ * whole budget on a phone, only nudge it one coin at a time. The desktop
+ * stepper stays exactly as it was; this isn't a redesign of it, just a
+ * narrower one swapped in below a breakpoint. */
 export default function BidStepper({ value, min, max, onChange }) {
+  const isMobileViewport = useMediaQuery("(max-width: 640px)");
   const numValue = Number(value);
   const canDecrement = Number.isFinite(numValue) ? numValue > min : true;
   const canIncrement = Number.isFinite(numValue) ? numValue < max : true;
+
+  // Mobile never shows a way to change the amount away from the minimum,
+  // so it needs to actually BE the minimum, not just default to it once
+  // and drift out of sync if `min` changes later (the bid war moving the
+  // floor up while this player's row was already showing an old value).
+  useEffect(() => {
+    if (isMobileViewport && value !== String(min)) onChange(String(min));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobileViewport, min]);
 
   // Passes a React functional updater through to onChange (which DraftBoard
   // wires directly to its useState setter) rather than a precomputed string
@@ -43,6 +63,36 @@ export default function BidStepper({ value, min, max, onChange }) {
 
   const canJumpBy5 = Number.isFinite(numValue) ? numValue + 5 <= max : max - min >= 5;
   const canJumpToMax = Number.isFinite(numValue) ? numValue < max : true;
+
+  if (isMobileViewport) {
+    return (
+      <div className="bid-stepper bid-stepper-mobile">
+        <motion.button
+          type="button"
+          className="bid-stepper-btn"
+          onClick={() => step(-1)}
+          disabled={!canDecrement}
+          whileTap={canDecrement ? { scale: 0.88 } : undefined}
+          aria-label="Decrease bid by 1"
+        >
+          −
+        </motion.button>
+        <span className="bid-stepper-mobile-value" aria-live="polite">
+          {value}c
+        </span>
+        <motion.button
+          type="button"
+          className="bid-stepper-btn"
+          onClick={() => step(1)}
+          disabled={!canIncrement}
+          whileTap={canIncrement ? { scale: 0.88 } : undefined}
+          aria-label="Increase bid by 1"
+        >
+          +
+        </motion.button>
+      </div>
+    );
+  }
 
   return (
     <div className="bid-stepper-group">

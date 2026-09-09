@@ -21,6 +21,7 @@ from nba_api.stats.endpoints import (
     commonallplayers,
     commonplayerinfo,
     alltimeleadersgrids,
+    playerawards,
 )
 
 import db
@@ -81,6 +82,7 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 STATS_CACHE_FILE = os.path.join(DATA_DIR, "statsCache.json")
 USAGE_CACHE_FILE = os.path.join(DATA_DIR, "usageCache.json")
 PHOTO_CACHE_FILE = os.path.join(DATA_DIR, "photoCache.json")
+AWARDS_CACHE_FILE = os.path.join(DATA_DIR, "awardsCache.json")
 
 # Render sets this env var to "true" for every service automatically. It's
 # used to skip live stats.nba.com calls that are confirmed to always fail
@@ -96,6 +98,7 @@ _cache = {}
 _usage_cache = {}
 _bio_cache = {}
 _photo_cache = {}
+_awards_cache = {}
 _pool_cache = {"players": None, "fetchedAt": 0}
 _notable_cache = {"ids": None, "fetchedAt": 0}
 _warmup_status = {"running": False, "processed": 0, "total": 0, "warmed": 0, "startedAt": None, "finishedAt": None}
@@ -204,13 +207,18 @@ def fetch_player_bio(player_id):
     df = info.get_data_frames()[0]
 
     if df.empty:
-        bio = {"position": None, "draftYear": None}
+        bio = {"position": None, "draftYear": None, "country": None}
     else:
         row = df.iloc[0]
         draft_year = row.get("DRAFT_YEAR")
+        country = row.get("COUNTRY")
         bio = {
             "position": abbreviate_position(row.get("POSITION")),
             "draftYear": int(draft_year) if str(draft_year).isdigit() else None,
+            # Real value straight from commonplayerinfo ("USA", "Serbia",
+            # "Canada", ...) -- not normalized further here. The client's
+            # countryFlags.js is what turns this into a flag.
+            "country": country if country else None,
         }
 
     _bio_cache[player_id] = {"bio": bio, "fetchedAt": time.time()}
@@ -281,6 +289,41 @@ def save_photo_cache_to_disk():
             json.dump(_photo_cache, f)
     except OSError as e:
         print(f"[photo cache] failed to save to disk: {e}")
+
+
+def load_awards_cache_from_disk():
+    """{player_id: {"fetchedAt": ..., "awards": [...]}}, same shape and
+    reasoning as the stats cache. Unlike statsCache.json/photoCache.json,
+    there's no offline warm script shipping a pre-built version of this
+    file yet -- it only ever grows from live requests made while this
+    process is running, so a fresh deploy starts empty and rebuilds from
+    whatever gets nominated. On Render specifically that means /awards
+    just comes back empty (see fetch_player_awards's ON_RENDER guard,
+    identical to fetch_stats_for_player's) until someone builds and ships
+    a warm_awards.py the same way warm_photos.py works today."""
+    global _awards_cache
+    try:
+        with open(AWARDS_CACHE_FILE, "r") as f:
+            raw = json.load(f)
+        _awards_cache = {int(k): v for k, v in raw.items()}
+        print(f"[awards cache] loaded {len(_awards_cache)} players from disk")
+    except FileNotFoundError:
+        _awards_cache = {}
+    except (ValueError, OSError) as e:
+        print(f"[awards cache] failed to load from disk, starting empty: {e}")
+        _awards_cache = {}
+
+
+load_awards_cache_from_disk()
+
+
+def save_awards_cache_to_disk():
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(AWARDS_CACHE_FILE, "w") as f:
+            json.dump(_awards_cache, f)
+    except OSError as e:
+        print(f"[awards cache] failed to save to disk: {e}")
 
 
 # Unlike stats.nba.com, NBA's photo CDN and Wikipedia are both confirmed
@@ -483,7 +526,7 @@ def _fetch_and_cache_stats(player_id):
                 bio = fetch_player_bio(player_id)
             except Exception as e:
                 print(f"[bio lookup failed] player_id={player_id} ({e.__class__.__name__}: {e})")
-                bio = {"position": None, "draftYear": None}
+                bio = {"position": None, "draftYear": None, "country": None}
 
             history = team_history(df)
 
@@ -511,6 +554,7 @@ def _fetch_and_cache_stats(player_id):
                 "teamHistory": history,
                 "position": bio["position"],
                 "draftYear": bio["draftYear"],
+                "country": bio.get("country"),
             }
 
     _cache[player_id] = {"stats": stats, "fetchedAt": time.time()}
@@ -533,6 +577,108 @@ def _fetch_and_cache_stats(player_id):
             print(f"[db] persist skipped for player_id={player_id}: {e.__class__.__name__}: {e}")
 
     return stats
+
+
+# Real award DESCRIPTION strings from stats.nba.com's PlayerAwards endpoint,
+# grouped by how big a deal each one actually is -- checked by hand against
+# a legend's full award list (92 rows for Kevin Durant, 13 distinct
+# descriptions) rather than guessed. Order matters: AWARD_TIER_ORDER is the
+# rank used to sort a player's grouped awards most-impressive-first, and
+# each tier's own color is what the client colors that award's chip with
+# (see PlayerAccolades.jsx), so "most impactful" reads as "most gold."
+# Anything not listed here (the game recognizes new honors over time) falls
+# back to the lowest "notable" tier rather than being dropped -- a real
+# accolade this doesn't recognize by name yet is still worth showing.
+AWARD_TIERS = {
+    "NBA Most Valuable Player": "mvp",
+    "NBA Finals Most Valuable Player": "mvp",
+    "NBA Champion": "champion",
+    "Olympic Gold Medal": "champion",
+    "NBA All-Star Most Valuable Player": "allnba",
+    "NBA Rookie of the Year": "allnba",
+    "NBA Defensive Player of the Year": "allnba",
+    "All-NBA": "allnba",
+    "NBA All-Star": "allstar",
+    "All-Defensive Team": "allstar",
+    "All-Rookie Team": "allstar",
+    "NBA Cup Most Valuable Player": "allstar",
+    "NBA Cup All-Tournament Team": "allstar",
+}
+AWARD_TIER_ORDER = {"mvp": 0, "champion": 1, "allnba": 2, "allstar": 3, "notable": 4}
+MAX_AWARD_CHIPS = 8
+
+# stats.nba.com's DESCRIPTION strings are the real award names, but a couple
+# read long for a small chip. Only the ones that actually benefit get an
+# entry; everything else just displays its own real description as-is.
+AWARD_SHORT_LABELS = {
+    "NBA Most Valuable Player": "MVP",
+    "NBA Finals Most Valuable Player": "Finals MVP",
+    "NBA All-Star Most Valuable Player": "All-Star MVP",
+    "NBA Defensive Player of the Year": "DPOY",
+    "NBA Cup Most Valuable Player": "NBA Cup MVP",
+    "NBA Cup All-Tournament Team": "NBA Cup All-Tourney",
+    "All-Defensive Team": "All-Defense",
+    "All-Rookie Team": "All-Rookie",
+    "Olympic Gold Medal": "Olympic Gold",
+}
+
+
+def _classify_award(description):
+    return AWARD_TIERS.get(description, "notable")
+
+
+def _fetch_and_cache_awards(player_id):
+    """The actual live stats.nba.com PlayerAwards lookup, grouped down from
+    individual season-by-season rows (a long career can have 90+) into one
+    chip per distinct honor with a count, sorted most-impactful tier first.
+    Weekly/monthly honors (Player of the Week, Rookie of the Month, ...)
+    stay in the "notable" tier rather than being filtered out entirely --
+    a rookie with nothing else yet still gets to show those."""
+    result = playerawards.PlayerAwards(player_id=player_id, timeout=15)
+    rows = result.get_normalized_dict()["PlayerAwards"]
+
+    counts = {}
+    for row in rows:
+        desc = row.get("DESCRIPTION")
+        if not desc:
+            continue
+        counts[desc] = counts.get(desc, 0) + 1
+
+    awards = [
+        {"label": AWARD_SHORT_LABELS.get(desc, desc), "count": count, "tier": _classify_award(desc)}
+        for desc, count in counts.items()
+    ]
+    awards.sort(key=lambda a: (AWARD_TIER_ORDER.get(a["tier"], 4), -a["count"]))
+    awards = awards[:MAX_AWARD_CHIPS]
+
+    _awards_cache[player_id] = {"fetchedAt": time.time(), "awards": awards}
+    save_awards_cache_to_disk()
+    return awards
+
+
+def fetch_player_awards(player_id):
+    """Same cache-first, Render-skips-live-calls shape as
+    fetch_stats_for_player, minus the stale-while-revalidate background
+    refresh (awards change rarely enough -- a season/week at a time -- that
+    serving a slightly stale list is never worth a second thought). Returns
+    [] rather than raising on any failure: an accolades strip is a nice-to-
+    have next to the reveal, not something worth breaking the card over."""
+    cached = _awards_cache.get(player_id)
+    if cached and (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS:
+        return cached["awards"]
+
+    if ON_RENDER:
+        # See fetch_stats_for_player's identical guard: stats.nba.com is
+        # unreachable from Render outright, so a live attempt here would
+        # just be a slow, doomed wait. A stale-but-real cached list (if any)
+        # still beats nothing.
+        return cached["awards"] if cached else []
+
+    try:
+        return _fetch_and_cache_awards(player_id)
+    except Exception as e:
+        print(f"[awards lookup failed] player_id={player_id} ({e.__class__.__name__}: {e})")
+        return cached["awards"] if cached else []
 
 
 def fetch_usage_pct(player_id, season):
@@ -902,6 +1048,22 @@ def get_photo_url():
 
     photo_url = get_fallback_photo_url(player["id"], player["full_name"])
     return jsonify({"player": {"id": player["id"], "fullName": player["full_name"]}, "photoUrl": photo_url})
+
+
+@app.get("/awards")
+def get_awards():
+    """Real career accolades (MVP, All-Star, championships, ...), grouped
+    and tier-sorted -- see _fetch_and_cache_awards. Always 200s with
+    whatever's known (possibly []), never a hard error: same best-effort
+    contract as /similar-players and /predicted-price, so a lookup failure
+    just means the reveal card's accolades strip renders nothing rather
+    than breaking the card."""
+    player = resolve_player(request)
+    if not player:
+        return jsonify({"error": "PLAYER_NOT_FOUND"}), 404
+
+    awards = fetch_player_awards(player["id"])
+    return jsonify({"player": {"id": player["id"], "fullName": player["full_name"]}, "awards": awards})
 
 
 @app.get("/health")

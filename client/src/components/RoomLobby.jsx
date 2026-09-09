@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import LogoMark from "./LogoMark.jsx";
 
 // Matches the room-code alphabet the server generates from (roomStore.js):
 // no I/O/0/1, to avoid characters that look alike. Sanitizing pasted text
@@ -92,6 +91,15 @@ export default function RoomLobby({
       onJoinRoom(joinCode, name);
     } else if (mode === "local" && localNamesReady) {
       onCreateLocalRoom(validLocalNames);
+    } else if (mode === "solo") {
+      // A solo room is just a private room nobody else ever joins -- there's
+      // no separate server-side "solo" concept to create. The draft itself
+      // already detects a genuinely one-player turnOrder at start time (see
+      // rerollNomination in draftStore.js), which is what actually turns on
+      // the flat-price/reroll behavior, not anything set here. The `true`
+      // just tells App.jsx to auto-start the draft instead of landing on
+      // the waiting room -- there's no one else to wait for.
+      onCreateRoom(name, "private", true);
     }
   }
 
@@ -106,22 +114,19 @@ export default function RoomLobby({
         ? privateSubMode === "create"
           ? "Create Room"
           : "Join Room"
-        : "Start Local Game";
+        : mode === "solo"
+          ? "Start Solo Draft"
+          : "Start Local Game";
 
   return (
     <motion.div
-      className="lobby-card"
+      className="lobby-card lobby-console"
       onMouseMove={handleCardMouseMove}
       onMouseLeave={handleCardMouseLeave}
       animate={{ rotateX: tilt.rx, rotateY: tilt.ry }}
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
       style={{ transformPerspective: 900 }}
     >
-      <div className="lobby-brand">
-        <LogoMark className="lobby-brand-logo" />
-        <h1>Hoop Bids</h1>
-      </div>
-
       <div className="mode-toggle">
         <button type="button" className={mode === "public" ? "active" : ""} onClick={() => setMode("public")}>
           Public
@@ -131,6 +136,9 @@ export default function RoomLobby({
         </button>
         <button type="button" className={mode === "local" ? "active" : ""} onClick={() => setMode("local")}>
           Local
+        </button>
+        <button type="button" className={mode === "solo" ? "active" : ""} onClick={() => setMode("solo")}>
+          Solo
         </button>
       </div>
 
@@ -161,6 +169,12 @@ export default function RoomLobby({
       {mode === "private" && privateSubMode === "create" && (
         <p className="hint-text lobby-mode-hint">Only joinable with the room code you share.</p>
       )}
+      {mode === "solo" && (
+        <p className="hint-text lobby-mode-hint">
+          Just you, no one to invite. Nominations skip bidding and land at a flat 1 coin, and you get one reroll for
+          the whole draft to spend on whichever pick you'd rather not keep.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit}>
         {mode !== "local" && (
@@ -182,13 +196,14 @@ export default function RoomLobby({
             Room Code
             <input
               type="text"
+              className="room-code-input"
               value={joinCode}
               onChange={(e) => setJoinCode(sanitizeCode(e.target.value))}
               onPaste={(e) => {
                 e.preventDefault();
                 setJoinCode(sanitizeCode(e.clipboardData.getData("text")));
               }}
-              placeholder="e.g. AB12C"
+              placeholder="AB12C"
               maxLength={5}
               autoComplete="off"
               autoCapitalize="characters"

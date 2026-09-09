@@ -12,7 +12,14 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
  * not trained yet, player has no cached stats, stats-service unreachable)
  * and this just renders nothing for that half rather than an error state,
  * matching how every other stats-dependent panel in this app degrades. */
-export default function PlayerInsights({ nbaPlayerId, era, difficulty, onPredictedPrice, onSimilarPlayerClick }) {
+export default function PlayerInsights({
+  nbaPlayerId,
+  era,
+  difficulty,
+  onPredictedPrice,
+  onSimilarPlayerClick,
+  showSimilar = true,
+}) {
   const [predictedPrice, setPredictedPrice] = useState(null);
   const [explanation, setExplanation] = useState([]);
   const [similar, setSimilar] = useState([]);
@@ -43,17 +50,22 @@ export default function PlayerInsights({ nbaPlayerId, era, difficulty, onPredict
       })
       .catch(() => {});
 
-    fetch(`${SERVER_URL}/api/players/${nbaPlayerId}/similar?k=5`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled && Array.isArray(data.similar)) setSimilar(data.similar);
-      })
-      .catch(() => {});
+    // Skipped entirely (not just hidden) when the caller doesn't want it
+    // rendered -- one fewer request for a card that's never going to show
+    // the result anyway (see DraftBoard.jsx's showSimilar={false}).
+    if (showSimilar) {
+      fetch(`${SERVER_URL}/api/players/${nbaPlayerId}/similar?k=5`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!cancelled && Array.isArray(data.similar)) setSimilar(data.similar);
+        })
+        .catch(() => {});
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [nbaPlayerId, era, difficulty]);
+  }, [nbaPlayerId, era, difficulty, showSimilar]);
 
   if (predictedPrice === null && similar.length === 0) return null;
 

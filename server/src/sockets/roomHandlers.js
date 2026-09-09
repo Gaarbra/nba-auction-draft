@@ -20,7 +20,14 @@ import {
   RECONNECT_GRACE_MS,
   computeNotablePoolOdds,
 } from "../rooms/roomStore.js";
-import { nominatePlayer, placeBid, passOnNomination, assignPosition, swapRosterPositions } from "../rooms/draftStore.js";
+import {
+  nominatePlayer,
+  rerollNomination,
+  placeBid,
+  passOnNomination,
+  assignPosition,
+  swapRosterPositions,
+} from "../rooms/draftStore.js";
 import { getPlayers } from "../services/playerCache.js";
 import { getNotablePlayerIds } from "../services/notablePlayers.js";
 import { filterPlayersByEra } from "../services/era.js";
@@ -107,6 +114,42 @@ async function drawPlayerWithStats(candidates) {
   return toNominatedPlayer(lastCandidate, null);
 }
 
+// The whole difficulty system, shared by draft:nominate and draft:reroll:
+// narrow to the data-driven "notable" pool (all-time leaders, see
+// notablePlayers.js) with odds set by difficulty, then one random draw from
+// whichever pool that leaves. Only one stats-service call per roll, not
+// several in parallel -- keeps rolls fast and resilient to stats.nba.com's
+// rate limiting. Falls back to the full pool if the notable list is empty
+// (fetch failure, or this era just has none). `excludeIds` is extra IDs to
+// treat as unavailable beyond what's already drafted -- a reroll needs this
+// to rule out drawing the exact same player it's trying to get away from.
+async function rollPlayerForRoom(room, excludeIds = []) {
+  const allPlayers = await getPlayers();
+  const eraPool = filterPlayersByEra(allPlayers, room.draftEra);
+  const unavailable = new Set([...(room.draft?.draftedPlayerIds || []), ...excludeIds]);
+  const available = eraPool.filter((p) => !unavailable.has(p.id));
+
+  if (available.length === 0) return { error: "NO_PLAYERS_LEFT" };
+
+  const notableIds = await getNotablePlayerIds();
+  const notableSet = new Set(notableIds);
+  const notablePool = notableSet.size > 0 ? available.filter((p) => notableSet.has(p.id)) : [];
+
+  // Threshold math lives in computeNotablePoolOdds (roomStore.js). Both
+  // the coin flip below and drawPlayerWithStats's draw are uniform over
+  // whichever pool this lands in: every player in it has an equal
+  // chance, every era, every roll.
+  const staticOdds = computeNotablePoolOdds(room.difficulty, notablePool.length);
+  const drawPool = notablePool.length > 0 && Math.random() < staticOdds ? notablePool : available;
+
+  // The actual draw (with its stats-lookup retries) runs alongside a fixed
+  // minimum delay, so the shared rolling animation always plays for at
+  // least MIN_ROLL_MS even when the draw resolves instantly from cache.
+  const [{ player, stats, nbaPlayerId }] = await Promise.all([drawPlayerWithStats(drawPool), sleep(MIN_ROLL_MS)]);
+
+  return { player: { ...player, stats, nbaPlayerId } };
+}
+
 function toPublicRoom(room) {
   const base = {
     code: room.code,
@@ -153,6 +196,7 @@ function toPublicRoom(room) {
       rosters: room.draft.rosters,
       draftedPlayerIds: room.draft.draftedPlayerIds,
       nomination: room.draft.nomination,
+      soloRerollUsed: room.draft.soloRerollUsed,
     },
   };
 }
@@ -380,43 +424,53 @@ export function registerRoomHandlers(io, socket) {
     // the same moment instead of only the nominator seeing it locally.
     io.to(roomCode).emit("draft:rolling");
 
-    const allPlayers = await getPlayers();
-    const eraPool = filterPlayersByEra(allPlayers, room.draftEra);
-    const drafted = new Set(room.draft?.draftedPlayerIds || []);
-    const available = eraPool.filter((p) => !drafted.has(p.id));
-
-    if (available.length === 0) {
+    const roll = await rollPlayerForRoom(room);
+    if (roll.error) {
       io.to(roomCode).emit("draft:rolling-cancelled");
-      return callback?.({ error: "NO_PLAYERS_LEFT" });
+      return callback?.({ error: roll.error });
     }
 
-    // The whole difficulty system: narrow to the data-driven "notable" pool
-    // (all-time leaders, see notablePlayers.js) with odds set by
-    // difficulty, then one random draw from whichever pool that leaves.
-    // Only one stats-service call per roll, not several in parallel. This
-    // keeps rolls fast and resilient to stats.nba.com's rate limiting. Falls
-    // back to the full pool if the notable list is empty (fetch failure, or
-    // this era just has none).
-    const notableIds = await getNotablePlayerIds();
-    const notableSet = new Set(notableIds);
-    const notablePool = notableSet.size > 0 ? available.filter((p) => notableSet.has(p.id)) : [];
+    const result = nominatePlayer(room, playerId, roll.player);
+    if (result.error) {
+      io.to(roomCode).emit("draft:rolling-cancelled");
+      return callback?.({ error: result.error });
+    }
 
-    // Threshold math lives in computeNotablePoolOdds (roomStore.js). Both
-    // the coin flip below and drawPlayerWithStats's draw are uniform over
-    // whichever pool this lands in: every player in it has an equal
-    // chance, every era, every roll.
-    const staticOdds = computeNotablePoolOdds(room.difficulty, notablePool.length);
-    const drawPool = notablePool.length > 0 && Math.random() < staticOdds ? notablePool : available;
+    callback?.({ room: toPublicRoom(result.room) });
+    io.to(roomCode).emit("room:update", toPublicRoom(result.room));
+  });
 
-    // The actual draw (with its stats-lookup retries) runs alongside a fixed
-    // minimum delay, so the shared rolling animation always plays for at
-    // least MIN_ROLL_MS even when the draw resolves instantly from cache.
-    const [{ player: chosenPlayer, stats, nbaPlayerId }] = await Promise.all([
-      drawPlayerWithStats(drawPool),
-      sleep(MIN_ROLL_MS),
-    ]);
+  // Solo-only: one reroll for the whole draft (see rerollNomination's own
+  // comment in draftStore.js for why solo gets this instead of real
+  // bidding). Mirrors draft:nominate's roll-then-broadcast shape, just
+  // replacing an existing "assigning"-phase nomination instead of starting
+  // a fresh one.
+  socket.on("draft:reroll", async (payload = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const roomCode = socket.data.roomCode;
+    const playerId = resolveActingPlayerId(socket, payload);
+    if (!roomCode || !playerId) return callback?.({ error: "NOT_IN_ROOM" });
 
-    const result = nominatePlayer(room, playerId, { ...chosenPlayer, stats, nbaPlayerId });
+    const room = getRoom(roomCode);
+    if (!room) return callback?.({ error: "ROOM_NOT_FOUND" });
+
+    if (room.status !== "drafting") return callback?.({ error: "NOT_DRAFTING" });
+    if (!room.draft?.nomination || room.draft.nomination.phase !== "assigning") {
+      return callback?.({ error: "NO_ACTIVE_NOMINATION" });
+    }
+    if (room.draft.nomination.currentBidder !== playerId) return callback?.({ error: "NOT_YOUR_ASSIGNMENT" });
+    if (room.draft.turnOrder.length !== 1) return callback?.({ error: "REROLL_SOLO_ONLY" });
+    if (room.draft.soloRerollUsed) return callback?.({ error: "REROLL_ALREADY_USED" });
+
+    io.to(roomCode).emit("draft:rolling");
+
+    const roll = await rollPlayerForRoom(room, [room.draft.nomination.player.id]);
+    if (roll.error) {
+      io.to(roomCode).emit("draft:rolling-cancelled");
+      return callback?.({ error: roll.error });
+    }
+
+    const result = rerollNomination(room, playerId, roll.player);
     if (result.error) {
       io.to(roomCode).emit("draft:rolling-cancelled");
       return callback?.({ error: result.error });

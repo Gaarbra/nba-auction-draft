@@ -209,6 +209,26 @@ export async function fetchMarketIndex() {
 }
 
 /**
+ * Real career accolades (MVP, All-Star, championships, ...), grouped and
+ * tier-sorted by stats-service (see app.py's _fetch_and_cache_awards).
+ * Returns [] on any failure, same best-effort contract as
+ * fetchSimilarPlayers -- an empty accolades strip, not a broken card.
+ */
+export async function fetchPlayerAwards(playerId) {
+  try {
+    const res = await fetch(`${STATS_SERVICE_URL}/awards?id=${encodeURIComponent(playerId)}`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.awards) ? data.awards : [];
+  } catch (err) {
+    console.warn(`[statsClient] awards failed for id=${playerId}: ${err.message}`);
+    return [];
+  }
+}
+
+/**
  * Standalone from fetchPlayerStats on purpose: this is only ever called
  * as a client-side retry a couple seconds after a nomination reveal that
  * had no photo yet (see PlayerHeadshot.jsx), and doesn't need a full

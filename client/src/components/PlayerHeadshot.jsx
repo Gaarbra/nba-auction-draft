@@ -9,7 +9,14 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 const RETRY_DELAY_MS = 2500;
 
 function nbaHeadshotUrl(nbaPlayerId) {
-  return `https://ak-static.cms.nba.com/wp-content/uploads/headshots/nba/latest/260x190/${nbaPlayerId}.png`;
+  // The transparent-cutout set, not the small rectangular studio-photo
+  // version -- a real floating headshot with no background fill, which is
+  // what lets the team-color wash and the big logo behind it (see
+  // DraftBoard.jsx's reveal) actually show through around the player.
+  // Matches stats-service/photos.py's own NBA_HEADSHOT_URL exactly; that
+  // file is what decides stats.photoUrl below, so the two have to agree
+  // on which CDN set "has a real photo" even means.
+  return `https://cdn.nba.com/headshots/nba/latest/1040x760/${nbaPlayerId}.png`;
 }
 
 /** `photoUrl` is an optional Wikipedia fallback (see stats-service/photos.py)

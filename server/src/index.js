@@ -12,6 +12,7 @@ import {
   fetchPredictedPrice,
   fetchSimilarPlayers,
   fetchPhotoUrl,
+  fetchPlayerAwards,
   fetchPlayerStats,
   fetchMarketIndex,
   fetchUsagePct,
@@ -134,6 +135,13 @@ app.get("/api/players/:id/usage-pct", async (req, res) => {
 app.get("/api/players/:id/photo", async (req, res) => {
   const photoUrl = await fetchPhotoUrl(req.params.id);
   res.json({ photoUrl });
+});
+
+// Never a hard error: a missing/empty award list just means the reveal
+// card's accolades strip renders nothing (see PlayerAccolades.jsx).
+app.get("/api/players/:id/awards", async (req, res) => {
+  const awards = await fetchPlayerAwards(req.params.id);
+  res.json({ awards });
 });
 
 // Called once when the homepage loads (see App.jsx). Nudges stats-service

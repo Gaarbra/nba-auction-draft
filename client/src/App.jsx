@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSocket } from "./hooks/useSocket.js";
-import LandingPage from "./components/LandingPage.jsx";
-import RoomLobby from "./components/RoomLobby.jsx";
+import Landing from "./components/Landing.jsx";
 import MarketTab from "./components/MarketTab.jsx";
 import RoomView from "./components/RoomView.jsx";
 import DraftBoard from "./components/DraftBoard.jsx";
@@ -10,6 +9,7 @@ import TopNav from "./components/TopNav.jsx";
 import BottomNav from "./components/BottomNav.jsx";
 import RoomFooter from "./components/RoomFooter.jsx";
 import InteractiveBackground from "./components/InteractiveBackground.jsx";
+import HowToPlay from "./components/HowToPlay.jsx";
 
 const SESSION_KEY = "nba-auction-draft:session";
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -69,16 +69,9 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [kickedMessage, setKickedMessage] = useState("");
-  // Shown once per page load before the actual room lobby. Deliberately not
-  // reset by handleLeaveRoom -- once someone's clicked past the pitch, going
-  // back to the lobby to start another room shouldn't replay it. A fresh
-  // page load (or tab) starts at the front door again since this isn't
-  // persisted to storage.
-  const [showLanding, setShowLanding] = useState(true);
-  // Which pre-room screen the top nav's tabs point at. Independent of
-  // showLanding -- Market is its own destination, not a step in the
-  // landing-page-to-lobby funnel, so switching to it shouldn't care whether
-  // the pitch screen was already dismissed.
+  // Which pre-room screen the top nav's tabs point at. Landing (the hero +
+  // room console) and Market are the only two destinations now that there's
+  // no separate landing-page-to-lobby step to track alongside this.
   const [activeTab, setActiveTab] = useState("lobby");
 
   const sessionRef = useRef(loadSession());
@@ -157,7 +150,7 @@ export default function App() {
     };
   }, [socketRef]);
 
-  function handleCreateRoom(name, visibility) {
+  function handleCreateRoom(name, visibility, isSolo = false) {
     setError("");
     setKickedMessage("");
     setIsSubmitting(true);
@@ -172,6 +165,25 @@ export default function App() {
       setLocalPlayerIds(null);
       sessionRef.current = { roomCode: response.room.code, playerId: response.playerId };
       saveSession(sessionRef.current);
+
+      // Solo has no one to wait for and no real settings choice worth
+      // pausing on -- era/difficulty/bidding mode don't change solo's
+      // flat-price, no-bidding behavior either way -- so skip the waiting
+      // room entirely and start drafting right away with the same defaults
+      // RoomView would otherwise have offered. Uses response.playerId
+      // directly rather than the currentPlayerId state set just above,
+      // since that state update hasn't actually landed yet this tick.
+      if (isSolo) {
+        socketRef.current.emit(
+          "room:start",
+          { era: "all", allowPositionSwaps: false, difficulty: "normal", biddingMode: "open", playerId: response.playerId },
+          (startResponse) => {
+            if (startResponse?.error) {
+              setError(ERROR_MESSAGES[startResponse.error] || "Could not start draft.");
+            }
+          }
+        );
+      }
     });
   }
 
@@ -260,11 +272,12 @@ export default function App() {
     }
   }, [room?.draft?.currentNominatorId, room?.draft?.nomination?.phase, room?.draft?.nomination?.currentBidder, localPlayerIds]);
 
-  // The wordmark's own "go home" -- only offered outside an active room
-  // (leaving a live draft is what the explicit "Leave room" button is for;
-  // this never doubles as a sneaky way to desert one by accident).
+  // The wordmark's own "go home" -- clickable from anywhere, including
+  // mid-room or mid-draft. Explicitly requested: clicking it while in a
+  // room leaves that room, same as the dedicated "Leave room" button, then
+  // lands back on the lobby tab.
   function handleGoHome() {
-    setShowLanding(true);
+    if (room) handleLeaveRoom();
     setActiveTab("lobby");
   }
 
@@ -277,12 +290,19 @@ export default function App() {
   const teamBudget = 20;
 
   return (
-    <div className="app-shell">
-      {/* The photo ticker is the lobby's ambient background -- the landing
-          page gets its own background instead (see LandingPage.jsx) and the
-          Market tab wants a static backdrop (browsing/reading real stats
-          shouldn't compete with a moving background), so neither uses it. */}
-      <InteractiveBackground ticker={!room && !showLanding && activeTab !== "market"} />
+    // room-drafting scopes the second Paper-redesigned screen (see
+    // .room-drafting in index.css): the live draft board plus the room
+    // chrome around it (TopNav's "room" variant, RoomFooter). It's gated on
+    // inDraft specifically, not just `room`, so the pre-draft waiting room
+    // (RoomView) keeps its current look -- that screen isn't part of this
+    // redesign pass.
+    <div className={`app-shell ${inDraft ? "room-drafting" : ""}`}>
+      {/* Landing carries its own compact ticker bar now (see MarketTicker.jsx)
+          instead of the full-screen drifting photo cards this background can
+          show, and the Market tab wants a static backdrop (browsing/reading
+          real stats shouldn't compete with a moving background) -- so this
+          background never turns its own ticker on for either. */}
+      <InteractiveBackground />
 
       {room ? (
         <TopNav
@@ -295,7 +315,9 @@ export default function App() {
           biddingMode={room.biddingMode}
           onClockName={inDraft && onClockPlayer ? (isMyNominationTurn ? "You" : onClockPlayer.name) : null}
           coins={inDraft ? myBudget : null}
+          maxCoins={inDraft ? teamBudget : null}
           onLeaveRoom={handleLeaveRoom}
+          onGoHome={handleGoHome}
         />
       ) : (
         <TopNav
@@ -332,17 +354,11 @@ export default function App() {
             )}
           </div>
         ) : activeTab === "market" ? (
-          <MarketTab
-            socket={socketRef.current}
-            onNavigateToLobby={() => {
-              setActiveTab("lobby");
-              setShowLanding(false);
-            }}
-          />
-        ) : showLanding ? (
-          <LandingPage onEnter={() => setShowLanding(false)} />
+          <MarketTab socket={socketRef.current} onNavigateToLobby={() => setActiveTab("lobby")} />
+        ) : activeTab === "how-to-play" ? (
+          <HowToPlay />
         ) : (
-          <RoomLobby
+          <Landing
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
             onCreateLocalRoom={handleCreateLocalRoom}

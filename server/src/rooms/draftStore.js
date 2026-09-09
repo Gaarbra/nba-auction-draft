@@ -83,6 +83,10 @@ export function initializeDraft(room) {
     draftedPlayerIds: [],
     currentNominatorId: turnOrder[0],
     nomination: null,
+    // Only meaningful in a genuinely solo room (turnOrder.length === 1).
+    // See rerollNomination below. Harmless to set unconditionally here,
+    // since a multiplayer room simply never checks it.
+    soloRerollUsed: false,
   };
 }
 
@@ -128,6 +132,36 @@ export function nominatePlayer(room, playerId, player) {
   if (phase === "bidding" && room.biddingMode === "orderly") {
     draft.nomination.currentBidTurnId = nextBidTurnId(draft, playerId);
   }
+
+  return { room };
+}
+
+// Solo rooms skip bidding entirely (see the hasActiveOpponent check in
+// nominatePlayer above) and land straight in "assigning" at a flat
+// STARTING_BID, since there's genuinely no one to bid against. That's a
+// worse experience than real bidding, though: the player has no say at all
+// in who they end up with. A single reroll per draft (not per pick) gives
+// them one real decision without turning solo mode into "reroll until you
+// like the price," since the price never changes either way.
+export function rerollNomination(room, playerId, newPlayer) {
+  if (room.status !== "drafting") return { error: "NOT_DRAFTING" };
+  const draft = room.draft;
+  const nomination = draft.nomination;
+  if (!nomination || nomination.phase !== "assigning") return { error: "NO_ACTIVE_NOMINATION" };
+  if (nomination.currentBidder !== playerId) return { error: "NOT_YOUR_ASSIGNMENT" };
+  // Deliberately keyed off the room's real size, not just "this nomination
+  // happened to skip bidding." The same "assigning" phase can also show up
+  // late in a real multiplayer draft once everyone else's roster is full,
+  // and that case is genuine competitive play, not something to reroll.
+  if (draft.turnOrder.length !== 1) return { error: "REROLL_SOLO_ONLY" };
+  if (draft.soloRerollUsed) return { error: "REROLL_ALREADY_USED" };
+  if (draft.draftedPlayerIds.includes(newPlayer.id)) return { error: "PLAYER_ALREADY_DRAFTED" };
+
+  // Price stays at the nomination's existing currentBid (still the flat
+  // STARTING_BID solo always opens at) -- rerolling changes who you get,
+  // never what they cost.
+  draft.nomination.player = newPlayer;
+  draft.soloRerollUsed = true;
 
   return { room };
 }
