@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 export default function InfoModal({ title, body, onClose }) {
   return (
     <div className="footer-modal-backdrop" onClick={onClose}>
-      {/* No AnimatePresence/exit here on purpose — a modal is load-bearing
+      {/* No AnimatePresence/exit here on purpose. A modal is load-bearing
           (it blocks the whole page while open), and an exit transition that
           never resolves would leave it stuck open forever with no way to
           close it. A plain conditional render with only an entrance

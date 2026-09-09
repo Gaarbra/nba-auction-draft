@@ -1,7 +1,7 @@
 -- Hoop Bids relational schema.
 --
 -- Two halves, owned by two different services (matching the app's existing
--- boundaries — stats-service already owns NBA player data, the Node server
+-- boundaries: stats-service already owns NBA player data, the Node server
 -- already owns room/draft logic):
 --
 --   Reference data (written by stats-service, in Python):
@@ -13,8 +13,8 @@
 -- The generated half is the more interesting one to query: every completed
 -- draft records what each player was auctioned for (draft_picks.acquired_for)
 -- next to how that player actually performed (draft_picks.op_score /
--- dir_score, or joined back to player_stats for their real career line) —
--- that's a real "did people over/underpay" analysis, not just a cache dump.
+-- dir_score, or joined back to player_stats for their real career line).
+-- That's a real "did people over/underpay" analysis, not just a cache dump.
 
 CREATE TABLE IF NOT EXISTS players (
     id              INTEGER PRIMARY KEY,        -- NBA person id (stats.nba.com), not a surrogate key
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS players (
 
 -- One row per player: their career-aggregate line, refreshed whenever
 -- stats-service (re)fetches them (see fetch_stats_for_player in app.py).
--- Split out from `players` because it's a different rate of change — the
+-- Split out from `players` because it's a different rate of change: the
 -- player's identity is essentially permanent, their stat line gets
 -- re-derived every time the cache refreshes.
 CREATE TABLE IF NOT EXISTS player_stats (
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
 );
 
 -- One row per team a player suited up for, with career games played on that
--- team — the normalized form of stats-service's teamHistory list. Lets you
+-- team: the normalized form of stats-service's teamHistory list. Lets you
 -- do things like "career games played by team" or "which team did this
 -- player play the most for" as a real query instead of app-side logic.
 CREATE TABLE IF NOT EXISTS player_team_stints (
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS draft_teams (
 
 CREATE INDEX IF NOT EXISTS idx_draft_teams_draft_id ON draft_teams(draft_id);
 
--- One row per filled roster slot (5 per team). player_id is nullable — a
+-- One row per filled roster slot (5 per team). player_id is nullable: a
 -- forfeited team can finish with empty slots, and very old/obscure players
 -- occasionally aren't in the `players` table at all if their stats were
 -- never fetched.

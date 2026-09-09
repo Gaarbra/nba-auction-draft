@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 
-// Shared between RoomView (lobby) and DraftBoard (mid-draft) — the host can
+// Shared between RoomView (lobby) and DraftBoard (mid-draft). The host can
 // start a vote against anyone else currently connected, but starting it
 // isn't a unilateral kick: everyone else eligible has to actually approve
 // before it goes through (see server/src/rooms/roomStore.js for the vote
@@ -25,7 +25,7 @@ function friendlyError(code) {
   return ERROR_MESSAGES[code] || "Something went wrong.";
 }
 
-/** Small "Kick" trigger next to a player row — host-only, hidden for local
+/** Small "Kick" trigger next to a player row. Host-only, hidden for local
  * rooms, for yourself, and while a vote is already underway (the server
  * only allows one at a time anyway). */
 export function KickButton({ room, currentPlayerId, socket, targetPlayerId }) {
@@ -52,7 +52,7 @@ export function KickButton({ room, currentPlayerId, socket, targetPlayerId }) {
   );
 }
 
-/** The vote-in-progress banner — approve/reject for anyone still eligible
+/** The vote-in-progress banner: approve/reject for anyone still eligible
  * to vote, a live tally, and a cancel option for whoever started it. */
 export default function VoteKickBanner({ room, currentPlayerId, socket }) {
   const [error, setError] = useState("");
@@ -64,7 +64,7 @@ export default function VoteKickBanner({ room, currentPlayerId, socket }) {
     room.players.filter((p) => p.connected && !p.forfeited && p.id !== voteKick.targetId).map((p) => p.id)
   );
   const approveCount = voteKick.approveIds.filter((id) => eligibleIds.has(id)).length;
-  // Strict majority — must match the server's tallyVoteKick threshold exactly.
+  // Strict majority. Must match the server's tallyVoteKick threshold exactly.
   const threshold = Math.floor(eligibleIds.size / 2) + 1;
 
   const isTarget = currentPlayerId === voteKick.targetId;

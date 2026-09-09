@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import LogoMark from "./LogoMark.jsx";
 
-// Matches the room-code alphabet the server generates from (roomStore.js) —
+// Matches the room-code alphabet the server generates from (roomStore.js):
 // no I/O/0/1, to avoid characters that look alike. Sanitizing pasted text
 // against this same set means a code copied out of a text message (with
 // stray whitespace, a trailing newline, or smart-quote-mangled casing)
@@ -44,7 +44,7 @@ export default function RoomLobby({
   }
 
   useEffect(() => {
-    // Also re-fires once `connected` flips true — the very first mount can
+    // Also re-fires once `connected` flips true. The very first mount can
     // race ahead of the socket actually being created (see App.jsx's
     // handleListPublicRooms), so this is what recovers from that instead of
     // leaving the list stuck empty until someone hits Refresh by hand.
@@ -52,7 +52,7 @@ export default function RoomLobby({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, connected]);
 
-  // A subtle 3D tilt toward the cursor — capped small (±6deg) so it reads as
+  // A subtle 3D tilt toward the cursor, capped small (±6deg) so it reads as
   // "responsive" rather than gimmicky, and skipped for anyone who's asked
   // the OS for reduced motion.
   function handleCardMouseMove(e) {

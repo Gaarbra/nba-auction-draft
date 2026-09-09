@@ -4,29 +4,20 @@ import { ERA_BUCKETS } from "../services/era.js";
 
 const VALID_ERA_IDS = new Set(["all", "active", ...ERA_BUCKETS.map((b) => b.id)]);
 
-// Difficulty is just the odds (per roll) that a nomination draws from the
-// data-driven "notable" pool — hundreds of real all-time statistical
-// leaders, sourced fresh from stats.nba.com and cached for a week (see
-// notablePlayers.js) — instead of the full era pool. A single random draw
-// happens either way (see drawPlayerWithStats in roomHandlers.js); this is
-// what actually matters against a big/varied pool like "All Eras", where a
-// pick from the full ~5,200-player history is unlikely to land anyone
-// recognizable regardless of difficulty. Nobody is ever excluded outright —
-// even on Easy there's still a chance of drawing the full pool — and the
-// notable pool itself is built from real leaderboards, not a hand-picked
-// list, so which names show up still varies roll to roll.
+// Difficulty is the odds (per roll) that a nomination draws from the
+// data-driven "notable" pool, real all-time statistical leaders (see
+// notablePlayers.js), instead of the full era pool. Nobody is ever
+// excluded outright; even on Easy there's a chance of the full pool, and
+// the notable pool itself comes from real leaderboards, not a curated list.
 export const DIFFICULTY_STATIC_ODDS = { easy: 0.92, normal: 0.55, hard: 0 };
 const VALID_DIFFICULTIES = new Set(Object.keys(DIFFICULTY_STATIC_ODDS));
 
 // A narrow era (e.g. "2020s", notable pool ~10 players) shouldn't dominate
-// every roll with the exact same handful of names — but it also shouldn't
-// lose the "well-known players show up a lot" feel just because it's a
-// young decade with few players old enough to crack an all-time top 500.
-// Every era except 2020s comfortably clears MIN_NOTABLE_POOL_FOR_FULL_ODDS
-// (58+ notable players — see server/verify scripts from this era of the
-// project's history for the real numbers), so this floor only ever engages
-// for that one outlier: scale down for real variety as the pool shrinks,
-// but never below POOL_SIZE_SCALE_FLOOR.
+// every roll with the same handful of names, but a young decade with few
+// all-time-caliber players yet shouldn't lose the "well-known players show
+// up a lot" feel either. Every other era clears this floor comfortably, so
+// it only ever engages for that one outlier: scale down for real variety
+// as the pool shrinks, but never below POOL_SIZE_SCALE_FLOOR.
 const MIN_NOTABLE_POOL_FOR_FULL_ODDS = 30;
 const POOL_SIZE_SCALE_FLOOR = 0.7;
 
@@ -34,7 +25,7 @@ const POOL_SIZE_SCALE_FLOOR = 0.7;
  * The odds (0-1) that a single nomination draw should come from the
  * data-driven "notable" pool rather than the full era pool, for a given
  * difficulty and how many notable players actually exist in the current
- * era. Pure and deterministic — the actual coin flip (`Math.random() <
+ * era. Pure and deterministic: the actual coin flip (`Math.random() <
  * odds`) and the actual uniform draw within whichever pool that picks live
  * in roomHandlers.js; this only computes the threshold.
  * @param {string} difficulty
@@ -49,8 +40,8 @@ export function computeNotablePoolOdds(difficulty, notablePoolSize) {
 
 // "open" (the long-standing default): anyone still active on a nomination
 // can bid or pass whenever they want, first-come-first-served. "orderly":
-// only one specific person may act at a time, cycling through turn order —
-// see nextBidTurnId in draftStore.js for the actual turn logic.
+// only one specific person may act at a time, cycling through turn order.
+// See nextBidTurnId in draftStore.js for the actual turn logic.
 const VALID_BIDDING_MODES = new Set(["open", "orderly"]);
 
 const rooms = new Map();
@@ -63,7 +54,7 @@ const STARTING_BUDGET = 20;
 // room:rejoin before their team is finalized without them.
 export const RECONNECT_GRACE_MS = 60_000;
 
-// How long an unresolved votekick stays open before it's auto-cancelled —
+// How long an unresolved votekick stays open before it's auto-cancelled:
 // long enough for everyone to notice and respond, short enough that it
 // doesn't just sit there blocking a new one from being started.
 export const VOTE_KICK_TIMEOUT_MS = 30_000;
@@ -98,7 +89,7 @@ export function getRoom(code) {
   return rooms.get(code?.toUpperCase());
 }
 
-/** Open, joinable-without-a-code rooms — for the lobby's "Public" tab. Local
+/** Open, joinable-without-a-code rooms, for the lobby's "Public" tab. Local
  * pass-and-play rooms are never listable (there's no one else to join). */
 export function listPublicRooms() {
   const list = [];
@@ -117,7 +108,7 @@ export function listPublicRooms() {
       createdAt: room.createdAt,
     });
   }
-  // Newest first — a room that's been sitting open a while is more likely
+  // Newest first: a room that's been sitting open a while is more likely
   // abandoned than one just created.
   list.sort((a, b) => b.createdAt - a.createdAt);
   return list;
@@ -239,7 +230,7 @@ function reassignHostIfNeeded(room, departedPlayer) {
 }
 
 /**
- * Permanently ends a player's participation — either because they clicked
+ * Permanently ends a player's participation, either because they clicked
  * "Leave Room" or because their reconnect grace period ran out. In the
  * lobby (status "waiting") this is a plain removal, same as before. Once
  * drafting has started, the player is deliberately NOT removed from
@@ -278,7 +269,7 @@ export function beginDisconnectGrace(room, playerId, socketId, onExpire) {
   const player = room.players.find((p) => p.id === playerId);
   // Guard against a stale socket's disconnect firing after the player has
   // already reconnected on a new socket (e.g. a flaky connection racing a
-  // fresh room:rejoin) — only the currently-registered socket may start the
+  // fresh room:rejoin). Only the currently-registered socket may start the
   // grace timer.
   if (!player || player.socketId !== socketId) return;
 
@@ -301,7 +292,7 @@ export function reconnectPlayer(code, playerId, socketId) {
 
   // If this identity was already live on a different socket (e.g. the same
   // person opened a second tab that shares localStorage), that previous
-  // socket is about to become a zombie — its owner should be told to boot
+  // socket is about to become a zombie. Its owner should be told to boot
   // it, rather than the room silently flip-flopping which tab is "really"
   // them. The caller (which has access to `io`) is responsible for actually
   // disconnecting it.
@@ -316,14 +307,11 @@ export function reconnectPlayer(code, playerId, socketId) {
   return { room, player, previousSocketId: previousSocketId !== socketId ? previousSocketId : null };
 }
 
-// Only the host can start a votekick, but starting one doesn't kick anyone
-// outright — it opens a vote that a majority of everyone else still in the
-// room (the target excluded) has to actually approve. That's the whole
-// point of making this a *vote*kick instead of a plain host-kick: it caps
-// what the host can unilaterally do to one other player, while still
-// giving the room a way to remove someone disruptive without needing every
-// single remaining player on board (unanimous would let one holdout block
-// it forever).
+// Only the host can start a votekick, but it doesn't kick anyone outright.
+// It opens a vote the rest of the room (target excluded) has to approve by
+// majority. That's the point of a *vote*kick over a plain host-kick: caps
+// what the host can unilaterally do, without requiring unanimity (which
+// would let one holdout block it forever).
 function eligibleVoteKickVoters(room, targetId) {
   return room.players.filter((p) => p.connected && !p.forfeited && p.id !== targetId).map((p) => p.id);
 }
@@ -338,7 +326,7 @@ function cancelVoteKick(room) {
 }
 
 /** Recomputes whether the pending votekick should resolve (kicked, or called
- * off as mathematically unreachable) given the current vote tally — called
+ * off as mathematically unreachable) given the current vote tally. Called
  * after every vote AND after anyone's connection status changes, since a
  * departure changes who's still eligible to vote and can flip either
  * outcome on its own. */
@@ -352,7 +340,7 @@ function tallyVoteKick(room) {
     return { room, resolved: true, kicked: false };
   }
 
-  // Strict majority, not "half" — Math.ceil(n/2) would let exactly 1 of 2
+  // Strict majority, not "half": Math.ceil(n/2) would let exactly 1 of 2
   // eligible voters pass a vote that only half the room actually backed.
   const threshold = Math.floor(eligible.length / 2) + 1;
   let approve = 0;
@@ -366,7 +354,7 @@ function tallyVoteKick(room) {
   if (approve >= threshold) {
     clearVoteKickTimer(room);
     room.voteKick = null;
-    // Capture the target's socketId before finalizePlayerExit runs — in the
+    // Capture the target's socketId before finalizePlayerExit runs. In the
     // lobby ("waiting") it removes them from room.players outright, so
     // looking this up afterward would always come back empty and the
     // targeted "you were kicked" notification would silently never fire.
@@ -377,7 +365,7 @@ function tallyVoteKick(room) {
 
   // Once enough people have voted no that the remaining undecided voters
   // couldn't possibly push it over threshold, there's no point leaving it
-  // open — call it off instead of making everyone wait for the timeout.
+  // open. Call it off instead of making everyone wait for the timeout.
   if (eligible.length - reject < threshold) {
     cancelVoteKick(room);
     return { room, resolved: true, kicked: false };
@@ -388,7 +376,7 @@ function tallyVoteKick(room) {
 
 /** Host-only: opens a votekick against another connected player. Resolves
  * immediately (no vote needed) when the host is the only other eligible
- * voter in the room — there's no one left to wait on. `onExpire` is called
+ * voter in the room, since there's no one left to wait on. `onExpire` is called
  * if the vote is still unresolved after VOTE_KICK_TIMEOUT_MS, so the caller
  * (which owns `io`) can broadcast the auto-cancellation. */
 export function startVoteKick(code, initiatorId, targetId, onExpire) {
@@ -447,14 +435,14 @@ export function cancelVoteKickByHost(code, playerId) {
 }
 
 /** Re-evaluates a pending votekick after someone's connection status
- * changes (left, disconnected, reconnected) — a departure can resolve a
+ * changes (left, disconnected, reconnected). A departure can resolve a
  * vote (kick or cancel) on its own even with no new vote cast, same idea
  * as recheckRematchAfterExit. */
 export function recheckVoteKickAfterExit(room) {
   if (!room?.voteKick) return room;
 
   // The target may have already left on their own (e.g. their disconnect
-  // grace period expired independently of this vote) — the vote is moot at
+  // grace period expired independently of this vote). The vote is moot at
   // that point, not just short a voter, so cancel it outright instead of
   // leaving a stale "vote in progress" banner for someone who's already gone.
   const target = room.players.find((p) => p.id === room.voteKick.targetId);
@@ -467,7 +455,7 @@ export function recheckVoteKickAfterExit(room) {
 }
 
 /** A finished draft has no more use for an in-flight votekick (there's
- * nothing left to remove someone from) — called from maybeComputeResults,
+ * nothing left to remove someone from). Called from maybeComputeResults,
  * the one place a draft can flip to "complete" without already going
  * through the leave/disconnect recheck above (a normal winning assignment). */
 export function clearVoteKickIfComplete(room) {
@@ -511,7 +499,7 @@ export function returnToLobby(code, playerId) {
   return { room };
 }
 
-/** If every currently connected, non-forfeited player has confirmed, resets the room and redeals a fresh draft with the same era/difficulty/swap settings — no lobby stop, straight back into a new game. Called after every vote change AND after a mid-vote departure, since someone leaving can turn a pending vote unanimous on its own. */
+/** If every currently connected, non-forfeited player has confirmed, resets the room and redeals a fresh draft with the same era/difficulty/swap settings, no lobby stop, straight back into a new game. Called after every vote change AND after a mid-vote departure, since someone leaving can turn a pending vote unanimous on its own. */
 function recheckRematch(room) {
   if (room.status !== "complete" || !room.rematchVotes || room.rematchVotes.size === 0) return;
 
@@ -549,7 +537,7 @@ export function setRematchVote(code, playerId, confirmed) {
   return { room };
 }
 
-/** Re-evaluates a pending rematch vote after someone leaves the room — exported separately from setRematchVote since a departure (not a vote) is what triggers the recheck here. */
+/** Re-evaluates a pending rematch vote after someone leaves the room. Exported separately from setRematchVote since a departure (not a vote) is what triggers the recheck here. */
 export function recheckRematchAfterExit(room) {
   recheckRematch(room);
 }

@@ -95,7 +95,7 @@ body {
 .interactive-bg {
   position: fixed;
   inset: 0;
-  /* Negative, not 0 — a positioned sibling with z-index:auto (like
+  /* Negative, not 0. A positioned sibling with z-index:auto (like
      .connection-badge) or a plain non-positioned block (like .lobby-card)
      would otherwise both still paint UNDER a position:fixed element with
      z-index:0 per normal stacking-context paint order, hiding the actual
@@ -183,8 +183,8 @@ body {
     opacity: 0.85;
   }
   100% {
-    /* Travels from the starting top:100vh up to roughly -60vh — well clear
-       of the top edge — so it fully exits before the next loop starts it
+    /* Travels from the starting top:100vh up to roughly -60vh, well clear
+       of the top edge, so it fully exits before the next loop starts it
        back at the bottom. */
     transform: translateY(-160vh);
     opacity: 0;
@@ -257,7 +257,7 @@ body {
   max-width: 520px;
   max-height: 80vh;
   overflow-y: auto;
-  /* Flat, not glass — there's nothing worth blurring behind this (the
+  /* Flat, not glass: there's nothing worth blurring behind this (the
      backdrop overlay already dims the real page content; that's the
      functional blur). A gradient-tinted blur here was just decoration. */
   background: var(--bg-panel-raised);
@@ -327,7 +327,7 @@ body {
   position: fixed;
   top: 16px;
   right: 16px;
-  /* Explicit and high — the draft board can now stretch close to full
+  /* Explicit and high, since the draft board can now stretch close to full
      viewport width (see .draft-board's max-width), so its own header
      content can land right under this same corner. Relying on implicit
      paint order was fragile; a real z-index guarantees this always wins. */
@@ -356,7 +356,7 @@ body {
 
 .lobby-card,
 .room-card {
-  /* Flat, not glass — see .footer-modal's comment above; same reasoning. */
+  /* Flat, not glass. See .footer-modal's comment above; same reasoning. */
   background: var(--bg-panel-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -388,7 +388,7 @@ body {
   letter-spacing: -0.02em;
   line-height: 1.1;
   text-align: center;
-  /* Solid, not a shimmering gradient, and not accent-colored — the accent
+  /* Solid, not a shimmering gradient, and not accent-colored. The accent
      stays reserved for the CTA below it rather than the wordmark. */
   color: var(--text);
 }
@@ -405,16 +405,13 @@ body {
 }
 
 /* The screen shown before the room lobby -- a scrollable, Stitch-inspired
-   multi-section pitch. No background photography: nothing in the pool of
-   usable court/hoop imagery was clean of baked-in team/league branding (the
-   two AI-generated candidates tried earlier had a Nike watermark and the
-   literal NBA logo respectively), and a real photo risks the same problem
-   again the next time one gets swapped in. The hero instead gets its own
-   court-line motif (see the CourtLines component in LandingPage.jsx) plus
-   the same radial glow used behind the lobby card, repeated per section.
-   `scroll-snap-type` lives on html (see near the top of this file) rather
-   than a nested scroll container, so this rides the page's own scrollbar
-   instead of fighting the fixed footer/bottom-nav for a second one. */
+   multi-section pitch. No background photography: two earlier AI-generated
+   candidates both had real trademarks baked in (a Nike watermark, the NBA
+   logo). The hero instead gets its own court-line motif (CourtLines in
+   LandingPage.jsx) plus the same radial glow behind the lobby card,
+   repeated per section. `scroll-snap-type` lives on html (near the top of
+   this file), not a nested scroll container, so this rides the page's own
+   scrollbar instead of fighting the fixed footer/bottom-nav for a second one. */
 .landing {
   width: 100%;
   max-width: 1040px;
@@ -999,7 +996,7 @@ body {
   justify-content: space-between;
   gap: 10px;
   padding: 9px 2px;
-  /* A plain divided row, not a card-inside-a-card — the outer .lobby-card
+  /* A plain divided row, not a card-inside-a-card. The outer .lobby-card
      is already the only "card" this list needs to sit inside; giving each
      row its own background + border + radius on top of that just stacked
      three layers of "card-ness" for what's really a simple list. */
@@ -1526,18 +1523,18 @@ form input {
 
 .draft-layout {
   display: flex;
-  /* stretch, not flex-start — the chat sidebar matches .draft-board's full
+  /* stretch, not flex-start. The chat sidebar matches .draft-board's full
      height this way, rather than being a short box floating at the top. */
   align-items: stretch;
   gap: 14px;
   width: 100%;
-  /* Was on .draft-board itself — moved up here so the chat sidebar sits
+  /* Was on .draft-board itself, moved up here so the chat sidebar sits
      inside this same width budget instead of floating past it. */
   max-width: 1560px;
 }
 
 @media (max-width: 860px) {
-  /* Not enough room for a side-by-side sidebar — stack chat below the
+  /* Not enough room for a side-by-side sidebar, so stack chat below the
      board instead. Still never covers anything, just takes its own row. */
   .draft-layout {
     flex-direction: column;
@@ -1613,10 +1610,10 @@ form input {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
   padding: 32px;
-  /* Was width:100% + its own max-width — now a flex child of .draft-layout,
-     alongside the chat sidebar, so opening the sidebar makes room instead
-     of covering the roster grid. min-width:0 is required for a flex child
-     to actually shrink below its content's natural width. */
+  /* Was width:100% plus its own max-width, now a flex child of
+     .draft-layout, alongside the chat sidebar, so opening the sidebar makes
+     room instead of covering the roster grid. min-width:0 is required for a
+     flex child to actually shrink below its content's natural width. */
   flex: 1 1 auto;
   min-width: 0;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -2053,7 +2050,7 @@ form input {
   flex-wrap: wrap;
 }
 
-/* The radar chart is a desktop-only flourish — on a phone it just eats
+/* The radar chart is a desktop-only flourish. On a phone it just eats
    vertical space the draft screen can't spare, and the big-number
    StatHighlightRow already carries the figures. */
 .stat-radar {
@@ -2210,7 +2207,7 @@ form input {
 }
 
 /* Hidden by default; shown on hover OR keyboard focus (tabIndex on the
-   parent makes :focus-within fire for non-mouse users too). Pure CSS —
+   parent makes :focus-within fire for non-mouse users too). Pure CSS,
    no JS show/hide state needed for something this simple. */
 .predicted-price-tooltip {
   position: absolute;
@@ -2509,7 +2506,7 @@ form input {
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  /* Hide the native up/down spinner — this input already has its own
+  /* Hide the native up/down spinner. This input already has its own
      dedicated +/- buttons right next to it, so the browser's built-in
      ones would just be redundant (and visually clash with the pill). */
   -moz-appearance: textfield;
@@ -2674,7 +2671,7 @@ form input {
   background: var(--bg-panel);
   border: 1px dashed var(--line);
   cursor: default;
-  /* Unlike its predecessor, this can't clip to its own bounds — the hover
+  /* Unlike its predecessor, this can't clip to its own bounds. The hover
      tooltip needs to escape past the card's edge. Visual clipping of the
      headshot itself now happens on .roster-slot-media instead. */
   overflow: visible;
@@ -2968,7 +2965,7 @@ form input {
 }
 
 /* ============================================================
-   Final results — two-column standings + sticky rematch panel
+   Final results: two-column standings + sticky rematch panel
    (matches the Stitch "Final Standings & Results" mock)
    ============================================================ */
 
@@ -3364,7 +3361,7 @@ form input {
   color: var(--text);
 }
 
-/* A real flex sidebar now, not a floating overlay — see .draft-layout,
+/* A real flex sidebar now, not a floating overlay. See .draft-layout,
    which is what actually reserves this width so the roster grid never sits
    underneath it. Expanded, it stretches to match .draft-board's full
    height (align-items: stretch on the shared parent); collapsed, it's a
@@ -3372,7 +3369,7 @@ form input {
 .chat-panel {
   display: flex;
   flex-direction: column;
-  /* Flat, not glass — see .footer-modal's comment. */
+  /* Flat, not glass. See .footer-modal's comment. */
   background: var(--bg-panel-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);

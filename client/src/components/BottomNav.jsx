@@ -1,5 +1,5 @@
 /* Mobile-only bottom tab bar for the lobby, mirroring TopNav's own lobby
-   tabs (client/src/components/TopNav.jsx) — this is the ONLY way to reach
+   tabs (client/src/components/TopNav.jsx). This is the ONLY way to reach
    Market on a phone, since TopNav's own tab row is desktop-only
    (`hidden md:flex`). Roster / Account stay visual stubs until there's an
    actual screen behind them. */

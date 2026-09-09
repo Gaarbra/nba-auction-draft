@@ -1,34 +1,31 @@
 // @ts-check
 
 /**
- * Bridges raw stats-service output (real box-score numbers, some of them
- * legitimately missing for older eras — not just "we didn't fetch it" but
- * genuinely absent from any accessible source) into the PlayerStatLine
- * shape scoring.js expects. Two documented, clearly-labeled fallback
- * estimates live here:
+ * Bridges raw stats-service output, real box-score numbers, some of which
+ * are genuinely missing for older eras rather than just unfetched, into the
+ * PlayerStatLine shape scoring.js expects. There are two labeled fallback
+ * estimates in here:
  *
- * 1. USG% before 1996-97 — stats.nba.com only started computing Advanced
- *    (usage-derived) stats that season; nothing earlier exists there, from
- *    any source that isn't Basketball-Reference. Estimated from shot volume
- *    relative to minutes played, calibrated so a "15 shot-equivalents per
- *    36 minutes" workload reads as a roughly league-average ~20% usage.
+ * 1. USG% before 1996-97. stats.nba.com has no Advanced stats that far
+ *    back, from any source that isn't scraping. This estimates it from
+ *    shot volume relative to minutes played, calibrated so that 15
+ *    shot-equivalents per 36 minutes reads as a roughly league-average 20%
+ *    usage rate.
  *
- * 2. Defensive Win Shares (the pre-1974 DIR fallback) — DWS is a
- *    Basketball-Reference metric with no official-NBA equivalent. Getting
- *    the real number would mean scraping BR, which is against their ToS
- *    and a fragile target; we don't do that. Estimated from rebounds per
- *    game instead, calibrated so a strong rebounding season (~15 REB/g)
- *    lands around a DIR of 5 — comparable in scale to a modern
- *    plus-defender's STL/BLK-based score. This is a single fixed calibration
- *    point, not a dynamic fit against real per-era league averages (which
- *    would need a league-average-stats data feed this app doesn't have) —
- *    good enough to put pre-1974 defenders in the right ballpark, not a
- *    rigorously era-adjusted rating.
+ * 2. Defensive Win Shares, used as the pre-1974 DIR fallback. DWS is a
+ *    Basketball-Reference metric with no official NBA equivalent, and we
+ *    deliberately don't scrape BR (it's against their ToS, and a fragile
+ *    thing to depend on anyway). This estimates it from rebounds per game,
+ *    calibrated so a strong rebounding season (around 15 REB/g) lands
+ *    around a DIR of 5, roughly in scale with a modern plus-defender's real
+ *    STL/BLK score. It's one fixed calibration point, not a real per-era
+ *    fit, so treat it as "in the right ballpark" rather than a precise era
+ *    adjustment.
  *
- * Both estimates are flagged (`usagePctEstimated`) or implicit (DIR
- * estimates only ever apply when scoring.js already detects untracked
- * STL/BLK) so downstream code and the results UI can distinguish real
- * numbers from approximations.
+ * Both estimates are flagged so downstream code can tell a real number from
+ * an approximation: USG% explicitly via `usagePctEstimated`, and DWS
+ * implicitly, since scoring.js only reaches for the DIR estimate once it
+ * detects untracked STL/BLK in the first place.
  */
 
 const USG_SHOT_EQUIV_BASELINE_PER_36 = 15; // "average" workload -> ~20% usage
@@ -54,11 +51,12 @@ export function estimateUsagePct({ fgaPerGame, ftaPerGame, tovPerGame, minutesPe
 }
 
 /**
- * Synthetic "season DWS" that, when run through scoring.js's existing
- * (seasonDWS / gamesPlayed) * 100 formula, reproduces the rebound-based DIR
- * estimate described above. Kept in this shape — rather than changing
- * scoring.js's interface — so that already-tested pure function stays
- * untouched; all estimation logic lives here in one documented place.
+ * Builds a synthetic "season DWS" that, once run through scoring.js's
+ * existing (seasonDWS / gamesPlayed) * 100 formula, reproduces the
+ * rebound-based DIR estimate described above. It's shaped this way instead
+ * of changing scoring.js's interface, so that file's already-tested pure
+ * functions stay untouched, and all the estimation logic stays in one
+ * documented place: here.
  * @param {{ reboundsPerGame?: number|null, gamesPlayed: number }} stats
  * @returns {number}
  */
@@ -95,8 +93,9 @@ export function toPlayerStatLine(rawStats) {
     stl: rawStats.stealsPerGame ?? null,
     blk: rawStats.blocksPerGame ?? null,
     // Feeds the tracked-era DIR branch's small rebounding term (see
-    // REB_WEIGHT in scoring.js) — separate from this same reboundsPerGame
-    // value's other use just below, seeding the pre-1974 DWS estimate.
+    // REB_WEIGHT in scoring.js). This is a separate use from this same
+    // reboundsPerGame value just below, which seeds the pre-1974 DWS
+    // estimate instead.
     reb: rawStats.reboundsPerGame ?? 0,
     seasonDWS: estimateSeasonDWS(rawStats),
     gamesPlayed: rawStats.gamesPlayed,

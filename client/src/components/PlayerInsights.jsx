@@ -8,7 +8,7 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
  * auction price (server/src/services/statsClient.js -> stats-service's
  * /predict-price, trained on real completed-draft history) and a handful of
  * statistically similar players (/similar-players, a k-NN over standardized
- * per-game stats). Both are best-effort — either can come back empty (model
+ * per-game stats). Both are best-effort: either can come back empty (model
  * not trained yet, player has no cached stats, stats-service unreachable)
  * and this just renders nothing for that half rather than an error state,
  * matching how every other stats-dependent panel in this app degrades. */
@@ -66,7 +66,7 @@ export default function PlayerInsights({ nbaPlayerId, era, difficulty, onPredict
     >
       {predictedPrice !== null && (
         // tabIndex makes the hover breakdown reachable by keyboard too
-        // (:focus-within in CSS) — cursor:help alone only signals mouse
+        // (:focus-within in CSS). cursor:help alone only signals mouse
         // users that there's more here.
         <p className="predicted-price" tabIndex={0}>
           <span className="predicted-price-label">Suggested value</span>
@@ -95,7 +95,7 @@ export default function PlayerInsights({ nbaPlayerId, era, difficulty, onPredict
               <span key={p.id} className="similar-player-chip">
                 {onSimilarPlayerClick ? (
                   // In-app navigation takes priority over the NBA.com link
-                  // in contexts that offer it (the Market tab) — jumping to
+                  // in contexts that offer it (the Market tab). Jumping to
                   // that player's own card is more useful there than
                   // leaving the app.
                   <button type="button" className="similar-player-link" onClick={() => onSimilarPlayerClick(p.id)}>

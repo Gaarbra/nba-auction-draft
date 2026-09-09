@@ -1,16 +1,13 @@
-"""Fallback player photos for players NBA's own CDN doesn't have a real
-headshot for — confirmed empirically (see stats-service/scripts/
-warm_photos.py's module docstring) that this is a real, permanent gap for
-a lot of older/short-career players, not something fixable by finding a
-different NBA URL: NBA's "latest" headshot set (the only one this app used
-before) 403s for players it has no photo of, and an alternate NBA CDN host
-serves back a generic byte-identical placeholder under a 200 instead of
-erring, rather than either of them having a real photo hiding somewhere.
+"""Fallback player photos for players NBA's own CDN has no real headshot
+for. This is a confirmed, permanent gap for many older/short-career
+players, not fixable with a different NBA URL: the "latest" set 403s for
+players it lacks, and an alternate CDN host serves a byte-identical generic
+placeholder under a 200 instead of erring.
 
-Wikipedia/Wikimedia Commons is a genuinely different, independently-
-maintained source with real coverage for a lot of these — not everyone (an
-extremely obscure one-season player may have nothing anywhere), but a
-meaningfully large slice of "old but still known" retired players.
+Wikipedia/Wikimedia Commons is a genuinely independent source with real
+coverage for a meaningful slice of "old but still known" retired players
+(not everyone; an extremely obscure one-season player may have nothing
+anywhere).
 """
 
 import requests
@@ -19,7 +16,7 @@ WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 REQUEST_HEADERS = {"User-Agent": "HoopBids/1.0 (https://github.com/Gaarbra/nba-auction-draft)"}
 REQUEST_TIMEOUT = 10
 
-# NBA's own CDN for real headshots — this app's original (and still primary,
+# NBA's own CDN for real headshots. This app's original (and still primary,
 # fast, no-lookup-needed) source. 403 for a player it has no photo of; 200
 # with a real image otherwise. Deliberately NOT the alternate cdn.nba.com
 # host: that one returns 200 with a generic filler image for a missing
@@ -29,7 +26,7 @@ NBA_HEADSHOT_URL = "https://ak-static.cms.nba.com/wp-content/uploads/headshots/n
 
 
 def has_nba_headshot(player_id):
-    """True if NBA's CDN actually has a real photo for this player — a
+    """True if NBA's CDN actually has a real photo for this player. Just a
     plain HEAD request, no image bytes downloaded. Only meant to be called
     from an offline warm script (see warm_photos.py), never on a live
     request path."""
@@ -38,31 +35,31 @@ def has_nba_headshot(player_id):
         return resp.status_code == 200
     except requests.RequestException:
         # Treat a network hiccup as "unknown, assume it has one" rather
-        # than triggering an unnecessary Wikipedia lookup — a real 403
+        # than triggering an unnecessary Wikipedia lookup. A real 403
         # will just get caught on a later warm run.
         return True
 
 
 def find_wikipedia_photo(full_name):
     """Best-effort Wikipedia photo lookup for a player NBA has no headshot
-    for. Returns an image URL, or None if nothing turned up (never raises
-    — a lookup failure just means "no fallback photo either," same as any
-    other "couldn't find this" case elsewhere in this app).
+    for. Returns an image URL, or None if nothing turned up. It never raises;
+    a lookup failure just means "no fallback photo either," same as any
+    other "couldn't find this" case elsewhere in this app.
 
     Search is deliberately scoped with "basketball player" appended to the
     query (not just the bare name) so Wikipedia's own relevance ranking
     does the disambiguation work for a common name shared with an
-    unrelated, more-famous person — full-text search naturally favors the
+    unrelated, more-famous person. Full-text search naturally favors the
     page whose content actually matches those extra terms.
 
-    One consolidated request (search + the matched page's thumbnail, via
-    generator=search) instead of two separate ones — halves the request
+    One consolidated request (search plus the matched page's thumbnail, via
+    generator=search) instead of two separate ones, which halves the request
     count across a multi-thousand-player batch. A content-based check (does
     the page mention "basketball"/"NBA") was considered and rejected: tested
     against the same degenerate case below, it would have happily accepted
     Wikipedia's own general "Basketball" article, which obviously mentions
     basketball constantly. Matching the searched name against the returned
-    page's TITLE is the check that actually catches that — an empty/garbage
+    page's TITLE is the check that actually catches that. An empty/garbage
     name matched "Basketball" (or, in another run, Steph Curry's page) with
     zero relevance to the real query; a real player's name should always
     appear in their own page's title. Not bulletproof (a wrong match is

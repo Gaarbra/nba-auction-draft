@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
-/** A styled stand-in for a native <select> — same idea (pick one of a list
+/** A styled stand-in for a native <select>: same idea (pick one of a list
  * of options), but themeable to match the rest of the app instead of
  * whatever plain OS-native dropdown the browser would otherwise draw. Not
  * used anywhere load-bearing enough to need full listbox ARIA semantics;
@@ -47,7 +47,7 @@ export default function Dropdown({ options, value, onChange, placeholder = "Sele
           ▾
         </motion.span>
       </button>
-      {/* No AnimatePresence/exit — same reasoning as the footer modal and
+      {/* No AnimatePresence/exit, same reasoning as the footer modal and
           DraftBoard's nomination panel: an exit animation that never
           resolves would leave the menu stuck open, overlapping whatever's
           rendered underneath it. Entrance-only still feels right for a

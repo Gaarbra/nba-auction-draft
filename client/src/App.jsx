@@ -47,7 +47,7 @@ function saveSession(session) {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   } catch {
-    // Storage unavailable (private browsing, quota) — reconnect just won't
+    // Storage unavailable (private browsing, quota). Reconnect just won't
     // survive a refresh; the live session still works fine.
   }
 }
@@ -85,7 +85,7 @@ export default function App() {
 
   // Nudges stats-service awake as soon as the page loads instead of
   // waiting for someone's first roll to discover it's asleep (Render's
-  // free tier spins it down after ~15 minutes idle — see
+  // free tier spins it down after ~15 minutes idle, see
   // pingStatsService). Fire-and-forget: nothing here depends on the
   // response, this is purely about lead time before a draft's first roll.
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function App() {
     }
 
     // The server tells this socket directly when a votekick against it
-    // resolves — a normal room:update broadcast wouldn't be enough on its
+    // resolves. A normal room:update broadcast wouldn't be enough on its
     // own, since the player would just silently vanish from the list with
     // no explanation for why their own screen still shows the room.
     function handleKicked() {
@@ -178,7 +178,7 @@ export default function App() {
   function handleListPublicRooms(callback) {
     // RoomLobby's own mount effect can fire before useSocket's effect has
     // assigned socketRef.current (child effects run before the parent's on
-    // mount) — a real race, not just theoretical, so guard it rather than
+    // mount). A real race, not just theoretical, so guard it rather than
     // relying on ordering.
     if (!socketRef.current) {
       callback([]);
@@ -245,7 +245,7 @@ export default function App() {
 
   // Pass-and-play: whoever needs to act next (the nominator, or the winning
   // bidder about to assign a slot) is automatically brought "to the
-  // controls" if they're one of this device's local players — saves a
+  // controls" if they're one of this device's local players, saving a
   // manual switch for the common case. Deliberately left alone during open
   // bidding, since any local player with room on their roster might want to
   // act next and guessing which one would just fight the switcher.

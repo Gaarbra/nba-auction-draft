@@ -6,7 +6,7 @@ import { isSoundMuted, setSoundMuted } from "../rollSound.js";
 
 /* The persistent app-shell header. Two variants:
    - "lobby": wordmark + section tabs (Market/Roster/Stats are visual-only
-     stubs — the app is a single-sitting draft, there are no such pages) +
+     stubs; the app is a single-sitting draft, there are no such pages) +
      notification/wallet glyphs.
    - "room": wordmark + room code/difficulty + live turn/coins status +
      sound, help, leave, and a connection dot. */

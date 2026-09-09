@@ -2,8 +2,9 @@
 statsCache.json cache into Postgres, so the players/player_stats/
 player_team_stints tables start out populated instead of only slowly
 accumulating from live cache-miss traffic (fetch_stats_for_player only
-persists to the DB on a fresh fetch — a cache HIT never reaches that code,
-which is exactly what happens for every player this cache already has).
+persists to the DB on a fresh fetch, and a cache HIT never reaches that
+code, which is exactly what happens for every player this cache already
+has).
 
 Usage (from the stats-service directory, with DATABASE_URL set via .env
 or the environment):
@@ -29,7 +30,7 @@ STATS_CACHE_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "statsC
 
 def main():
     if not os.environ.get("DATABASE_URL"):
-        print("DATABASE_URL isn't set — nothing to backfill into.")
+        print("DATABASE_URL isn't set, nothing to backfill into.")
         return
 
     with open(STATS_CACHE_FILE, "r", encoding="utf-8") as f:

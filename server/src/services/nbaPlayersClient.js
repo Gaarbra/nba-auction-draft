@@ -2,7 +2,7 @@ const STATS_SERVICE_URL = process.env.STATS_SERVICE_URL || "http://127.0.0.1:500
 
 /**
  * The full draft-eligible player pool, sourced from stats-service's /players
- * (which wraps nba_api's commonallplayers — one bulk call, not a paginated
+ * (which wraps nba_api's commonallplayers, one bulk call, not a paginated
  * scrape). Kept as a single async function with the same shape as the old
  * balldontlie client so playerCache.js didn't need to change its interface,
  * just which client it imports.

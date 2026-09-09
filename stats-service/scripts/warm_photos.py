@@ -1,14 +1,14 @@
 """Fills in photoCache.json for players NBA's own CDN has no real headshot
 for. Confirmed empirically (not a guess): NBA's "latest" headshot set
 403s for a player it has no photo of, and there's no alternate NBA URL
-that secretly has it — an alternate CDN host just serves back a generic,
+that secretly has it. An alternate CDN host just serves back a generic,
 byte-identical placeholder image under a 200 instead of erring. See
 photos.py's module docstring for the full story.
 
 This checks every player already in statsCache.json (real career stats,
 so a real person worth having a photo for) against NBA's CDN, and for
 anyone missing one, searches Wikipedia via photos.py.find_wikipedia_photo.
-Only ever run locally/offline — never on a live request path — same
+Only ever run locally/offline, never on a live request path, same
 reasoning as warm_full_pool.py: paced, resumable, safe to stop and rerun.
 
 Run from stats-service/:  python scripts/warm_photos.py
@@ -35,7 +35,7 @@ PLAYERS_POOL_FILE = os.path.join(
 
 # NBA's CDN check is a cheap HEAD request (no rate-limit history observed
 # there the way stats.nba.com has), but the Wikipedia lookup is a real
-# external API — paced the same conservative way as every other warm
+# external API, paced the same conservative way as every other warm
 # script in this project.
 DELAY_RANGE = (0.8, 1.4)
 SAVE_EVERY = 25

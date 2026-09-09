@@ -1,4 +1,4 @@
-/* The Hoop Bids mark — a coin whose face is a basketball, with a small
+/* The Hoop Bids mark: a coin whose face is a basketball, with a small
    medallion hub. From the Stitch "Hoop Bids Coin-Basketball Logo" asset.
    Shared by the TopNav, the lobby card, and the mobile nav. */
 export default function LogoMark({ className = "" }) {

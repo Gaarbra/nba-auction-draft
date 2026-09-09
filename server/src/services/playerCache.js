@@ -8,16 +8,16 @@ const CACHE_DIR = path.join(__dirname, "..", "..", "data");
 const CACHE_FILE = path.join(CACHE_DIR, "players.json");
 // The NBA's historical player list barely changes day to day (mostly just
 // gains new rookies each season), so a week-long cache is still "fresh
-// enough" — no need to re-hit stats-service (and by extension stats.nba.com)
-// on every server start.
+// enough," with no need to re-hit stats-service (and by extension
+// stats.nba.com) on every server start.
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 let memoryCache = null;
 let inFlightRefresh = null;
 // Set on a failed refresh, separate from memoryCache.fetchedAt (the last
-// real success — a failure never bumps it). Without this, once memoryCache
+// real success; a failure never bumps it). Without this, once memoryCache
 // passes CACHE_TTL_MS, isFresh() is false forever and EVERY getPlayers()
-// call — i.e. every single roll — re-triggers a live refresh attempt. Same
+// call, i.e. every single roll, re-triggers a live refresh attempt. Same
 // bug, same fix, as notablePlayers.js; see that file's comment for the
 // production incident this caused.
 let lastRefreshFailureAt = 0;
@@ -56,7 +56,7 @@ export async function getPlayers({ forceRefresh = false, onProgress } = {}) {
   }
 
   if (!memoryCache) {
-    // Read the disk cache even if it's stale (past CACHE_TTL_MS) — not just
+    // Read the disk cache even if it's stale (past CACHE_TTL_MS), not just
     // when fresh. A stale-but-real player pool is what refreshCache() below
     // falls back to if stats.nba.com can't be reached (e.g. blocked/
     // rate-limited from a cloud host's IP, a real risk this app has hit
@@ -72,7 +72,7 @@ export async function getPlayers({ forceRefresh = false, onProgress } = {}) {
     }
   }
 
-  // Already tried recently and it failed — serve stale data immediately
+  // Already tried recently and it failed. Serve stale data immediately
   // rather than pay for the same doomed attempt again on every request.
   // forceRefresh always bypasses this (an explicit request to actually try).
   if (!forceRefresh && memoryCache && Date.now() - lastRefreshFailureAt < REFRESH_RETRY_COOLDOWN_MS) {
@@ -90,7 +90,7 @@ export async function getPlayers({ forceRefresh = false, onProgress } = {}) {
           return memoryCache;
         }
         // Nothing to fall back to (first-ever run, no disk cache, and the
-        // very first fetch failed) — there's genuinely no player pool to
+        // very first fetch failed). There's genuinely no player pool to
         // serve, so this has to propagate.
         throw err;
       })

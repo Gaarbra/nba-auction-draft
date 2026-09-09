@@ -3,7 +3,7 @@ import PriceTicker from "./PriceTicker.jsx";
 
 /** A soft spotlight that follows the cursor, plus (homepage only, via
  * `ticker`) real player photos and prices drifting upward, looping
- * endlessly — that's the background doing something specific to this app,
+ * endlessly. That's the background doing something specific to this app,
  * rather than generic decoration. Deliberately no drifting color-blob
  * layer here anymore: it was pure atmosphere with nothing to do with an
  * NBA auction draft, competing with the ticker for the same "ambient

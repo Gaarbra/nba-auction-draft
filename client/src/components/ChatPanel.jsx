@@ -4,11 +4,11 @@ import { motion } from "motion/react";
 const REACTIONS = ["🔥", "😭", "💯", "💔"];
 const MAX_MESSAGE_LENGTH = 200;
 
-/** Bottom-corner chat during the draft. Messages/reactions are ephemeral —
+/** Bottom-corner chat during the draft. Messages/reactions are ephemeral:
  * this only shows what arrived while mounted (see server/src/sockets/
  * roomHandlers.js's chat handlers), there's no history to fetch on open. */
 export default function ChatPanel({ socket, room, currentPlayerId, messages }) {
-  // Starts collapsed — expanded-by-default was covering roster columns the
+  // Starts collapsed. Expanded-by-default was covering roster columns the
   // moment a draft loaded, before anyone had even opened it on purpose.
   const [collapsed, setCollapsed] = useState(true);
   const [text, setText] = useState("");

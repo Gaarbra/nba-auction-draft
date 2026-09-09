@@ -3,7 +3,7 @@ server/data/players.json, server/data/notablePlayers.json, and
 stats-service/data/statsCache.json.
 
 This exists because Render's own outbound IP is confirmed blocked by
-stats.nba.com (every live lookup from there fails outright — see
+stats.nba.com (every live lookup from there fails outright, see
 app.py's ON_RENDER handling), so production can never refresh this data on
 its own. It has to be fetched from somewhere that *can* reach stats.nba.com
 and shipped via a normal commit + push, which then triggers Render's usual
@@ -25,14 +25,14 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
-import app as stats_app  # noqa: E402  (side-effect-safe to import — see warm_full_pool.py)
+import app as stats_app  # noqa: E402  (side-effect-safe to import, see warm_full_pool.py)
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SERVER_DATA_DIR = os.path.join(ROOT_DIR, "server", "data")
 PLAYERS_FILE = os.path.join(SERVER_DATA_DIR, "players.json")
 NOTABLE_FILE = os.path.join(SERVER_DATA_DIR, "notablePlayers.json")
 
-# Same jittered, one-at-a-time pacing as warm_full_pool.py — stats.nba.com's
+# Same jittered, one-at-a-time pacing as warm_full_pool.py. stats.nba.com's
 # rate limiting tracks request rate, not total volume.
 DELAY_RANGE = (1.0, 1.6)
 FAILURE_THRESHOLD = 3
@@ -41,7 +41,7 @@ SAVE_EVERY = 25
 
 # Bounded so a routine scheduled run can't hang for hours. In steady state
 # only a handful of players are ever missing between runs (a new draftee, a
-# rare late-career debut), so this ceiling is normally never hit — a big
+# rare late-career debut), so this ceiling is normally never hit. A big
 # backlog (e.g. right after a season's rookie class gets added to the pool)
 # just means the run picks up where it left off next time instead of
 # finishing in one shot.
@@ -85,7 +85,7 @@ def warm_missing_stats(all_ids):
         if time.time() - start > MAX_RUNTIME_SECONDS:
             print(
                 f"  hit the {MAX_RUNTIME_SECONDS}s runtime budget, stopping early "
-                f"({i - 1}/{len(to_fetch)} attempted) — picks up where it left off next run."
+                f"({i - 1}/{len(to_fetch)} attempted), picks up where it left off next run."
             )
             break
 

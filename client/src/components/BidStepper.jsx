@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 
 /** Up/down stepper for entering a bid, with the number field left directly
- * editable too — the arrows are a convenience for "one more coin", not a
+ * editable too. The arrows are a convenience for "one more coin", not a
  * replacement for typing a specific amount. Bounded to [min, max] on every
  * path (arrows, typing, and the clamp-on-blur below), so the same
  * currentBid+1..budget rule the server enforces is always visible in the UI
@@ -13,7 +13,7 @@ export default function BidStepper({ value, min, max, onChange }) {
 
   // Passes a React functional updater through to onChange (which DraftBoard
   // wires directly to its useState setter) rather than a precomputed string
-  // closed over this render's `value` prop — several rapid clicks fired
+  // closed over this render's `value` prop. Several rapid clicks fired
   // faster than a re-render (e.g. quick repeated taps) would otherwise all
   // compute "one more than the same stale value" and collapse into a single
   // net +1 instead of stacking. The functional form always sees whatever
@@ -33,7 +33,7 @@ export default function BidStepper({ value, min, max, onChange }) {
   }
 
   // Same clamp-to-[min,max] guarantee as step(), just to an absolute
-  // target instead of a relative delta — for the quick-jump buttons below.
+  // target instead of a relative delta, for the quick-jump buttons below.
   // Bidding is the single most-repeated action across a whole draft, and
   // ±1-at-a-time was the only way to move the number: fine for a close
   // bid war, tedious for "I just want to go all-in" against a 15-coin gap.

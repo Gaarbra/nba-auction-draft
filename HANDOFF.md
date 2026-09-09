@@ -1,21 +1,21 @@
-# Hoop Bids — Handoff Notes (2026-08-27)
+# Hoop Bids: Handoff Notes (2026-08-27)
 
 Continuation notes so a fresh conversation can pick up without re-deriving context.
 Repo root: `C:\Users\gabri\Documents\Code\hoop-bids\nba-auction-draft`
 
-## 0. Votekick — DONE & VERIFIED (added after the rest of this doc was first written)
+## 0. Votekick: DONE & VERIFIED (added after the rest of this doc was first written)
 
 Host can start a vote to remove another player, both in the lobby and mid-draft.
-Starting one isn't a unilateral kick — it opens a vote that a **strict majority**
+Starting one isn't a unilateral kick; it opens a vote that a **strict majority**
 of everyone else still in the room (target excluded) must approve; only the
 host can initiate. Disabled entirely for local pass-and-play rooms (kicking
 your own local identity doesn't mean anything).
 
-- Server: [server/src/rooms/roomStore.js](server/src/rooms/roomStore.js) —
+- Server: [server/src/rooms/roomStore.js](server/src/rooms/roomStore.js):
   `startVoteKick`, `castVoteKick`, `cancelVoteKickByHost`, `recheckVoteKickAfterExit`,
   `clearVoteKickIfComplete`. Vote state is `room.voteKick = { targetId, initiatedBy,
   votes: Map<playerId, boolean>, startedAt, timer }`. Threshold is
-  `Math.floor(eligible/2) + 1` (strict majority — resolves instantly when the
+  `Math.floor(eligible/2) + 1` (strict majority, resolves instantly when the
   host is the only other eligible voter, e.g. a 2-player room). Auto-cancels if
   enough people vote no that passing becomes mathematically impossible, or after
   `VOTE_KICK_TIMEOUT_MS` (30s) with no resolution. Reuses the existing
@@ -24,7 +24,7 @@ your own local identity doesn't mean anything).
 - Socket events: `room:vote-kick-start` ({targetId}), `room:vote-kick-cast`
   ({confirmed}), `room:vote-kick-cancel` (host only). The kicked player's own
   socket gets a dedicated `room:kicked` event (a plain `room:update` broadcast
-  isn't enough — they'd just silently vanish from the list with no explanation).
+  isn't enough, since they'd just silently vanish from the list with no explanation).
 - Client: [client/src/components/VoteKick.jsx](client/src/components/VoteKick.jsx)
   exports `KickButton` (small per-player-row trigger, host-only, wired into
   [RoomView.jsx](client/src/components/RoomView.jsx)'s player list and
@@ -36,13 +36,13 @@ your own local identity doesn't mean anything).
 
 **A real bug was caught and fixed during verification**: the target's `socketId`
 was originally looked up *after* `finalizePlayerExit` ran, which in the lobby
-case already removes them from `room.players` — so the targeted "you were
+case already removes them from `room.players`, so the targeted "you were
 kicked" notification silently found nobody and never fired. Fixed by capturing
 `targetSocketId` in `tallyVoteKick` *before* calling `finalizePlayerExit`, and
 threading it back through `startVoteKick`/`castVoteKick`'s return value instead
 of re-deriving it downstream. Also caught and fixed a threshold math bug during
 implementation: `Math.ceil(n/2)` gives exactly half for even `n` (so 1 of 2
-voters could "pass" a vote only half the room backed) — corrected to
+voters could "pass" a vote only half the room backed), corrected to
 `Math.floor(n/2) + 1` for a true strict majority.
 
 **Verified** via direct `socket.io-client` scripts against an isolated server
@@ -59,10 +59,10 @@ UI is correctly absent for local rooms.
 
 **Not yet done**: no dedicated automated test file for this (the project doesn't
 have client-side tests at all yet; server has `scoring.test.js` for the scoring
-engine only) — the verification above was manual/scripted, not committed as a
+engine only). The verification above was manual/scripted, not committed as a
 repeatable test suite.
 
-## 1. Repeated-players bug — FIXED & VERIFIED
+## 1. Repeated-players bug: FIXED & VERIFIED
 
 **Report:** "i keep on getting the same players for 2020 easy"
 
@@ -97,17 +97,17 @@ const drawPool = notablePool.length > 0 && Math.random() < staticOdds ? notableP
 Narrow eras now get real variety; wide eras are unaffected (no regression).
 `node --check` passed on the edited file before verifying.
 
-## 2. Stats visibility — DONE
+## 2. Stats visibility: DONE
 
 Added a bklit.com-style "big number" stat row so career per-game stats are
 readable at a glance instead of only appearing as 9px text inside the SVG radar
-chart (which was the only place PPG/RPG/etc. were visible before — the "Career
+chart (which was the only place PPG/RPG/etc. were visible before; the "Career
 avg" line only showed season count/years, not the actual numbers).
 
 - New component: [client/src/components/StatHighlightRow.jsx](client/src/components/StatHighlightRow.jsx)
-  — PPG/RPG/APG/SPG/BPG as large tabular-nums numbers with small uppercase labels,
-  count-up animated from 0 on mount (plain `requestAnimationFrame`, not Motion —
-  it never unmounts mid-animation so there's no exit-timing risk). Respects
+  PPG/RPG/APG/SPG/BPG as large tabular-nums numbers with small uppercase labels,
+  count-up animated from 0 on mount (plain `requestAnimationFrame`, not Motion,
+  since it never unmounts mid-animation so there's no exit-timing risk). Respects
   `prefers-reduced-motion` (skips straight to the final value).
 - Wired into [client/src/components/DraftBoard.jsx](client/src/components/DraftBoard.jsx),
   directly under the "Career avg, N seasons" line in the nominated-player card.
@@ -116,11 +116,11 @@ avg" line only showed season count/years, not the actual numbers).
 
 **Verified**: confirmed via a live local-play draft that the values rendered match
 the underlying `stats` object exactly (pointsPerGame 6.5, reboundsPerGame 1.2, etc.
-— read directly off the React fiber props, bypassing the animation). The "0.0"
+(read directly off the React fiber props, bypassing the animation). The "0.0"
 shown in the automation pane's accessibility snapshot is the browser-automation
 harness's known non-compositing limitation (rAF never pumps when the pane isn't
-displayed) — already documented from earlier in this session for Motion/CSS
-transitions — not a real bug; a real foregrounded browser tab runs rAF normally.
+displayed), already documented from earlier in this session for Motion/CSS
+transitions. Not a real bug; a real foregrounded browser tab runs rAF normally.
 
 **Not yet done** (ideas for later, not started):
 - Per-stat bar/sparkline showing rank vs. league average or era.
@@ -129,7 +129,7 @@ transitions — not a real bug; a real foregrounded browser tab runs rAF normall
   prominent during bidding specifically).
 - Compact stat-comparison view across a team's whole roster (ties into RosterGrid.jsx).
 
-## 3. Modern look pass — DONE (first round)
+## 3. Modern look pass: DONE (first round)
 
 Grounded in real inspection of [kokonutui.com](https://kokonutui.com/) (previously
 unexplored) via computed-style extraction: near-black backgrounds, very
@@ -154,12 +154,12 @@ Applied to [client/src/index.css](client/src/index.css):
 translucent border; buttons → `border-radius: 9px`).
 
 **Not yet done** (ideas for later, not started):
-- Typography/spacing refresh beyond what's here — hasn't been touched this round.
+- Typography/spacing refresh beyond what's here, hasn't been touched this round.
 - Background treatments (gradient mesh, noise) beyond the existing radial glow.
-- Dark/light mode — app is dark-only today (`color-scheme: dark` hardcoded);
+- Dark/light mode: app is dark-only today (`color-scheme: dark` hardcoded);
   no light mode exists to check consistency against.
 - Mobile responsiveness pass specifically for the new glass panels (blur can be
-  expensive on low-end mobile GPUs — worth a perf check if this becomes an issue).
+  expensive on low-end mobile GPUs, worth a perf check if this becomes an issue).
 
 ## 4. Architecture quick-reference (for a fresh session)
 
@@ -167,9 +167,9 @@ translucent border; buttons → `border-radius: 9px`).
 - **Difficulty system:** single random draw per nomination; odds of narrowing to the "notable" pool (all-time per-game leaders) vs. full era pool, now scaled by how big that era's notable intersection actually is (see section 1). `DIFFICULTY_STATIC_ODDS` in [server/src/rooms/roomStore.js](server/src/rooms/roomStore.js): `{ easy: 0.92, normal: 0.55, hard: 0 }`.
 - **Caching:** `server/data/players.json` (full pool, 7-day TTL), `server/data/notablePlayers.json` (notable IDs), `stats-service/data/statsCache.json` (career stats, 24h TTL), `stats-service/data/usageCache.json` (USG%). Background warm-up job in `stats-service/app.py` (`warm_notable_pool()`), status at `/warmup-status`.
 - **Postgres:** `db/schema.sql` (6 tables: players, player_stats, player_team_stints, drafts, draft_teams, draft_picks). Two independent writers: `stats-service/db.py` (reference data) and `server/src/services/db.js` (draft history). Both no-op if `DATABASE_URL` unset.
-- **Motion (motion.dev):** used for entrance springs, staggered results, button hover/tap feedback. **Known gotcha:** never pair `AnimatePresence mode="wait"` with an `exit` animation on load-bearing UI — an exit animation that never resolves can permanently freeze the panel. The nomination panel in DraftBoard.jsx intentionally uses only a keyed `motion.div` remount, no `AnimatePresence`/`exit`.
-- **Browser-automation harness limitation** (hit again this session, second confirmation): the in-app Browser pane can't composite/paint frames when not actively displayed — `requestAnimationFrame` callbacks never fire, so any rAF-driven animation (the new `StatHighlightRow` count-up included) reads as stuck at its initial value in this harness specifically. Not a real bug; verify data correctness via computed styles / React fiber props / network responses instead of trusting animated on-screen values in this environment.
-- **Local dev / ngrok:** server on port 4000, client on 5173, stats-service on 5001. Free ngrok rotates subdomains on every restart — `server/.env` (`CLIENT_ORIGIN`) and `client/.env.local` (`VITE_SERVER_URL`) need resyncing to the new ngrok URLs each time tunnels are relaunched. The pair in those files as of this session is already stale/mismatched (confirmed via a CORS error during this session's verification) — expect to need a fresh `ngrok http` pair next time the site needs to go live externally.
+- **Motion (motion.dev):** used for entrance springs, staggered results, button hover/tap feedback. **Known gotcha:** never pair `AnimatePresence mode="wait"` with an `exit` animation on load-bearing UI. An exit animation that never resolves can permanently freeze the panel. The nomination panel in DraftBoard.jsx intentionally uses only a keyed `motion.div` remount, no `AnimatePresence`/`exit`.
+- **Browser-automation harness limitation** (hit again this session, second confirmation): the in-app Browser pane can't composite/paint frames when not actively displayed, so `requestAnimationFrame` callbacks never fire, and any rAF-driven animation (the new `StatHighlightRow` count-up included) reads as stuck at its initial value in this harness specifically. Not a real bug; verify data correctness via computed styles / React fiber props / network responses instead of trusting animated on-screen values in this environment.
+- **Local dev / ngrok:** server on port 4000, client on 5173, stats-service on 5001. Free ngrok rotates subdomains on every restart, so `server/.env` (`CLIENT_ORIGIN`) and `client/.env.local` (`VITE_SERVER_URL`) need resyncing to the new ngrok URLs each time tunnels are relaunched. The pair in those files as of this session is already stale/mismatched (confirmed via a CORS error during this session's verification); expect to need a fresh `ngrok http` pair next time the site needs to go live externally.
 - **Verifying UI changes locally without touching the ngrok-wired `.env` files:** run an isolated pair on spare ports instead of editing the real env files, e.g.:
   ```bash
   # terminal 1 (from server/)
@@ -177,7 +177,7 @@ translucent border; buttons → `border-radius: 9px`).
   # terminal 2 (from client/)
   VITE_SERVER_URL=http://localhost:4001 npx vite --port 5174
   ```
-  Note: this app's Vite/Node dev servers bind to `[::1]` (IPv6) by default on this machine, not `127.0.0.1` — use `http://localhost:<port>` when checking with curl or the browser, not `127.0.0.1`.
+  Note: this app's Vite/Node dev servers bind to `[::1]` (IPv6) by default on this machine, not `127.0.0.1`. Use `http://localhost:<port>` when checking with curl or the browser, not `127.0.0.1`.
 
 ## 5. Suggested order for next session
 

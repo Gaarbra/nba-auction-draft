@@ -1,6 +1,6 @@
 /* The draft-screen status bar pinned to the bottom of the shell.
    Mirrors the Stitch mock: budget on the left, chat / how-to / wordmark
-   on the right. "Draft Log" is a visual stub — there's no persisted log
+   on the right. "Draft Log" is a visual stub; there's no persisted log
    in a single-sitting game. */
 export default function RoomFooter({ totalBudget, chatCount = 0, onOpenChat, onOpenHelp }) {
   return (

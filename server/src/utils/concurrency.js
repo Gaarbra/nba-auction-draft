@@ -4,10 +4,9 @@
  * Maps `items` through `mapper` with at most `limit` calls in flight at
  * once, preserving output order. Used for batches of external calls (e.g.
  * the end-of-draft stats lookups in computeResults.js) where full
- * `Promise.all` parallelism would risk hammering a rate-limited upstream
- * (stats.nba.com, fronted by stats-service) — this app already fought that
- * exact problem once this session (aggressive parallel testing cascaded into
- * ReadTimeout/ConnectionReset errors across the whole stack).
+ * `Promise.all` parallelism would hammer a rate-limited upstream
+ * (stats.nba.com, fronted by stats-service). Unbounded parallel calls have
+ * previously cascaded into ReadTimeout/ConnectionReset errors here.
  * @template T, R
  * @param {T[]} items
  * @param {number} limit

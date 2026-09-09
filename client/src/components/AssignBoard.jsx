@@ -5,7 +5,7 @@ import StatHighlightRow from "./StatHighlightRow.jsx";
 import StatRadarChart from "./StatRadarChart.jsx";
 import { getTeamColors } from "../teamColors.js";
 
-/* The focused "you won a player — now place them" screen, matching the
+/* The focused "you won a player, now place them" screen, matching the
    Stitch "Assign Player to Roster Slot" mock: a hero banner for the won
    player, then this player's own five roster slots as large cards. It
    replaces the multi-roster grid only for this brief moment. */

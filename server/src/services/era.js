@@ -18,7 +18,7 @@ export function getEraId(fromYear) {
 
 /**
  * "active" is a special filter (real players currently on an NBA roster,
- * via nba_api's ROSTERSTATUS flag) rather than a decade bucket — a player
+ * via nba_api's ROSTERSTATUS flag) rather than a decade bucket. A player
  * can be both "active" and "2020s" at once, so it's checked independently
  * of the fromYear-based decade buckets.
  */

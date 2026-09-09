@@ -37,28 +37,17 @@ const CURRENT_TEAM_IDS = {
   WAS: 1610612764,
 };
 
-// This is the actual "changes based on era" mechanism: a historical
-// abbreviation resolves to whichever CURRENT franchise carries that
-// lineage, so a 1990s Sonics player shows the real Thunder logo and a
-// 1990s Hornets player shows the real (current) Hornets logo, while a
-// 2020s Thunder/Hornets player shows the exact same logo -- correctly,
-// since it's the same team. This is NOT the same as showing the actual
-// vintage crest a team wore in that decade (the SuperSonics' own logo, the
-// teal-era Hornets' own logo, etc.) -- there's no rights-clear, always-live
-// source for that period-accurate artwork the way there is for each
-// franchise's current official mark, and downloading/embedding a personal
-// copy of dozens of real vintage trademarks is a meaningfully different
-// (and riskier) thing to do than hotlinking a team's own live official CDN
-// asset the way this file and PlayerHeadshot.jsx both already do.
+// "Changes based on era": a historical abbreviation resolves to whichever
+// CURRENT franchise carries that lineage (1990s Sonics -> real Thunder
+// logo), not the actual vintage crest that team wore then. There's no
+// rights-clear source for that period-accurate artwork, and embedding real
+// vintage trademarks locally is a meaningfully riskier move than hotlinking
+// a team's own live current CDN asset.
 //
-// Deliberately conservative: only relocations/renames with well-documented,
-// widely-agreed lineage are listed. A historical code left out (mostly
-// 1940s-50s BAA/early-NBA teams -- Anderson Packers, the Providence
-// Steamrollers, Sheboygan, the original Baltimore/St. Louis/Chicago-era
-// teams whose exact lineage isn't confidently resolvable here, etc.) just
-// falls through to the plain colored-initials badge below, same as any
-// other unmapped code -- guessing a lineage would risk stating a false
-// team history, which is worse than a neutral badge.
+// Deliberately conservative: only well-documented relocations are listed.
+// An unmapped code (mostly 1940s-50s BAA/early-NBA teams with genuinely
+// unclear lineage) just falls through to the colored-initials badge.
+// Guessing wrong would state a false team history, worse than a neutral one.
 const HISTORICAL_ALIASES = {
   SEA: "OKC", // Seattle SuperSonics -> Oklahoma City Thunder, 2008
   VAN: "MEM", // Vancouver Grizzlies -> Memphis Grizzlies, 2001

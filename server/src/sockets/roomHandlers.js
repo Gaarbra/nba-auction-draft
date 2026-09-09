@@ -30,16 +30,16 @@ import { computeDraftResults } from "../scoring/computeResults.js";
 import { createKeyedRateLimiter, createSocketEventLimiter } from "../middleware/rateLimit.js";
 import { containsProfanity } from "../utils/nameFilter.js";
 
-// Worst case per candidate is roughly MAX_STATS_DRAW_ATTEMPTS × the
+// Worst case per candidate is roughly MAX_STATS_DRAW_ATTEMPTS times the
 // per-attempt timeout (see fetchPlayerStats's AbortSignal in
-// statsClient.js) — kept low and tight so a roll takes roughly the same
+// statsClient.js). Kept low and tight so a roll takes roughly the same
 // amount of time whether the draw succeeds on the first try or has to
 // retry, instead of the duration swinging from ~1s up to a minute-plus.
 const MAX_STATS_DRAW_ATTEMPTS = 2;
 const MIN_ROLL_MS = 1400;
 const MAX_NAME_LENGTH = 30;
 
-// Shared across every connection (module scope) — caps how many rooms a
+// Shared across every connection (module scope). Caps how many rooms a
 // single IP can spin up, since an unbounded flood of rooms is the one
 // server-memory-exhaustion vector a per-socket limiter alone can't catch
 // (a script could just open a fresh socket per room).
@@ -52,7 +52,7 @@ function sleep(ms) {
 // Normally a socket controls exactly one player, so socket.data.playerId is
 // authoritative. In local pass-and-play (room:create-local), one socket
 // controls every player in the room instead, and the client tells us who's
-// "at the controls" for a given action via payload.playerId — trusted only
+// "at the controls" for a given action via payload.playerId, trusted only
 // when it's one of the identities this socket actually owns.
 function resolveActingPlayerId(socket, payload) {
   const requested = payload?.playerId;
@@ -63,15 +63,12 @@ function resolveActingPlayerId(socket, payload) {
 function toNominatedPlayer(candidate, result) {
   if (!result) return { player: candidate, stats: { unavailable: true }, nbaPlayerId: null };
 
-  // Pool entries (nbaPlayersClient.js) only carry id/name/active-status/
-  // career span — position, team, and draft year live in the stats response
-  // instead (see stats-service's fetch_stats_for_player).
-  //
-  // Which team "represents" them: an active player's last team already is
-  // their current one, so use that; a retired player's last team was often
-  // just wherever they happened to finish (a late-career bench stint), so
-  // use whichever team they actually played the most games for instead —
-  // that's what team color/branding should follow.
+  // Pool entries carry only id/name/active-status/career span; position,
+  // team, and draft year come from the stats response instead. Which team
+  // "represents" them: an active player's last team is their current one,
+  // but a retired player's last team is often just a late-career bench
+  // stint, so use whichever team they played the most games for instead.
+  // That's what team color/branding should follow.
   const primaryTeam = candidate.isActive ? result.stats.team : result.stats.mostPlayedTeam || result.stats.team;
 
   return {
@@ -90,7 +87,7 @@ function toNominatedPlayer(candidate, result) {
 // One candidate at a time, with a few retries against the same shared pool
 // if a candidate's stats fail to fetch (a stats-service hiccup shouldn't
 // sink an otherwise-fine roll). Deliberately NOT sampling several
-// candidates in parallel per roll anymore — that made rolls slow and much
+// candidates in parallel per roll anymore. That made rolls slow and much
 // more likely to trip stats.nba.com's rate limiting for only a modest
 // quality bump. Difficulty instead comes entirely from which pool this
 // draws from (see draft:nominate below): a big, real, all-time-leaders pool
@@ -124,7 +121,7 @@ function toPublicRoom(room) {
     results: room.results || null,
     rematchVotes: room.rematchVotes ? Array.from(room.rematchVotes) : [],
     // Eligibility/threshold are derived client-side from players + targetId
-    // (connected, non-forfeited, not the target) — only the raw ballots need
+    // (connected, non-forfeited, not the target); only the raw ballots need
     // to cross the wire.
     voteKick: room.voteKick
       ? {
@@ -173,7 +170,7 @@ function maybeComputeResults(io, room, roomCode) {
       room.results = results;
       room.resultsStatus = "ready";
       io.to(roomCode).emit("room:update", toPublicRoom(room));
-      saveDraftResults(room, results); // fire-and-forget — analytics persistence, never blocks the live room
+      saveDraftResults(room, results); // fire-and-forget: analytics persistence, never blocks the live room
     })
     .catch((err) => {
       console.error(`[computeDraftResults] failed for room ${roomCode}:`, err);
@@ -184,7 +181,7 @@ function maybeComputeResults(io, room, roomCode) {
 
 export function registerRoomHandlers(io, socket) {
   // Cheap per-connection throttle against a spammy/scripted client hammering
-  // any of these events — each socket gets its own independent counter.
+  // any of these events. Each socket gets its own independent counter.
   const allowEvent = createSocketEventLimiter(10_000, 40);
 
   socket.on("room:create", ({ name, visibility } = {}, callback) => {
@@ -218,7 +215,7 @@ export function registerRoomHandlers(io, socket) {
     io.to(room.code).emit("room:update", toPublicRoom(result.room));
   });
 
-  // Callable before joining any room — the lobby's "Public" tab uses this to
+  // Callable before joining any room. The lobby's "Public" tab uses this to
   // browse open rooms it can join without needing a code. A snapshot on
   // request, not a live subscription: simpler, and good enough for a list
   // that's just there to help someone find a room to join.
@@ -268,7 +265,7 @@ export function registerRoomHandlers(io, socket) {
 
     if (result.previousSocketId) {
       // Same identity just came back on a different socket while the old
-      // one was still marked live — most likely a duplicate tab. Boot the
+      // one was still marked live, most likely a duplicate tab. Boot the
       // old connection so it shows an honest "disconnected" state instead
       // of silently going stale while this one takes over.
       io.sockets.sockets.get(result.previousSocketId)?.disconnect(true);
@@ -285,7 +282,7 @@ export function registerRoomHandlers(io, socket) {
   // Pass-and-play: one device, multiple named local players sharing this
   // one socket. Everything downstream (draft:*, room:leave, disconnect)
   // treats socket.data.localPlayerIds as the set of identities this socket
-  // is allowed to act as — see resolveActingPlayerId above.
+  // is allowed to act as. See resolveActingPlayerId above.
   socket.on("room:create-local", ({ names } = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     if (!Array.isArray(names) || names.length < 2 || names.length > 4) {
@@ -371,14 +368,14 @@ export function registerRoomHandlers(io, socket) {
     const room = getRoom(roomCode);
     if (!room) return callback?.({ error: "ROOM_NOT_FOUND" });
 
-    // Validate up front, before broadcasting anything — a request that was
+    // Validate up front, before broadcasting anything. A request that was
     // never going to produce a nomination shouldn't kick off a fake "rolling"
     // animation for everyone else in the room.
     if (room.status !== "drafting") return callback?.({ error: "NOT_DRAFTING" });
     if (room.draft?.nomination) return callback?.({ error: "NOMINATION_IN_PROGRESS" });
     if (room.draft?.currentNominatorId !== playerId) return callback?.({ error: "NOT_YOUR_TURN" });
 
-    // Broadcast to the whole room — including the requester — before doing
+    // Broadcast to the whole room, including the requester, before doing
     // any of the slow work, so every client's rolling animation starts at
     // the same moment instead of only the nominator seeing it locally.
     io.to(roomCode).emit("draft:rolling");
@@ -393,24 +390,21 @@ export function registerRoomHandlers(io, socket) {
       return callback?.({ error: "NO_PLAYERS_LEFT" });
     }
 
-    // The whole difficulty system now: narrow the candidates down to the
-    // data-driven "notable" pool (all-time leaders — see notablePlayers.js)
-    // with odds set by difficulty, then do a single random draw from
-    // whichever pool that leaves. Only one stats-service call per roll
-    // (with retries on failure, not extra parallel candidates) — that's
-    // what keeps rolls fast and resilient to stats.nba.com's rate limiting.
-    // Falls back to the full pool whenever the notable list came back empty
-    // (fetch failure) or this era has none in it.
+    // The whole difficulty system: narrow to the data-driven "notable" pool
+    // (all-time leaders, see notablePlayers.js) with odds set by
+    // difficulty, then one random draw from whichever pool that leaves.
+    // Only one stats-service call per roll, not several in parallel. This
+    // keeps rolls fast and resilient to stats.nba.com's rate limiting. Falls
+    // back to the full pool if the notable list is empty (fetch failure, or
+    // this era just has none).
     const notableIds = await getNotablePlayerIds();
     const notableSet = new Set(notableIds);
     const notablePool = notableSet.size > 0 ? available.filter((p) => notableSet.has(p.id)) : [];
 
-    // See computeNotablePoolOdds in roomStore.js for the actual threshold
-    // math (and why 2020s is the only era it meaningfully affects). The coin
-    // flip itself (Math.random() < odds) and the draw below
-    // (drawPlayerWithStats's Math.floor(Math.random() * n)) are both uniform
-    // over whichever pool this lands in — every player in that pool has an
-    // equal chance, in every era, every roll.
+    // Threshold math lives in computeNotablePoolOdds (roomStore.js). Both
+    // the coin flip below and drawPlayerWithStats's draw are uniform over
+    // whichever pool this lands in: every player in it has an equal
+    // chance, every era, every roll.
     const staticOdds = computeNotablePoolOdds(room.difficulty, notablePool.length);
     const drawPool = notablePool.length > 0 && Math.random() < staticOdds ? notablePool : available;
 
@@ -480,7 +474,7 @@ export function registerRoomHandlers(io, socket) {
 
     callback?.({ room: toPublicRoom(result.room) });
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
-    // Global, not room-scoped — the Market tab (browsing outside any room)
+    // Global, not room-scoped. The Market tab (browsing outside any room)
     // is the listener, showing real completed sale prices for whichever
     // player it's looking at as they happen across every active draft.
     // Deliberately carries no player-facing identity (no player name/id
@@ -523,7 +517,7 @@ export function registerRoomHandlers(io, socket) {
   });
 
   // Rematch needs every currently connected, non-forfeited player to confirm
-  // before it fires — see setRematchVote/recheckRematch in roomStore.js. A
+  // before it fires. See setRematchVote/recheckRematch in roomStore.js. A
   // player can also un-confirm (confirmed: false) before the vote resolves.
   socket.on("room:vote-rematch", (payload = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
@@ -547,7 +541,7 @@ export function registerRoomHandlers(io, socket) {
   // for a room it's no longer part of.
   function handleVoteKickResolution(room, roomCode, targetId, targetSocketId) {
     // targetSocketId is captured by the caller (roomStore.js) before
-    // finalizePlayerExit runs — looking it up here instead, after the fact,
+    // finalizePlayerExit runs. Looking it up here instead, after the fact,
     // would find nothing in the lobby case, since finalizePlayerExit already
     // removed the target from room.players by the time this runs.
     const targetSocket = io.sockets.sockets.get(targetSocketId);
@@ -573,7 +567,7 @@ export function registerRoomHandlers(io, socket) {
 
   // Host-only: opens a vote to remove another connected player, from either
   // the lobby or mid-draft. Resolves instantly if the host is the only other
-  // eligible voter (nothing to wait on) — otherwise it's genuinely a vote,
+  // eligible voter (nothing to wait on). Otherwise it's genuinely a vote,
   // not a unilateral host kick, so the room's difficulty/era settings can't
   // be steamrolled by one person just because they happened to create it.
   socket.on("room:vote-kick-start", ({ targetId } = {}, callback) => {
@@ -647,7 +641,7 @@ export function registerRoomHandlers(io, socket) {
 
     if (room) {
       // A departure can turn an already-pending rematch vote unanimous, or
-      // resolve/moot a pending votekick, on its own — recheck both before
+      // resolve/moot a pending votekick, on its own. Recheck both before
       // broadcasting. The votekick recheck can (rarely) empty the room too,
       // same as the finalizePlayerExit loop above.
       recheckRematchAfterExit(room);
@@ -684,13 +678,13 @@ export function registerRoomHandlers(io, socket) {
 
     // A disconnect (even before its grace period expires) already drops the
     // player out of the rematch's/votekick's required-voter sets, same as
-    // finalizePlayerExit does — recheck both here too, not just on expiry.
+    // finalizePlayerExit does. Recheck both here too, not just on expiry.
     recheckRematchAfterExit(room);
     const afterVoteKick = recheckVoteKickAfterExit(room);
     if (afterVoteKick) io.to(roomCode).emit("room:update", toPublicRoom(afterVoteKick));
   });
 
-  // Chat and reactions are purely ephemeral — relayed to the room and never
+  // Chat and reactions are purely ephemeral, relayed to the room and never
   // stored on `room` itself, so there's no history to send a new joiner and
   // nothing here for toPublicRoom to serialize. That matches how they're
   // actually used (a live pop-up near the sender's profile plus a

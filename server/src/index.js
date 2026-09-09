@@ -18,7 +18,7 @@ import {
   pingStatsService,
 } from "./services/statsClient.js";
 
-initSchema(); // no-op if DATABASE_URL isn't set — see db.js
+initSchema(); // no-op if DATABASE_URL isn't set, see db.js
 
 const PORT = process.env.PORT || 4000;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
@@ -30,8 +30,8 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
 
 const app = express();
 
-// Running behind a hosting platform's reverse proxy (Render, Railway, etc.)
-// — without this, req.ip is the proxy's address, which would make the
+// Running behind a hosting platform's reverse proxy (Render, Railway, etc.).
+// Without this, req.ip is the proxy's address, which would make the
 // per-IP rate limits below useless (everyone shares one bucket).
 if (IS_PRODUCTION) app.set("trust proxy", 1);
 
@@ -55,7 +55,7 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use("/api/", httpRateLimit({ windowMs: 60_000, max: 60, message: "Too many requests — try again shortly." }));
+app.use("/api/", httpRateLimit({ windowMs: 60_000, max: 60, message: "Too many requests, try again shortly." }));
 
 app.get("/api/players", async (req, res) => {
   try {
@@ -77,7 +77,7 @@ app.get("/api/players", async (req, res) => {
   }
 });
 
-// The Market tab's era/team/player pickers — see fetchMarketIndex's own
+// The Market tab's era/team/player pickers. See fetchMarketIndex's own
 // comment for why this is safe to serve on Render (no live stats.nba.com
 // call anywhere in this path).
 app.get("/api/players/market-index", async (req, res) => {
@@ -86,7 +86,7 @@ app.get("/api/players/market-index", async (req, res) => {
 });
 
 // Standalone per-player stats lookup for the Market tab, which browses a
-// player outside any room/nomination — everywhere else in the app this
+// player outside any room/nomination. Everywhere else in the app this
 // data only ever arrives bundled into a room's nomination payload.
 app.get("/api/players/:id/stats", async (req, res) => {
   const result = await fetchPlayerStats(req.params.id);
@@ -107,9 +107,9 @@ app.get("/api/players/cache-info", async (req, res) => {
   res.json(await getCacheInfo());
 });
 
-// Both ML features: never a hard error for the client to handle — a missing
+// Both ML features: never a hard error for the client to handle. A missing
 // model or a stats-service hiccup just means "no prediction/no similar
-// players right now", not a broken page. See stats-service/ml.py.
+// players right now," not a broken page. See stats-service/ml.py.
 app.get("/api/players/:id/predicted-price", async (req, res) => {
   const { predictedPrice, explanation } = await fetchPredictedPrice(req.params.id, {
     era: req.query.era,
@@ -130,13 +130,13 @@ app.get("/api/players/:id/usage-pct", async (req, res) => {
 });
 
 // Client-side retry target for a nomination that had no photo yet at
-// reveal time — see PlayerHeadshot.jsx.
+// reveal time. See PlayerHeadshot.jsx.
 app.get("/api/players/:id/photo", async (req, res) => {
   const photoUrl = await fetchPhotoUrl(req.params.id);
   res.json({ photoUrl });
 });
 
-// Called once when the homepage loads (see App.jsx) — nudges stats-service
+// Called once when the homepage loads (see App.jsx). Nudges stats-service
 // awake early so its Render free-tier spin-down (see pingStatsService)
 // mostly resolves before anyone's first roll, not during it. Responds
 // immediately either way; the ping itself runs in the background.

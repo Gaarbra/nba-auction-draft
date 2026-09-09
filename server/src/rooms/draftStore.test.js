@@ -7,8 +7,8 @@ function emptyRoster() {
 }
 
 // A minimal room/draft shape, built directly rather than through
-// initializeDraft (which shuffles turnOrder randomly) — these tests need a
-// deterministic order to assert exact turn-cycling behavior.
+// initializeDraft (which shuffles turnOrder randomly), since these tests
+// need a deterministic order to assert exact turn-cycling behavior.
 function makeRoom({ biddingMode = "open", turnOrder = ["A", "B", "C"], budgets = {} } = {}) {
   const rosters = {};
   for (const id of turnOrder) rosters[id] = emptyRoster();
@@ -40,7 +40,7 @@ test("open mode: nominating leaves currentBidTurnId null (no turn gating)", () =
   assert.strictEqual(room.draft.nomination.currentBidTurnId, null);
 });
 
-test("open mode: bidding and passing out of 'turn' still works — there is no turn to be out of", () => {
+test("open mode: bidding and passing out of 'turn' still works, since there is no turn to be out of", () => {
   const room = makeRoom({ biddingMode: "open" });
   nominatePlayer(room, "A", player);
   const bidResult = placeBid(room, "C", 5);

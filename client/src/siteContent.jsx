@@ -1,9 +1,9 @@
-// Shared static page content — was inline inside Footer.jsx, extracted so
+// Shared static page content, was inline inside Footer.jsx, extracted so
 // DraftBoard's mid-draft help button (see InfoModal usage in both) can
 // show the same "How to Play" content without duplicating it or forcing a
 // player to leave the room to read it.
 //
-// Placeholder copy — a reasonable starting point for a small hobby project,
+// Placeholder copy: a reasonable starting point for a small hobby project,
 // not vetted legal text. If Hoop Bids ever collects real user data, takes
 // payments, or is run as a registered business, these should be reviewed
 // (or replaced) by someone qualified to write actual Privacy/Terms/Cookie

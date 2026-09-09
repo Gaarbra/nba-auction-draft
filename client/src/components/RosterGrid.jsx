@@ -26,8 +26,8 @@ export default function RosterGrid({
 
   const canSwap = Boolean(room.allowPositionSwaps) && room.status === "drafting";
 
-  // Right after winning a bid, the open slot the player taps IS the pick —
-  // no separate row of position buttons duplicating the same five labels
+  // Right after winning a bid, the open slot the player taps IS the pick.
+  // No separate row of position buttons duplicating the same five labels
   // already shown here. Swapping (after the roster's built out) stays a
   // distinct flow below; the two never overlap in practice.
   function handleSlotClick(pos, isMine, occupant) {
@@ -96,7 +96,7 @@ export default function RosterGrid({
                 const assignable = isMine && assigningSlot && !occupant;
                 const interactive = assignable || (isMine && canSwap);
                 const colors = occupant ? getTeamColors(occupant.team?.abbreviation) : null;
-                // A plain div, not a <button> — the hover tooltip nests a
+                // A plain div, not a <button>. The hover tooltip nests a
                 // real <a> (the NBA.com stats link) inside it, and a link
                 // inside a <button> is invalid HTML that browsers handle
                 // inconsistently. role/tabIndex/onKeyDown restore the

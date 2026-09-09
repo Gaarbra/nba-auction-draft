@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 
 /** A single animated budget meter instead of literally rendering one dot per
- * coin — with a 20-coin starting budget, 20 individual dots read as clutter
+ * coin. With a 20-coin starting budget, 20 individual dots read as clutter
  * rather than information. The fill bar communicates "how much is left"
  * just as clearly, animates smoothly when it changes (a bid landing), and
  * the exact number is still right there for anyone who wants precision. */

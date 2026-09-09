@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, "..", "..", "data");
 const CACHE_FILE = path.join(CACHE_DIR, "notablePlayers.json");
-// All-time leaderboards barely move week to week — same reasoning as
+// All-time leaderboards barely move week to week, same reasoning as
 // playerCache.js's 7-day pool cache.
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -16,7 +16,7 @@ let inFlightRefresh = null;
 // Set on a failed refresh, separate from memoryCache.fetchedAt (which stays
 // the last real success and never gets bumped by a failure). Without this,
 // once memoryCache passes CACHE_TTL_MS, isFresh() is false forever and
-// EVERY call re-triggers a live refresh — on Render, where stats.nba.com is
+// EVERY call re-triggers a live refresh. On Render, where stats.nba.com is
 // confirmed unreachable, that turned every single roll into a multi-second
 // (sometimes much longer) wait instead of the one-time cost this was meant
 // to be. Real production bug, not theoretical: hit this exact path live.
@@ -57,18 +57,16 @@ async function refreshCache() {
 }
 
 /**
- * The "static" half of the difficulty system: a data-driven pool of
- * all-time career leaders (points/rebounds/assists/steals/blocks), sourced
- * once from stats-service and cached to disk for a week. Layered with the
- * "dynamic" half (drawPlayerWithStats's random best-of-N sampling in
- * roomHandlers.js) — narrowing the sampled candidates to this pool first is
- * what makes an easier difficulty actually land recognizable players
- * against a huge pool like "All Eras", where blind random sampling would
- * almost always miss them.
+ * The difficulty system's data-driven pool: all-time career leaders
+ * (points/rebounds/assists/steals/blocks), sourced once from stats-service
+ * and cached to disk for a week. Higher difficulty narrows a roll's
+ * candidates to this pool first (see draft:nominate in roomHandlers.js).
+ * Without it, an easier difficulty couldn't reliably land recognizable
+ * players against a huge pool like "All Eras".
  *
- * Deliberately never throws: a missing or stale notable-players list should
- * degrade the difficulty system back to pure random sampling, not break
- * nominations. Errors are logged and an empty list is returned instead.
+ * Deliberately never throws: a missing or stale list degrades the
+ * difficulty system back to pure random sampling, not broken nominations.
+ * Errors are logged and an empty list returned instead.
  */
 export async function getNotablePlayerIds() {
   if (isFresh(memoryCache)) return memoryCache.ids;
@@ -85,7 +83,7 @@ export async function getNotablePlayerIds() {
     }
   }
 
-  // Already tried recently and it failed — serve stale data immediately
+  // Already tried recently and it failed. Serve stale data immediately
   // rather than pay for the same doomed attempt again on every request.
   if (memoryCache && Date.now() - lastRefreshFailureAt < REFRESH_RETRY_COOLDOWN_MS) {
     return memoryCache.ids;

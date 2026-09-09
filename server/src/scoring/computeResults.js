@@ -7,7 +7,7 @@ const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
 // Capped, not unbounded Promise.all: stats-service (and, behind it,
 // stats.nba.com) is the same rate-limited upstream the live draft loop is
-// careful with — a full room's worth of slots run concurrently but not all
+// careful with. A full room's worth of slots run concurrently but not all
 // 20 at once, so one results page doesn't hammer it the way an early
 // version of this app's difficulty-rolling logic once did.
 const STATS_FETCH_CONCURRENCY = 4;
@@ -15,7 +15,7 @@ const STATS_FETCH_CONCURRENCY = 4;
 /**
  * Fetches full stats (including FGA/FTA/TOV/USG%) for every player on every
  * roster in a completed room, scores each team, and ranks them. This is a
- * one-time, post-draft computation — not part of the live draft loop — so
+ * one-time, post-draft computation, not part of the live draft loop, so
  * it's fine for it to take a while, but the up-to-20 stats-service calls run
  * concurrently (capped, with retries) rather than one at a time.
  * @param {object} room A room whose draft.rosters are all full.
@@ -32,7 +32,7 @@ const STATS_FETCH_CONCURRENCY = 4;
 export async function computeDraftResults(room) {
   // Flatten every (player, position) slot across the whole room into one
   // list up front, so the concurrency cap below applies across the entire
-  // room's fetches at once — not per-team, which would still serialize
+  // room's fetches at once, not per-team, which would still serialize
   // team-by-team and undercut the point of raising concurrency at all.
   const slots = [];
   for (const player of room.players) {
@@ -61,7 +61,7 @@ export async function computeDraftResults(room) {
       fullName: slot.drafted?.fullName ?? null,
       nbaPlayerId: slot.drafted?.nbaPlayerId ?? null,
       // NBA's own CDN photo is constructed client-side from nbaPlayerId
-      // directly and needs no server involvement — this is only ever
+      // directly and needs no server involvement. This is only ever
       // set as a fallback for players confirmed to have no photo there
       // (see stats-service/photos.py).
       photoUrl,

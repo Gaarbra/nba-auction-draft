@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 
 // Career-high-ish ceilings per stat, used purely to normalize the radar's
-// 0-1 axes — not a claim about the literal all-time record, just enough
+// 0-1 axes. Not a claim about the literal all-time record, just enough
 // headroom that a real standout reaches close to the edge without every
 // axis looking maxed out for everyone.
 const AXES = [
@@ -23,7 +23,7 @@ function pointAt(angleDeg, r) {
 }
 
 /** A small 5-axis radar chart (PTS/REB/AST/STL/BLK) for a player's career per-game
- * line, drawn as raw SVG and animated in with Motion — no charting library needed
+ * line, drawn as raw SVG and animated in with Motion. No charting library needed
  * for something this simple, and it means the fill color can follow the player's
  * team like everything else in the app already does. */
 export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
@@ -32,7 +32,7 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
   const points = AXES.map((axis, i) => {
     // Steals/blocks genuinely weren't recorded before 1973-74 (see
     // defensiveImpactRating in scoring.js, which makes this same
-    // distinction) — that's a real `null`, not a measured zero, so it has
+    // distinction). That's a real `null`, not a measured zero, so it has
     // to plot as 0 on the chart but must not print as "0" in the label,
     // which would misrepresent "never tracked" as "recorded zero".
     const raw = stats[axis.key];

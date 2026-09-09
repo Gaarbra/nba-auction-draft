@@ -10,8 +10,8 @@ const DATABASE_URL = process.env.DATABASE_URL || null;
 
 // Off by default so this stays a no-op for Render's own Postgres, reached
 // over an internal same-region connection that never needed TLS. Once
-// DATABASE_URL points at AWS RDS — reached from Render over the public
-// internet — set DATABASE_SSL=require. rejectUnauthorized:false accepts
+// DATABASE_URL points at AWS RDS, reached from Render over the public
+// internet, set DATABASE_SSL=require. rejectUnauthorized:false accepts
 // RDS's cert chain without bundling AWS's root CA locally; that's the one
 // corner this cuts versus a fully verified connection (verify-full with the
 // real CA bundle), acceptable for a learning project, worth naming as a
@@ -20,9 +20,9 @@ const DATABASE_SSL = process.env.DATABASE_SSL === "require";
 
 // Entirely optional, same philosophy as stats-service/db.py: with no
 // DATABASE_URL, `pool` stays null and every exported function becomes a
-// no-op — the app plays exactly as it did before there was a database at
+// no-op, so the app plays exactly as it did before there was a database at
 // all. With one set, every completed draft also gets written here, so the
-// generated-data tables (drafts/draft_teams/draft_picks — see
+// generated-data tables (drafts/draft_teams/draft_picks, see
 // db/schema.sql) build up organically from real games instead of needing a
 // separate import step.
 const pool = DATABASE_URL
@@ -45,8 +45,8 @@ export async function initSchema() {
 }
 
 /**
- * Persists one completed draft — the room's settings, every team's final
- * standing, and every filled roster slot — as a single transaction. Called
+ * Persists one completed draft: the room's settings, every team's final
+ * standing, and every filled roster slot, as a single transaction. Called
  * once, right after computeDraftResults resolves (see maybeComputeResults
  * in roomHandlers.js). Failures are logged and swallowed, never thrown:
  * losing the analytics record for one draft shouldn't take down the game
@@ -84,8 +84,8 @@ export async function saveDraftResults(room, results) {
       for (const pick of team.roster) {
         // draft_picks.player_id has a foreign key into players(id), but
         // stats-service (Python) owns writing real player rows and might
-        // not have gotten to this one yet — e.g. their stats fetch failed
-        // and nominatePlayer stored them as "unavailable" anyway. Ensure a
+        // not have gotten to this one yet (e.g. their stats fetch failed
+        // and nominatePlayer stored them as "unavailable" anyway). Ensure a
         // minimal stub row exists first so that FK never rejects an
         // otherwise-valid pick; ON CONFLICT DO NOTHING means this never
         // clobbers the richer row stats-service will fill in later.

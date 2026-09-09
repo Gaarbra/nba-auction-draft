@@ -1,21 +1,21 @@
 name: Refresh player data
 
 # Fetches the player pool, notable-players leaderboard, and per-player stats
-# from stats.nba.com and commits the result — see
+# from stats.nba.com and commits the result. See
 # stats-service/scripts/refresh_all.py for the actual logic and why this
 # exists at all: Render's own outbound IP is confirmed blocked by
 # stats.nba.com, so production can never refresh its own data. It has to
 # come from somewhere else and get shipped via a normal commit + push, which
 # then triggers Render's usual auto-deploy.
 #
-# NOT scheduled — confirmed by an actual run (2026-09-01) that GitHub-hosted
+# NOT scheduled. Confirmed by an actual run (2026-09-01) that GitHub-hosted
 # runners are blocked too (same ReadTimeoutError signature as Render, not a
-# quick rejection — stats.nba.com blackholes a lot of datacenter/cloud IP
+# quick rejection; stats.nba.com blackholes a lot of datacenter/cloud IP
 # ranges, this one included). A cron trigger here would just email a
 # guaranteed failure notice every run for no benefit. Kept as
 # workflow_dispatch only, for the day this needs re-testing (stats.nba.com's
 # block list isn't static) or gets pointed at a self-hosted runner on a
-# machine that can actually reach it — the one thing proven to work so far.
+# machine that can actually reach it, the one thing proven to work so far.
 on:
   workflow_dispatch: {}
 
@@ -41,7 +41,7 @@ jobs:
 
       - name: Refresh player pool, notable players, and stats cache
         working-directory: stats-service
-        # No DATABASE_URL on purpose — this only touches the git-shipped
+        # No DATABASE_URL on purpose. This only touches the git-shipped
         # JSON caches, not Postgres, and app.py already treats a missing
         # DATABASE_URL as "skip DB persistence" everywhere, not an error.
         env:

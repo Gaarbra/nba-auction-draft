@@ -9,7 +9,7 @@ const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
  * LocalPlayerSwitcher), every local player who could currently raise or
  * pass gets their own inline row, all visible at once. Whoever's turn it
  * actually is (in orderly mode) or whoever wants to act (in open mode) just
- * uses their own row directly — nothing to switch first. */
+ * uses their own row directly, nothing to switch first. */
 export default function LocalBiddingRows({ room, nomination, socket, friendlyError }) {
   const [amounts, setAmounts] = useState({});
   const [errors, setErrors] = useState({});

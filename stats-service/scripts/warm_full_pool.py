@@ -1,7 +1,7 @@
 """Fetches every player in the full pool that isn't already in
-statsCache.json — not just the "notable" leaderboard subset app.py's
+statsCache.json, not just the "notable" leaderboard subset app.py's
 warm_notable_pool() covers. Needed because Render can't reach
-stats.nba.com live (confirmed — see HANDOFF notes), so any player outside
+stats.nba.com live (confirmed, see HANDOFF notes), so any player outside
 the shipped cache currently comes back "stats unavailable" in production.
 This runs locally (which *can* reach stats.nba.com) and the resulting
 expanded statsCache.json gets committed and shipped, the same way the

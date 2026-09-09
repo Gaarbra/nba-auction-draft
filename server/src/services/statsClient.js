@@ -2,38 +2,30 @@ const STATS_SERVICE_URL = process.env.STATS_SERVICE_URL || "http://127.0.0.1:500
 
 /**
  * Fire-and-forget wake-up ping for stats-service. On Render's free tier it
- * spins down after ~15 minutes with no traffic and takes ~20-60s to wake
- * back up on the next request — nothing about normal lobby browsing (name
- * entry, room list, chat) ever touches stats-service, so without this nudge
- * the FIRST roll of a draft is what pays that wake-up cost, and every
- * per-attempt timeout in the roll path (1.5s, see fetchPlayerStats) is
- * nowhere near long enough to wait it out — a cold stats-service just looks
- * identical to "no stats for this player" for that whole window. Called
- * from GET /api/warm-stats-service as soon as the homepage loads, so the
- * wake-up mostly happens while someone's still typing their name instead of
- * during their first actual roll. Never awaited by the route that calls
- * it — the caller doesn't need to know or care whether this succeeds.
+ * spins down after ~15 min idle and takes ~20-60s to wake up. Without this,
+ * the first roll of a draft pays that cost, and the roll path's own timeout
+ * (1.5s, see fetchPlayerStats) is nowhere near long enough to wait it out.
+ * Called from GET /api/warm-stats-service on homepage load, so the wake-up
+ * mostly happens while someone's still typing their name. Never awaited:
+ * the caller doesn't need to know if it succeeds.
  */
 export function pingStatsService() {
   fetch(`${STATS_SERVICE_URL}/health`, { signal: AbortSignal.timeout(60000) }).catch(() => {});
 }
 
 /**
- * Looks players up by NBA person id — the pool (server/src/services/
+ * Looks players up by NBA person id. The pool (server/src/services/
  * nbaPlayersClient.js) already carries the real id for every player, so
  * there's no need for stats-service to fuzzy-match on name anymore.
  */
 export async function fetchPlayerStats(playerId) {
   try {
     const res = await fetch(`${STATS_SERVICE_URL}/stats?id=${encodeURIComponent(playerId)}`, {
-      // A cache hit on the stats-service side answers in single-digit
-      // milliseconds (see fetch_stats_for_player in app.py) — this timeout
-      // only ever actually gets used on a genuine cache miss, and on Render
-      // that live stats.nba.com lookup is confirmed to never succeed (the
-      // outbound IP is blocked outright, not just rate-limited). Was 3000ms;
-      // with up to MAX_STATS_DRAW_ATTEMPTS misses per roll, that made a
-      // roll that happened to draw two uncached players take up to 6s for
-      // no payoff. 1500ms halves that worst case while staying well above
+      // A cache hit answers in single-digit ms; this timeout only matters on
+      // a genuine miss, where the live stats.nba.com lookup is confirmed to
+      // never succeed on Render (outbound IP is blocked). This was 3000ms,
+      // and with up to MAX_STATS_DRAW_ATTEMPTS misses per roll, that cost up
+      // to 6s for no payoff. 1500ms halves the worst case, still well above
       // what any cache hit needs.
       signal: AbortSignal.timeout(1500),
     });
@@ -51,7 +43,7 @@ export async function fetchPlayerStats(playerId) {
 }
 
 /**
- * Like fetchPlayerStats, but also includes FGA/FTA/TOV/USG% — the extra
+ * Like fetchPlayerStats, but also includes FGA/FTA/TOV/USG%, the extra
  * fields the scoring module needs. Only used for the one-time end-of-draft
  * results computation, not the live nomination reveal, since the USG%
  * lookup costs an extra stats.nba.com call.
@@ -59,12 +51,10 @@ export async function fetchPlayerStats(playerId) {
 export async function fetchFullPlayerStats(playerId) {
   try {
     // Longer than fetchPlayerStats on purpose: this endpoint does an extra
-    // real-USG% lookup server-side (a heavier whole-season query, not
-    // cached by the notable-pool warm-up) on top of the base stats fetch,
-    // and its own internal timeout for that step is 20s (see
-    // fetch_usage_pct in app.py). This needs to stay comfortably above
-    // that, or Node routinely gives up right as the Python side was about
-    // to return a perfectly good (if USG%-less) response.
+    // real-USG% lookup server-side (a heavier query, not cached by the
+    // warm-up), with its own 20s internal timeout (see fetch_usage_pct in
+    // app.py). This needs to stay comfortably above that, or Node gives up
+    // right as Python was about to return a good response.
     const res = await fetch(`${STATS_SERVICE_URL}/full-stats?id=${encodeURIComponent(playerId)}`, {
       signal: AbortSignal.timeout(25000),
     });
@@ -89,10 +79,10 @@ function sleep(ms) {
 }
 
 /**
- * fetchFullPlayerStats with a couple of retries (exponential backoff + a
+ * fetchFullPlayerStats with a couple of retries (exponential backoff plus a
  * little jitter) on failure, before falling back to null. Used for the
  * end-of-draft results computation, where up to 20 of these run for one
- * results page — a single flaky call there shouldn't need someone to
+ * results page. A single flaky call there shouldn't need someone to
  * manually recompute, and a plain null (no stats) fallback is a worse
  * outcome than one quick retry when the first attempt was just transient
  * (a timeout, a 502, stats.nba.com hiccuping).
@@ -113,10 +103,10 @@ export async function fetchFullPlayerStatsWithRetry(playerId, attempts = FULL_ST
 /**
  * Predicted auction price (in coins) from the trained price model, plus a
  * short "what this is mainly based on" breakdown for the UI's hover
- * tooltip — see stats-service/ml.py (predict_price / explain_prediction)
+ * tooltip. See stats-service/ml.py (predict_price / explain_prediction)
  * and scripts/train_price_model.py. Returns predictedPrice: null (and
  * explanation: []) on any failure (model not trained yet, player not
- * found, timeout) — this is a "nice to have" hint for the bidding UI, never
+ * found, timeout). This is a "nice to have" hint for the bidding UI, never
  * something the draft flow should block or error on.
  */
 export async function fetchPredictedPrice(playerId, { era, difficulty, slot } = {}) {
@@ -162,7 +152,7 @@ export async function fetchSimilarPlayers(playerId, k = 5) {
 
 /**
  * Real usage rate (USG%) for whichever cached season stats-service has for
- * this player — see /usage-pct's own docstring for why this never falls
+ * this player. See /usage-pct's own docstring for why this never falls
  * back to a live lookup. Returns { usagePct: null, season: null } on any
  * failure or when nothing's cached, same "just don't show it" contract as
  * every other best-effort stats call in this file.
@@ -185,18 +175,18 @@ export async function fetchUsagePct(playerId) {
 }
 
 let marketIndexCache = null; // { players, fetchedAt } | null
-const MARKET_INDEX_CACHE_TTL_MS = 60 * 60 * 1000; // an hour -- see fetchMarketIndex
+const MARKET_INDEX_CACHE_TTL_MS = 60 * 60 * 1000; // an hour, see fetchMarketIndex
 
 /**
- * The Market tab's era/team/player picker data — every player stats-service
+ * The Market tab's era/team/player picker data: every player stats-service
  * already has real cached stats for, with team/position/draft year. Backed
  * entirely by stats-service's own on-disk cache (see /market-index's own
  * docstring for why that's what makes this Render-safe), so the only thing
- * worth caching here is the network round-trip + JSON size (a few thousand
- * small objects) itself. A stale-for-up-to-an-hour list is fine — this
- * data changes on the order of "a new season starts", not per request —
- * and returning the last good list on a transient failure beats a blank
- * picker for something this static.
+ * worth caching here is the network round-trip plus JSON size (a few
+ * thousand small objects) itself. A stale-for-up-to-an-hour list is fine,
+ * since this data changes on the order of "a new season starts," not per
+ * request, and returning the last good list on a transient failure beats a
+ * blank picker for something this static.
  */
 export async function fetchMarketIndex() {
   if (marketIndexCache && Date.now() - marketIndexCache.fetchedAt < MARKET_INDEX_CACHE_TTL_MS) {
@@ -219,7 +209,7 @@ export async function fetchMarketIndex() {
 }
 
 /**
- * Standalone from fetchPlayerStats on purpose — this is only ever called
+ * Standalone from fetchPlayerStats on purpose: this is only ever called
  * as a client-side retry a couple seconds after a nomination reveal that
  * had no photo yet (see PlayerHeadshot.jsx), and doesn't need a full
  * career-stats re-fetch just to ask "did the fallback resolve by now?".

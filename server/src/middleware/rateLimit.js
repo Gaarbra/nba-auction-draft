@@ -1,6 +1,6 @@
 // Small, dependency-free rate limiting. This is a casual friends-scale app
-// behind whatever the hosting platform's own edge/proxy already provides —
-// these are a defense-in-depth backstop against a spammy client or script,
+// behind whatever the hosting platform's own edge/proxy already provides.
+// These are a defense-in-depth backstop against a spammy client or script,
 // not a substitute for real DDoS protection.
 
 /**
@@ -44,7 +44,7 @@ export function httpRateLimit({ windowMs, max, message = "Too many requests" }) 
 }
 
 /**
- * A single socket's own fixed-window counter — no shared Map needed since
+ * A single socket's own fixed-window counter. No shared Map needed since
  * it's already scoped to one connection's lifetime and dies with it.
  */
 export function createSocketEventLimiter(windowMs, max) {

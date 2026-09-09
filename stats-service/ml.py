@@ -1,13 +1,13 @@
-"""Shared feature engineering + model I/O for the two ML features:
+"""Shared feature engineering and model I/O for the two ML features:
 auction-price prediction and player-similarity search.
 
-Centralized here on purpose — the offline training script
-(scripts/train_price_model.py) and the live serving code in app.py both
-import from this module rather than each defining their own feature
-engineering. If those two ever drifted apart (say, the live code started
-passing raw None instead of the trained-on 0-default, or a column got
-renamed in one place but not the other), the model wouldn't error — it
-would just silently predict garbage. One source of truth avoids that.
+This lives in one place so the offline training script
+(scripts/train_price_model.py) and the live serving code in app.py build
+features the exact same way. If those two ever drifted apart, say a
+renamed column or a different default for handling a missing value, the
+model wouldn't throw an error. It would just quietly predict garbage,
+which is a much harder bug to catch. Having one source of truth for the
+feature engineering is what avoids that.
 """
 
 import os
@@ -18,12 +18,12 @@ import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-# Deliberately NOT under data/ (that whole directory is gitignored — it's
-# just ephemeral caches, fine to lose). This is a real trained artifact
-# that needs to survive a redeploy: Render's free web services have an
-# ephemeral filesystem, so anything written to local disk at runtime is
-# gone on the next restart. Committing the model file to git and shipping
-# it with the code is what actually persists it there.
+# Deliberately NOT under data/ (that whole directory is gitignored, since
+# it's just ephemeral caches that are fine to lose). This is a real trained
+# artifact that needs to survive a redeploy: Render's free web services have
+# an ephemeral filesystem, so anything written to local disk at runtime is
+# gone on the next restart. Committing the model file to git and shipping it
+# with the code is what actually makes it persist.
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 PRICE_MODEL_PATH = os.path.join(MODELS_DIR, "price_model.joblib")
 
@@ -32,9 +32,9 @@ PRICE_MODEL_PATH = os.path.join(MODELS_DIR, "price_model.joblib")
 # Numeric columns come straight from player_stats (training: a SQL alias per
 # column; serving: extract_numeric_features below) plus a derived ts_pct.
 # Missing values (pre-1974 steals/blocks, pre-1996-97 usage%) are left as
-# None/NaN on purpose — the pipeline's SimpleImputer(strategy="median")
-# handles them consistently at both train and serve time, rather than this
-# module guessing a fill value in two different places.
+# None/NaN on purpose. The pipeline's SimpleImputer(strategy="median")
+# handles them consistently at both train and serve time, instead of this
+# module having to guess a fill value in two different places.
 NUMERIC_COLS = [
     "points_per_game",
     "rebounds_per_game",
@@ -46,18 +46,18 @@ NUMERIC_COLS = [
     "minutes_per_game",
     "games_played",
 ]
-# Room/pick context — not derived from the player at all, but genuinely
+# Room/pick context, not derived from the player at all, but genuinely
 # predictive: the same player can fetch a different price depending on how
 # deep the era pool is (scarcity) and how the room's difficulty shaped who
-# else was available that roll.
+# else was available on that roll.
 CATEGORICAL_COLS = ["era", "slot", "difficulty"]
 FEATURE_COLS = NUMERIC_COLS + CATEGORICAL_COLS
 
 # Prices above this are vanishingly rare in real data (see the training
-# script's own printed distribution) and a raw regressor can occasionally
+# script's own printed distribution), and a raw regressor can occasionally
 # extrapolate above what's actually possible (a 20-coin budget, minus at
-# least 1 coin held back per remaining slot) — clip predictions into a
-# sane range rather than showing someone "predicted price: 27 coins".
+# least 1 coin held back per remaining slot). Clipping predictions into a
+# sane range keeps us from ever showing someone "predicted price: 27 coins".
 PRICE_CLIP_MIN = 0
 PRICE_CLIP_MAX = 20
 
@@ -71,7 +71,7 @@ def true_shooting_pct(pts, fga, fta):
 
 def extract_numeric_features(stats):
     """`stats` is the camelCase dict shape fetch_stats_for_player returns
-    (or the cached equivalent) — this is what the live /predict-price
+    (or the cached equivalent). This is what the live /predict-price
     endpoint has on hand. Returns a plain dict keyed by NUMERIC_COLS."""
     pts = stats.get("pointsPerGame") or 0
     fga = stats.get("fgaPerGame") or 0
@@ -91,7 +91,7 @@ def extract_numeric_features(stats):
 
 def build_feature_row(stats, era=None, slot=None, difficulty=None):
     """One full feature row (dict matching FEATURE_COLS) for a single live
-    prediction — numeric features from the player's stats, plus this
+    prediction: numeric features from the player's stats, plus this
     nomination's room context."""
     row = extract_numeric_features(stats)
     row["era"] = era or "all"
@@ -102,8 +102,8 @@ def build_feature_row(stats, era=None, slot=None, difficulty=None):
 
 def load_price_model():
     """Returns the fitted sklearn Pipeline, or None if it hasn't been
-    trained yet (run scripts/train_price_model.py) — callers must treat
-    that as "no prediction available", not an error."""
+    trained yet (run scripts/train_price_model.py). Callers must treat
+    that as "no prediction available," not as an error."""
     if not os.path.exists(PRICE_MODEL_PATH):
         return None
     try:
@@ -115,8 +115,8 @@ def load_price_model():
 
 def predict_price(model, stats, era=None, slot=None, difficulty=None):
     """Single-row prediction, clipped to a sane coin range. `model` is
-    whatever load_price_model() returned — callers should skip calling this
-    at all if that was None."""
+    whatever load_price_model() returned. Callers should skip calling this
+    at all if that came back None."""
     row = build_feature_row(stats, era, slot, difficulty)
     df = pd.DataFrame([row], columns=FEATURE_COLS)
     raw = float(model.predict(df)[0])
@@ -125,16 +125,13 @@ def predict_price(model, stats, era=None, slot=None, difficulty=None):
 
 # --- price model explanation ------------------------------------------------
 #
-# What the "Suggested value" hover in the UI shows. Not a true per-prediction
-# attribution — that's what a library like SHAP is for, and pulling in a
-# whole extra dependency (plus its own per-request compute cost) is more
-# than a hover tooltip is worth here. Instead: the model's own global
-# feature_importances_ (how much each feature typically moves ITS
-# predictions, learned across every training example) tells us what this
-# model leans on most in general, and pairing that with this specific
-# player's actual values for those features gives an honest, useful "here's
-# mainly what this is based on" without overclaiming precision it doesn't
-# have.
+# What the "Suggested value" hover shows. This isn't a true per-prediction
+# attribution. That's what SHAP is for, and it's an extra dependency plus
+# per-request compute cost that isn't worth paying for a hover tooltip.
+# Instead, the model's own global feature_importances_, paired with this
+# player's actual values for those features, gives an honest "here's mainly
+# what this is based on" without overclaiming precision the model doesn't
+# actually have.
 _FEATURE_DISPLAY = {
     "points_per_game": ("PPG", "{:.1f}"),
     "rebounds_per_game": ("RPG", "{:.1f}"),
@@ -152,13 +149,13 @@ _FEATURE_DISPLAY = {
 
 
 def _model_feature_importance(model):
-    """Best-effort global importance per original FEATURE_COLS entry (a
+    """Best-effort global importance per original FEATURE_COLS entry. A
     one-hot categorical like "era" gets several encoded columns inside the
-    pipeline — e.g. era_2020s, era_1990s — whose weights get summed back
-    into a single "era" entry here). Returns {} if the model's regressor
+    pipeline (era_2020s, era_1990s, and so on), and their weights get summed
+    back into a single "era" entry here. Returns {} if the model's regressor
     doesn't expose feature_importances_/coef_, or if the pipeline's
-    internals don't match what train_price_model.py builds (display-only —
-    never worth this failing serving over)."""
+    internals don't match what train_price_model.py builds. This is
+    display-only, so it's never worth letting serving fail over it."""
     try:
         pipeline = model.regressor_  # TransformedTargetRegressor -> fitted inner Pipeline
         preprocessor = pipeline.named_steps["preprocess"]
@@ -187,8 +184,8 @@ def _model_feature_importance(model):
 
 def explain_prediction(model, stats, era=None, slot=None, difficulty=None, top_n=4):
     """The `top_n` features this model leans on most, each paired with this
-    player's actual value — what the "Suggested value" hover shows. []
-    (never an error) if importance introspection isn't available."""
+    player's actual value: what the "Suggested value" hover shows. Returns
+    [] (never an error) if importance introspection isn't available."""
     importances = _model_feature_importance(model)
     if not importances:
         return []
@@ -216,11 +213,11 @@ def explain_prediction(model, stats, era=None, slot=None, difficulty=None, top_n
 # --- player similarity ------------------------------------------------------
 #
 # Deliberately a smaller, different feature set than the price model: this
-# is about playing style/production, not context that affects what a room
-# happened to pay. No persisted model file — it's cheap enough (a couple
-# thousand players, 6 features) to rebuild from Postgres each time the
-# process starts, so there's nothing to keep in sync across a retrain like
-# the price model has.
+# is about playing style and production, not context that affects what a
+# room happened to pay. There's no persisted model file, since it's cheap
+# enough (a couple thousand players, 6 features) to rebuild from Postgres
+# each time the process starts. That means there's nothing to keep in sync
+# across a retrain the way there is with the price model.
 SIMILARITY_COLS = [
     "points_per_game",
     "rebounds_per_game",
@@ -234,9 +231,10 @@ SIMILARITY_COLS = [
 class SimilarityIndex:
     """Wraps a fitted NearestNeighbors index over standardized per-game stat
     vectors for every player with a stats row. `build` takes a list of dicts
-    (player_id, full_name, points_per_game, ... — the SIMILARITY_COLS names)
-    from a DB query; missing values are median-imputed same as the price
-    model, so an old player missing steals/blocks doesn't just get excluded.
+    (player_id, full_name, points_per_game, and so on, matching the
+    SIMILARITY_COLS names) from a DB query. Missing values are
+    median-imputed the same way as the price model, so an old player
+    missing steals or blocks doesn't just get excluded outright.
     """
 
     def __init__(self):
@@ -247,9 +245,10 @@ class SimilarityIndex:
     def build(self, rows):
         """`rows` needs player_id, full_name, and the raw per-game counting
         stats (points/rebounds/assists/steals/blocks_per_game, fga_per_game,
-        fta_per_game) — see db.fetch_all_player_stats_for_similarity for the
-        exact shape. ts_pct is derived here, not expected pre-computed, so
-        there's exactly one place (true_shooting_pct) that formula lives."""
+        fta_per_game). See db.fetch_all_player_stats_for_similarity for the
+        exact shape. ts_pct is derived here rather than expected
+        pre-computed, so there's exactly one place (true_shooting_pct) where
+        that formula lives."""
         if not rows:
             self.frame = None
             self.model = None

@@ -91,7 +91,7 @@ test("defensiveImpactRating: tracked stats also add a small REB term (REB*0.3)",
 
 test("defensiveImpactRating: a dominant rebounder's REB term lands in the same rough range as a plus defender's STL/BLK terms, not swamping them", () => {
   // ~15 REB/g -> 4.5, comparable to a good defender's STL/BLK contribution
-  // (roughly 1-6 for realistic per-game rates) — this is meant to close the
+  // (roughly 1-6 for realistic per-game rates). This is meant to close the
   // "rebounding counts for nothing" gap, not make DIR mostly about boards.
   const dominantRebounder = defensiveImpactRating({ stl: 0.5, blk: 0.5, reb: 15 });
   const plusDefenderNoReb = defensiveImpactRating({ stl: 1.5, blk: 1.5, reb: 0 });
@@ -105,7 +105,7 @@ test("defensiveImpactRating: missing reb (undefined) contributes 0, same as befo
 
 test("defensiveImpactRating: the untracked (DWS) branch never double-counts REB even if reb is present", () => {
   // The DWS estimate is itself derived from rebounds/game (see
-  // statsAdapter.js's estimateSeasonDWS) — this branch must ignore a raw
+  // statsAdapter.js's estimateSeasonDWS). This branch must ignore a raw
   // `reb` field entirely, not add REB_WEIGHT on top of an already
   // rebounding-derived DWS number.
   const withReb = defensiveImpactRating({ stl: null, blk: null, reb: 15, seasonDWS: 3.5, gamesPlayed: 70 });
@@ -193,7 +193,7 @@ test("teamScore: missing usagePct is treated as 0 contribution, not a crash", ()
 });
 
 // A player who disconnects and forfeits mid-draft still gets ranked on
-// whatever roster they'd filled — computeResults.js pads their unfilled
+// whatever roster they'd filled. computeResults.js pads their unfilled
 // slots with an all-zero stat line rather than omitting them, so teamScore
 // needs to score those slots as a clean zero, not blow up on partial data.
 const emptySlotStatLine = { pts: 0, fga: 0, fta: 0, ast: 0, tov: 0, stl: null, blk: null, gamesPlayed: 0, usagePct: 0 };

@@ -72,7 +72,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   const rollIntervalRef = useRef(null);
   const autoNominatedForRef = useRef(null);
 
-  // Chat/reactions are ephemeral (see roomHandlers.js) — chatMessages is just
+  // Chat/reactions are ephemeral (see roomHandlers.js). chatMessages is just
   // a session-local scrollback for the panel, and floatingByPlayer tracks at
   // most one pop-up per player at a time, auto-clearing itself via a timer
   // per player rather than one global sweep.
@@ -145,7 +145,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
 
   // The reveal is server-authoritative and broadcast to everyone at once
   // (see roomHandlers.js), so the rolling animation is driven by socket
-  // events rather than the local button click — that's what makes it play
+  // events rather than the local button click. That's what makes it play
   // in sync for every player in the room, not just whoever clicked reveal.
   useEffect(() => {
     function startRolling() {
@@ -202,7 +202,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   // Nominating used to be a manual "Reveal Random Player" click; now it
   // fires on its own the moment it becomes your turn. The dedupe key mixes
   // in draftedPlayerIds.length (not just currentNominatorId) so a fresh
-  // draft — solo replay, a rematch, anyone nominating a second time — still
+  // draft (solo replay, a rematch, anyone nominating a second time) still
   // triggers again instead of being silently skipped as "already handled".
   useEffect(() => {
     if (!isMyTurn || nomination || isRolling || !draft?.currentNominatorId) return;
@@ -213,8 +213,8 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMyTurn, nomination, isRolling, draft?.currentNominatorId, draft?.draftedPlayerIds?.length]);
 
-  // The stepper's starting point is always "one more than the current bid" —
-  // reset it every time that changes (a fresh nomination, or someone else
+  // The stepper's starting point is always "one more than the current bid."
+  // Reset it every time that changes (a fresh nomination, or someone else
   // raising) so a stale typed amount from the previous bid never lingers
   // as an invalid (too-low) value.
   useEffect(() => {
@@ -311,7 +311,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
       )}
 
       {!isRolling && nomination && !isAssigningAsWinner && (
-        // No AnimatePresence/exit animation here on purpose — this panel is
+        // No AnimatePresence/exit animation here on purpose. This panel is
         // load-bearing (it's how you assign a won player to a slot), and an
         // exit transition that never resolves would leave it stuck showing
         // stale content forever with mode="wait" queued behind it. A keyed

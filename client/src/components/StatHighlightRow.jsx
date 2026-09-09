@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // Same five per-game stats as StatRadarChart, but rendered as bklit.com-style
-// big numbers with a small uppercase label underneath — the radar chart is
+// big numbers with a small uppercase label underneath. The radar chart is
 // great for shape-at-a-glance, but the actual figures were previously only
 // legible in 9px SVG text. This is the "read it from across the room" view.
 const STATS = [
@@ -16,9 +16,9 @@ const COUNT_UP_MS = 650;
 
 /** A single stat's number, animated with a quick count-up from 0 on mount
  * (and again whenever the target value changes, i.e. a new player). Plain
- * rAF rather than Motion here — this never unmounts mid-animation, so there's
- * none of the exit-animation risk that ruled out AnimatePresence elsewhere
- * in this app; it's just simpler for a one-shot numeric tween. */
+ * rAF rather than Motion here, since this never unmounts mid-animation, so
+ * there's none of the exit-animation risk that ruled out AnimatePresence
+ * elsewhere in this app; it's just simpler for a one-shot numeric tween. */
 function CountUpStat({ value, decimals }) {
   const [display, setDisplay] = useState(0);
   const frameRef = useRef(null);
@@ -26,7 +26,7 @@ function CountUpStat({ value, decimals }) {
   useEffect(() => {
     if (value === null || value === undefined) return undefined;
 
-    // Respect reduced-motion the same way the lobby title shimmer does —
+    // Respect reduced-motion the same way the lobby title shimmer does,
     // and skip straight to the final value rather than leaving it stuck at 0.
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
       setDisplay(value);

@@ -1,4 +1,4 @@
-// Synthesized (Web Audio API) sound effects for the nomination roll — a
+// Synthesized (Web Audio API) sound effects for the nomination roll: a
 // quick tick on each name-flip while rolling, and a short chime when it
 // lands on a real player. Generated in-browser rather than played from an
 // audio file, so there's nothing to download or license.
@@ -10,7 +10,7 @@ function getAudioContext() {
   const Ctor = window.AudioContext || window.webkitAudioContext;
   if (!Ctor) return null;
   if (!audioCtx) audioCtx = new Ctor();
-  // Browsers start contexts suspended until a user gesture — any bid/pass/
+  // Browsers start contexts suspended until a user gesture. Any bid/pass/
   // nominate click that got us here already counts as one, so this resume
   // is normally a same-tick no-op, not something the user has to notice.
   if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
@@ -29,11 +29,11 @@ export function setSoundMuted(muted) {
   try {
     localStorage.setItem(MUTE_KEY, muted ? "true" : "false");
   } catch {
-    // Storage unavailable — the toggle just won't survive a refresh.
+    // Storage unavailable, the toggle just won't survive a refresh.
   }
 }
 
-/** A short, dry tick — one per name-flip while the roll is spinning. */
+/** A short, dry tick: one per name-flip while the roll is spinning. */
 export function playRollTick() {
   if (isSoundMuted()) return;
   const ctx = getAudioContext();

@@ -20,11 +20,11 @@ function mulberry32(seed) {
 
 /** The homepage background from the sketch: real player headshots drifting
  * slowly upward with a "$price" tag, looping endlessly, new ones entering
- * from the bottom as old ones exit the top — like a stock ticker for the
+ * from the bottom as old ones exit the top, like a stock ticker for the
  * draft pool. Purely decorative (prices are randomized, not real
- * predictions — hitting the ML endpoint for a couple dozen background cards
+ * predictions; hitting the ML endpoint for a couple dozen background cards
  * on every homepage load isn't worth the extra server load for something
- * nobody's meant to read as accurate). Pure CSS animation, not a rAF loop —
+ * nobody's meant to read as accurate). Pure CSS animation, not a rAF loop,
  * much cheaper than the physics approach an earlier version of this
  * background used. */
 export default function PriceTicker({ active }) {
@@ -85,7 +85,7 @@ export default function PriceTicker({ active }) {
   return (
     <div className="price-ticker" aria-hidden="true">
       {/* Two groups pushed to opposite edges (space-between), leaving the
-          center clear for the lobby card — matches the sketch. */}
+          center clear for the lobby card. Matches the sketch. */}
       <div className="price-ticker-side">{Array.from({ length: half }, (_, i) => renderLane(i))}</div>
       <div className="price-ticker-side">{Array.from({ length: half }, (_, i) => renderLane(half + i))}</div>
     </div>

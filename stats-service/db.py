@@ -1,10 +1,10 @@
 """Postgres persistence for player reference data (players, player_stats,
-player_team_stints — see db/schema.sql at the repo root). Entirely optional:
+player_team_stints, see db/schema.sql at the repo root). Entirely optional:
 if DATABASE_URL isn't set, every function here becomes a no-op, so the
 stats-service caches (statsCache.json etc.) keep working exactly as before
 with no database at all. When it IS set, every successful stats fetch also
 upserts into Postgres, so the reference tables build up the same way the
-JSON caches do — organically, from real usage and the warm-up job — rather
+JSON caches do: organically, from real usage and the warm-up job, rather
 than needing a separate one-time import.
 """
 
@@ -18,21 +18,21 @@ except ImportError:
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Same flag, same default, as server/src/services/db.js's DATABASE_SSL —
-# off for Render's own internal Postgres connection, set to "require" once
+# Same flag, same default, as server/src/services/db.js's DATABASE_SSL: off
+# for Render's own internal Postgres connection, set to "require" once
 # DATABASE_URL points at AWS RDS (reached over the public internet from
 # here). psycopg follows libpq conventions, so sslmode="require" encrypts
 # the connection but does not verify RDS's certificate against a CA
-# bundle — the same "not fully verified, but real TLS" tradeoff the Node
-# side makes with rejectUnauthorized:false, for the same reason (no local
-# AWS CA bundle to point at yet).
+# bundle. That's the same "not fully verified, but real TLS" tradeoff the
+# Node side makes with rejectUnauthorized:false, for the same reason (no
+# local AWS CA bundle to point at yet).
 DATABASE_SSL = os.environ.get("DATABASE_SSL") == "require"
 
 _pool_warned = False
 
 
 def _connect():
-    """A fresh connection per call rather than a real pool — this service's
+    """A fresh connection per call rather than a real pool. This service's
     write volume is low (one upsert per stats fetch, not per request), so
     the extra complexity of a connection pool isn't worth it yet. Returns
     None (not a connection) if DATABASE_URL isn't configured or psycopg
@@ -43,7 +43,7 @@ def _connect():
         return None
     if psycopg is None:
         if not _pool_warned:
-            print("[db] DATABASE_URL is set but psycopg isn't installed — skipping persistence")
+            print("[db] DATABASE_URL is set but psycopg isn't installed, skipping persistence")
             _pool_warned = True
         return None
     try:
@@ -57,7 +57,7 @@ def _connect():
 
 
 def init_schema():
-    """Runs db/schema.sql (CREATE TABLE IF NOT EXISTS ... — safe to re-run)
+    """Runs db/schema.sql (CREATE TABLE IF NOT EXISTS ..., safe to re-run)
     once at startup. A no-op if there's no DATABASE_URL."""
     conn = _connect()
     if not conn:
@@ -77,7 +77,7 @@ def init_schema():
 
 def upsert_player_and_stats(player_id, full_name, is_active, from_year, to_year, stats):
     """Called after every successful stats fetch (live or from the warm-up
-    job) — writes the player's identity row and their career-stats row in
+    job). Writes the player's identity row and their career-stats row in
     one transaction. `stats` is the same dict shape fetch_stats_for_player
     returns (or None, if the fetch came back empty)."""
     conn = _connect()
@@ -178,11 +178,11 @@ def upsert_player_and_stats(player_id, full_name, is_active, from_year, to_year,
 def fetch_all_player_stats_for_similarity():
     """Every player with a stats row, for building the in-memory player-
     similarity index at startup (see ml.SimilarityIndex). Returns [] if
-    there's no DATABASE_URL or the query fails — the caller already treats
-    an empty list as "no similarity index available", not an error.
+    there's no DATABASE_URL or the query fails, since the caller already
+    treats an empty list as "no similarity index available," not an error.
     NUMERIC columns are cast to float8 in the query itself so callers get
     plain Python floats, not decimal.Decimal (which doesn't mix with plain
-    float arithmetic — see the price-model training script for the version
+    float arithmetic; see the price-model training script for the version
     of this bug that actually shipped once)."""
     conn = _connect()
     if not conn:
@@ -215,7 +215,7 @@ def fetch_all_player_stats_for_similarity():
 
 def update_usage_pct(player_id, usage_pct):
     """Usage% arrives later than the rest of a player's stats (it's a
-    separate, heavier fetch — see fetch_usage_pct in app.py), so it gets its
+    separate, heavier fetch, see fetch_usage_pct in app.py), so it gets its
     own small update rather than going through the full upsert above. A
     no-op if the player's base stats row doesn't exist yet."""
     conn = _connect()

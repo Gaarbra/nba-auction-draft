@@ -1,13 +1,13 @@
 // @ts-check
 
 /**
- * Post-draft team scoring. Pure functions only — no I/O, no framework
- * dependencies, no knowledge of rooms/sockets/etc. Given the same inputs,
- * these always return the same outputs, which is what makes them safe to
- * unit test in isolation and reuse from both the server and, later, a
- * results-screen preview.
+ * Post-draft team scoring. Everything in here is a pure function: no I/O,
+ * no framework dependencies, no knowledge of rooms or sockets. Same
+ * inputs always give the same outputs, which is what makes these easy to
+ * unit test on their own and reuse anywhere (the server today, maybe a
+ * results-screen preview later).
  *
- * Formulas (as specified):
+ * The formulas:
  *   TS%  = PTS / (2 * (FGA + 0.44 * FTA))
  *   Op   = (PTS * TS%) + (AST * 1.5) - (TOV * 2.0)
  *   DIR  = (STL * 2.5) + (BLK * 2.0) + (REB * 0.3)      [stats tracked]
@@ -17,12 +17,13 @@
  *        = 0.85 if sum(USG%) > 125
  *   Final Team Score = sum(Op + DIR across 5 starters) * Ms
  *
- * Every raw counting stat here (PTS, AST, TOV, STL, BLK, REB) is a PER-GAME
- * average, not a season total — mixing the two would put Op and DIR on
- * wildly different scales (season PTS in the hundreds vs. per-game AST/TOV
- * in the single digits) and make their sum meaningless. statsAdapter.js is
- * the one place raw stats get shaped into this per-game form; scoring.js
- * itself never touches a season total.
+ * One thing worth knowing if you're new to this file: every stat here
+ * (PTS, AST, TOV, STL, BLK, REB) is a PER-GAME average, not a season
+ * total. If you mixed the two, Op and DIR would end up on wildly
+ * different scales, since a season point total is in the hundreds while
+ * per-game assists is a single digit, and adding them together would be
+ * meaningless. statsAdapter.js is the file that does that per-game
+ * shaping. scoring.js itself never touches a season total.
  */
 
 /** @typedef {{
@@ -34,21 +35,21 @@
 
 const ROSTER_SIZE = 5;
 
-// Weight for the tracked-era DIR rebounding term — small on purpose. A
-// dominant rebounder (~15 REB/g) contributes ~4.5, putting it in the same
-// rough range as the STL/BLK terms for a plus defender (1-6ish) rather than
-// swamping them; this only closes the "rebounding counts for nothing" gap,
-// it isn't meant to make DIR primarily about boards. Not applied in the
-// untracked (pre-1974) branch below — that branch's DWS estimate is already
-// itself derived from rebounds/game (see statsAdapter.js's
-// estimateSeasonDWS), so adding a second REB term there would double-count
-// the same signal.
+// This weight is small on purpose. A dominant rebounder pulling down about
+// 15 boards a game only contributes around 4.5 points here, which keeps
+// rebounding in the same range as the STL/BLK terms instead of letting it
+// take over the whole defensive score. It also isn't applied in the
+// untracked (pre-1974) branch below, because that branch's DWS estimate is
+// already built from rebounds per game (see estimateSeasonDWS in
+// statsAdapter.js). Adding a second rebounding term there would just be
+// counting the same signal twice.
 const REB_WEIGHT = 0.3;
 
 /**
- * TS% with a guarded zero-division: a player who never attempted a shot
- * or free throw (FGA=0 and FTA=0) has an undefined shooting percentage,
- * not an infinite or NaN one — treated as 0 so downstream math stays finite.
+ * True Shooting %, guarded against division by zero. If a player has no
+ * field goal attempts and no free throw attempts, their shooting
+ * percentage is genuinely undefined, not Infinity or NaN, so this just
+ * returns 0 instead of letting the math blow up.
  * @param {{ pts: number, fga: number, fta: number }} stats
  * @returns {number}
  */
@@ -68,13 +69,12 @@ export function offenseScore({ pts, fga, fta, ast, tov }) {
 }
 
 /**
- * Steals and blocks were not tracked by the NBA before the 1973-74 season.
- * Our stats pipeline (server/src/services/... via stats-service) already
- * represents that as `stl`/`blk` being `null` rather than `0` — a real
- * measured zero-steal game is not the same thing as "this stat doesn't
- * exist for this era". This function keys off that null distinction rather
- * than sniffing for a literal 0, which is a more faithful (and safer)
- * implementation of "untracked" than the literal value comparison.
+ * Steals and blocks weren't officially tracked before the 1973-74 season.
+ * The stats pipeline represents that gap as `stl`/`blk` being `null`,
+ * not `0`, because a real game where a player recorded zero steals is a
+ * completely different thing from "this stat wasn't tracked yet." So this
+ * function checks for null specifically, instead of just checking whether
+ * the value happens to equal 0.
  * @param {{ stl: number | null, blk: number | null, reb?: number, seasonDWS?: number | null, gamesPlayed?: number | null }} stats
  * @returns {number}
  */
@@ -137,13 +137,12 @@ export function teamScore(roster) {
 }
 
 /**
- * Simple logistic win-probability estimate from the delta between two
- * Final Team Scores. Not statistically fitted to real outcome data — it's
- * a documented heuristic, tuned so that a ~50-point score gap (a
- * substantial but not implausible edge given the scale of these formulas)
- * lands around a 73/27 split, rather than snapping straight to near-0/100.
- * SCALE_K is the one knob; raise it to make the same delta feel more
- * decisive, lower it to flatten predictions toward a coin flip.
+ * Turns the gap between two Final Team Scores into a win probability using
+ * a logistic curve. This is a heuristic we picked by hand, not a model
+ * fitted to real outcome data, and it's tuned so that a roughly 50-point
+ * gap lands around a 73/27 split instead of snapping straight to near
+ * 0/100. SCALE_K is the one dial here: turn it up for more decisive splits,
+ * turn it down to flatten things back toward a coin flip.
  * @param {number} scoreA
  * @param {number} scoreB
  * @returns {{ probA: number, probB: number }}

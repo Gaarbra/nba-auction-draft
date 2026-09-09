@@ -35,7 +35,7 @@ test("computeNotablePoolOdds: scales smoothly between the floor and full odds", 
   const at15 = computeNotablePoolOdds("normal", 15); // 15/30 = 0.5, above the 0.7 floor's threshold (0.7*30=21)... actually below it
   const at25 = computeNotablePoolOdds("normal", 25); // 25/30 ≈ 0.833, above the floor
   // 15/30=0.5 is below the 0.7 floor, so it should be clamped to the floor,
-  // same as 10/30 would be — floor kicks in for anything below 21/30.
+  // same as 10/30 would be. The floor kicks in for anything below 21/30.
   assert.ok(Math.abs(at15 - DIFFICULTY_STATIC_ODDS.normal * 0.7) < 1e-9);
   // 25/30 ≈ 0.833 is above the floor, so it should reflect the real ratio.
   assert.ok(Math.abs(at25 - DIFFICULTY_STATIC_ODDS.normal * (25 / 30)) < 1e-9);

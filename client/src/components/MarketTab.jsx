@@ -85,7 +85,7 @@ const LIVE_SALE_HISTORY_LIMIT = 60;
 const SEARCH_RESULTS_LIMIT = 50;
 
 /** A small inline line chart of real suggested-value readings for the
- * player currently on screen — one point per time the price model actually
+ * player currently on screen: one point per time the price model actually
  * ran (a difficulty switch, or a fresh player load), never a fabricated
  * trend. Starts as a single flat point and grows during the session. */
 function ValueHistoryChart({ points }) {
@@ -129,16 +129,13 @@ function ValueHistoryChart({ points }) {
 }
 
 /** The Market tab: a "luxury exchange" browse of the same real player pool
- * the draft nominates from, adapted from a Stitch mock ("Hoop Bids —
- * Luxury Market & Player Marketplace"). Every number on screen is real or
- * clearly session-derived -- the mock's own fabricated flourishes (a "24H
- * volume" ticker, "MVP Candidate"/"99 ISO Rating" tier badges, per-user bid
- * handles, a cross-room "Market Depth & Ceilings" panel) were dropped or
- * replaced with the closest honest equivalent this app can actually back.
- * Every list here comes from GET /api/players/market-index, which is
- * itself just stats-service's own already-cached, already-warmed player
- * data (see that endpoint's docstring) -- nothing here does a fresh
- * stats.nba.com lookup. */
+ * the draft nominates from, adapted from a Stitch mock. Every number on
+ * screen is real or clearly session-derived -- the mock's own fabricated
+ * flourishes (a "24H volume" ticker, tier/rating badges, per-user bid
+ * handles, a cross-room ceilings panel) were dropped or replaced with the
+ * closest honest equivalent this app can back. Backed entirely by
+ * GET /api/players/market-index, itself stats-service's own already-cached
+ * data -- nothing here does a fresh stats.nba.com lookup. */
 export default function MarketTab({ socket, onNavigateToLobby }) {
   const [index, setIndex] = useState([]);
   const [indexLoading, setIndexLoading] = useState(true);
@@ -161,7 +158,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
   const [valueHistory, setValueHistory] = useState([]);
 
   // Real completed sales, broadcast globally (not room-scoped) the instant
-  // any room anywhere assigns a won player to a slot — see
+  // any room anywhere assigns a won player to a slot. See
   // server/src/sockets/roomHandlers.js's "market:sale" emit. A rolling
   // buffer, not per-player storage: this only ever reflects what actually
   // happened while this tab was open this session, nothing back-filled.

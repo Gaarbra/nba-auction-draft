@@ -12,7 +12,7 @@ Honest caveat printed at the end, not just in this comment: as of writing
 this trains on ~395 real picks from ~39 completed drafts, most of which are
 this project's own development/testing sessions rather than organic
 multi-person auctions. That's enough to build and validate a real pipeline
-end to end, but it is a small, self-generated sample — treat the printed
+end to end, but it is a small, self-generated sample. Treat the printed
 metrics as "does this pipeline work," not "is this production-accurate."
 Re-run this as real usage accumulates.
 """
@@ -49,7 +49,7 @@ if not DATABASE_URL:
         pass
 
 if not DATABASE_URL:
-    print("DATABASE_URL is not set — nothing to train from. Set it in stats-service/.env.")
+    print("DATABASE_URL is not set, nothing to train from. Set it in stats-service/.env.")
     sys.exit(1)
 
 import psycopg  # noqa: E402
@@ -86,7 +86,7 @@ def load_training_data():
             rows = cur.fetchall()
     df = pd.DataFrame(rows)
     # Postgres NUMERIC columns come back as decimal.Decimal, which doesn't
-    # mix with plain floats (0.44 * a_decimal raises TypeError) — cast every
+    # mix with plain floats (0.44 * a_decimal raises TypeError). Cast every
     # numeric-ish column to float right away so the rest of this script
     # never has to think about it.
     numeric_db_cols = [
@@ -118,7 +118,7 @@ def build_preprocessor():
 def make_model(regressor):
     pipeline = Pipeline([("preprocess", build_preprocessor()), ("regress", regressor)])
     # Price is heavily right-skewed (most nominations go for the 1-coin
-    # minimum, a long tail up to ~19) — training on log1p(price) and
+    # minimum, a long tail up to ~19). Training on log1p(price) and
     # inverting with expm1 is standard practice for this shape of target,
     # and keeps a bad prediction from ever going negative.
     return TransformedTargetRegressor(regressor=pipeline, func=np.log1p, inverse_func=np.expm1)
@@ -138,7 +138,7 @@ def main():
     df = load_training_data()
     print(f"Loaded {len(df)} labeled picks from Postgres.\n")
     if len(df) < 30:
-        print("Fewer than 30 rows — not worth training on yet. Play more drafts first.")
+        print("Fewer than 30 rows, not worth training on yet. Play more drafts first.")
         sys.exit(1)
 
     df["ts_pct"] = df.apply(
@@ -148,7 +148,7 @@ def main():
     X = df[FEATURE_COLS]
     y = df["acquired_for"].astype(float)
 
-    print(f"Price distribution — min={y.min():.0f} max={y.max():.0f} mean={y.mean():.2f} median={y.median():.0f}")
+    print(f"Price distribution: min={y.min():.0f} max={y.max():.0f} mean={y.mean():.2f} median={y.median():.0f}")
     print(f"  {(y <= 1).mean() * 100:.0f}% of picks went for 1 coin or less (the minimum bid).\n")
 
     print("5-fold cross-validated performance (out-of-fold predictions, not train-set fit):")
@@ -166,7 +166,7 @@ def main():
     print(f"\nBest by cross-validated MAE: {best_name}")
 
     # Refit the winner on ALL the data for the model that actually gets
-    # saved and served — cross-validation above is purely for honest
+    # saved and served. Cross-validation above is purely for honest
     # evaluation, not what ships.
     final_model = make_model(candidates[best_name])
     final_model.fit(X, y)
@@ -179,7 +179,7 @@ def main():
         "\nCaveat: this is trained on a small, mostly self-generated sample "
         "(this project's own dev/test drafts, not organic multi-person "
         "auctions). Treat it as a working pipeline, not a production-accurate "
-        "predictor yet — re-run this script as real usage accumulates."
+        "predictor yet, re-run this script as real usage accumulates."
     )
 
 

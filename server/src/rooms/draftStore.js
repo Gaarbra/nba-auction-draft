@@ -30,7 +30,7 @@ function nextNominatorId(room, fromId) {
 }
 
 // Shared by placeBid/passOnNomination/removePlayerFromDraft: who's still in
-// the running on the current nomination — not the high bidder (they can't
+// the running on the current nomination. Not the high bidder (they can't
 // act against themselves), not roster-full (nothing left to win a slot
 // with), and hasn't already passed. Once this is empty, bidding is over
 // regardless of which bidding mode the room is using.
@@ -99,22 +99,16 @@ export function nominatePlayer(room, playerId, player) {
 
   if (draft.draftedPlayerIds.includes(player.id)) return { error: "PLAYER_ALREADY_DRAFTED" };
 
-  // A nominator with less than the usual starting bid (down to 0 coins)
-  // can still nominate — they just open the bidding at whatever they can
-  // actually afford. If nobody else bids, they end up winning the player
-  // for that amount via the normal pass-out flow (see passOnNomination),
-  // which can be 0. That's what keeps a broke player's turn from stalling
-  // the whole draft: their turn always produces a result, they just can't
-  // outbid anyone if someone else wants the player too.
+  // A nominator with less than the usual starting bid (down to 0) can still
+  // nominate. They open the bidding at whatever they can afford, and win
+  // for that amount via the normal pass-out flow if nobody outbids them.
+  // Keeps a broke player's turn from stalling the draft.
   const bid = Math.min(STARTING_BID, nominator.budget);
 
-  // Skip straight to "assigning" not just for a literal one-player room, but
-  // whenever no one else in the room is even able to bid (everyone else has
-  // already filled their roster). Otherwise the nomination sits in "bidding"
-  // forever: a roster-full opponent gets no Pass button (see DraftBoard's
-  // "spectating" state), so passOnNomination never runs and stillActive
-  // never gets recomputed down to zero. This is the scenario a broke player
-  // hits most often, since they're typically the last one to finish drafting.
+  // Skip straight to "assigning" whenever no one else can even bid (every
+  // other roster is full), not just for a literal one-player room.
+  // Otherwise the nomination sits in "bidding" forever, since a roster-full
+  // opponent has no Pass button to trigger the recompute.
   const hasActiveOpponent = draft.turnOrder.some(
     (id) => id !== playerId && !isRosterFull(draft.rosters[id])
   );
@@ -127,7 +121,7 @@ export function nominatePlayer(room, playerId, player) {
     currentBidder: playerId,
     passed: [],
     phase,
-    // Only meaningful in "orderly" bidding mode — see placeBid/passOnNomination.
+    // Only meaningful in "orderly" bidding mode. See placeBid/passOnNomination.
     // In "open" mode (the default) this stays null and nobody checks it.
     currentBidTurnId: null,
   };
@@ -146,7 +140,7 @@ export function placeBid(room, playerId, amount) {
   if (nomination.currentBidder === playerId) return { error: "ALREADY_HIGH_BIDDER" };
   if (nomination.passed.includes(playerId)) return { error: "ALREADY_PASSED" };
   // Orderly mode: bids (like passes) only happen one at a time, in turn
-  // order — open mode has no such restriction, so currentBidTurnId stays
+  // order. Open mode has no such restriction, so currentBidTurnId stays
   // null there and this check is skipped entirely.
   if (room.biddingMode === "orderly" && nomination.currentBidTurnId !== playerId) {
     return { error: "NOT_YOUR_BID_TURN" };
@@ -166,7 +160,7 @@ export function placeBid(room, playerId, amount) {
   if (room.biddingMode === "orderly") {
     // The new high bidder is excluded from stillActiveBidders by definition
     // (they're now currentBidder), so this can never immediately resolve to
-    // "assigning" the same way a pass can — there's always at least the
+    // "assigning" the same way a pass can. There's always at least the
     // previous currentBidder's turn to come back around to, unless they were
     // the only other active bidder, in which case nextBidTurnId already
     // returns null and the UI just shows nobody else can act.
@@ -229,7 +223,7 @@ export function assignPosition(room, playerId, position) {
   }
 
   // Surfaced to the caller so it can broadcast a room-independent "this
-  // player just sold for N coins" event — the Market tab's live bid feed
+  // player just sold for N coins" event. The Market tab's live bid feed
   // (see roomHandlers.js's draft:assign handler) is the only consumer, and
   // it has no room to be `io.to(roomCode)`-scoped into.
   return { room, sale: { nbaPlayerId: soldPlayer.nbaPlayerId, fullName: soldPlayer.fullName, price: finalPrice } };
@@ -258,7 +252,7 @@ export function getOpenSlotsForPlayer(room, playerId) {
 
 // Used both for a voluntary mid-draft leave and for a disconnect that timed
 // out its reconnect grace period. Deliberately never touches room.players or
-// draft.rosters — the caller (roomStore) decides whether to keep the player
+// draft.rosters. The caller (roomStore) decides whether to keep the player
 // entry around, and their roster (however incomplete) needs to survive so
 // computeResults can still rank the team they'd built so far.
 export function removePlayerFromDraft(room, playerId) {
@@ -273,8 +267,8 @@ export function removePlayerFromDraft(room, playerId) {
     } else {
       draft.nomination.passed = draft.nomination.passed.filter((id) => id !== playerId);
 
-      // The player leaving might have been the last still-active holdout —
-      // recompute the same "has everyone but the high bidder passed" check
+      // The player leaving might have been the last still-active holdout.
+      // Recompute the same "has everyone but the high bidder passed" check
       // passOnNomination uses, so bidding doesn't stall waiting on someone
       // who's gone. Note: draft.turnOrder has already been filtered above,
       // so stillActiveBidders naturally excludes the departed player too.
@@ -284,7 +278,7 @@ export function removePlayerFromDraft(room, playerId) {
         nomination.phase = "assigning";
         nomination.currentBidTurnId = null;
       } else if (room.biddingMode === "orderly" && nomination.currentBidTurnId === playerId) {
-        // It was specifically the departed player's turn to act — hand the
+        // It was specifically the departed player's turn to act. Hand the
         // turn to whoever's next rather than leaving it stuck pointing at
         // someone no longer in the draft.
         nomination.currentBidTurnId = nextBidTurnId(draft, playerId);
