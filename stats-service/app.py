@@ -256,11 +256,25 @@ def load_stats_cache_from_disk():
 load_stats_cache_from_disk()
 
 
+def _atomic_write_json(path, obj):
+    """Write JSON to `path` so a reader never sees a half-written file.
+    `open(path, "w")` truncates immediately and fills back in over many
+    write() calls -- anything reading in that window (a git add for a
+    milestone commit, the dev server loading its cache, a monitoring
+    check) gets a truncated or empty file. Write a sibling temp file and
+    os.replace() it into place instead; replace is atomic on the same
+    filesystem, so a reader sees either the whole old file or the whole
+    new one, never a torn state."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = f"{path}.tmp-{os.getpid()}"
+    with open(tmp, "w") as f:
+        json.dump(obj, f)
+    os.replace(tmp, path)
+
+
 def save_stats_cache_to_disk():
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        with open(STATS_CACHE_FILE, "w") as f:
-            json.dump(_cache, f)
+        _atomic_write_json(STATS_CACHE_FILE, _cache)
     except OSError as e:
         print(f"[stats cache] failed to save to disk: {e}")
 
@@ -288,9 +302,7 @@ load_photo_cache_from_disk()
 
 def save_photo_cache_to_disk():
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        with open(PHOTO_CACHE_FILE, "w") as f:
-            json.dump(_photo_cache, f)
+        _atomic_write_json(PHOTO_CACHE_FILE, _photo_cache)
     except OSError as e:
         print(f"[photo cache] failed to save to disk: {e}")
 
@@ -323,9 +335,7 @@ load_awards_cache_from_disk()
 
 def save_awards_cache_to_disk():
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        with open(AWARDS_CACHE_FILE, "w") as f:
-            json.dump(_awards_cache, f)
+        _atomic_write_json(AWARDS_CACHE_FILE, _awards_cache)
     except OSError as e:
         print(f"[awards cache] failed to save to disk: {e}")
 
@@ -406,10 +416,8 @@ load_usage_cache_from_disk()
 
 def save_usage_cache_to_disk():
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
         serializable = {_usage_cache_key(pid, season): entry for (pid, season), entry in _usage_cache.items()}
-        with open(USAGE_CACHE_FILE, "w") as f:
-            json.dump(serializable, f)
+        _atomic_write_json(USAGE_CACHE_FILE, serializable)
     except OSError as e:
         print(f"[usage cache] failed to save to disk: {e}")
 
