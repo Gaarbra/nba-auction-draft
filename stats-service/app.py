@@ -904,36 +904,58 @@ def fetch_star_player_ids():
     return ids
 
 
-# The tightest pool, for the "superstars only" difficulty: an MVP or Finals
-# MVP, OR sustained perennial-elite status (3+ All-NBA selections or 5+
-# All-Star selections). A single All-Star nod or one All-NBA year clears
-# the broader "star" pool above; this one is meant to be nothing but names
-# a casual fan knows on sight -- Jordan, LeBron, Duncan, Curry, Giannis --
-# not merely very good players.
+# The tightest pool, for the "superstars only" difficulty. Two ways in:
+#
+#   1. Awards -- an MVP or Finals MVP, OR sustained perennial-elite status
+#      (3+ All-NBA selections or 5+ All-Star selections). A single All-Star
+#      nod or one All-NBA year only clears the broader "star" pool.
+#   2. Stats -- 20+ career PPG, or a strong all-around composite, over a
+#      real sample (250+ games). This is what the awards test alone misses:
+#      a current young star three years in who's clearly elite but hasn't
+#      piled up the selections yet, plus a few dominant rebounders and
+#      playmakers whose game doesn't show up in a scoring line.
+#
+# Meant to be nothing but names a casual fan knows on sight -- Jordan,
+# LeBron, Curry, Giannis, Luka -- not merely very good players.
 SUPERSTAR_MIN_ALLNBA = 3
 SUPERSTAR_MIN_ALLSTAR = 5
+SUPERSTAR_MIN_GAMES = 250
+SUPERSTAR_MIN_PPG = 20.0
+SUPERSTAR_MIN_COMPOSITE = 28.0  # PPG + 0.7*(RPG + APG)
+
+
+def _is_award_superstar(entry):
+    allnba = 0
+    allstar = 0
+    for award in entry.get("awards", []):
+        label = award["label"]
+        if label in ("MVP", "Finals MVP"):
+            return True
+        if label == "All-NBA":
+            allnba = award.get("count", 0)
+        elif label == "NBA All-Star":
+            allstar = award.get("count", 0)
+    return allnba >= SUPERSTAR_MIN_ALLNBA or allstar >= SUPERSTAR_MIN_ALLSTAR
+
+
+def _is_stats_superstar(stats):
+    if not stats or stats.get("gamesPlayed", 0) < SUPERSTAR_MIN_GAMES:
+        return False
+    ppg = stats.get("pointsPerGame") or 0
+    rpg = stats.get("reboundsPerGame") or 0
+    apg = stats.get("assistsPerGame") or 0
+    return ppg >= SUPERSTAR_MIN_PPG or (ppg + 0.7 * (rpg + apg)) >= SUPERSTAR_MIN_COMPOSITE
 
 
 def fetch_superstar_player_ids():
-    """Same pure-in-memory scan as fetch_star_player_ids, just a stricter
-    membership test (see SUPERSTAR_MIN_* above). Falls back gracefully at
-    the draw site: when a narrow era's superstar subset runs low, the roll
-    drops to the broader star pool, then notable, then the full pool."""
-    ids = set()
-    for pid, entry in _awards_cache.items():
-        allnba = 0
-        allstar = 0
-        is_mvp = False
-        for award in entry.get("awards", []):
-            label = award["label"]
-            if label in ("MVP", "Finals MVP"):
-                is_mvp = True
-                break
-            if label == "All-NBA":
-                allnba = award.get("count", 0)
-            elif label == "NBA All-Star":
-                allstar = award.get("count", 0)
-        if is_mvp or allnba >= SUPERSTAR_MIN_ALLNBA or allstar >= SUPERSTAR_MIN_ALLSTAR:
+    """Union of the award-based and stats-based superstar tests above, a
+    pure in-memory scan over both already-warmed caches -- no network call.
+    Falls back gracefully at the draw site: when a narrow era's superstar
+    subset runs low, the roll drops to the broader star pool, then notable,
+    then the full pool."""
+    ids = {pid for pid, entry in _awards_cache.items() if _is_award_superstar(entry)}
+    for pid, entry in _cache.items():
+        if pid not in ids and _is_stats_superstar(entry.get("stats")):
             ids.add(pid)
     return ids
 
