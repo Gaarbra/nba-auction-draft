@@ -10,3 +10,4 @@ data/*
 !data/players.json
 !data/notablePlayers.json
 !data/topTeamPlayers.json
+!data/starPlayers.json

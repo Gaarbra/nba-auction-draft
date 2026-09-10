@@ -49,6 +49,48 @@ export function computeNotablePoolOdds(difficulty, notablePoolSize) {
   return base * poolSizeScale;
 }
 
+// The "notable" pool (top-500-per-game-stat cutoff, see notablePlayers.js)
+// is broad enough that "easy" could still land a journeyman with a long,
+// modest-but-recognizable career instead of an actual star -- real example
+// hit live: Zaza Pachulia (2x NBA Champion, but a backup center averaging
+// 6.8 PPG) qualified for "notable" the same way Jayson Tatum does. This
+// second, narrower pool is award-driven instead of stat-driven (see
+// starPlayers.js / stats-service's fetch_star_player_ids): MVP, All-NBA, a
+// real All-Star selection, and similar individually-selective honors --
+// deliberately excluding "NBA Champion," which every player on a winning
+// roster gets regardless of role.
+export const DIFFICULTY_STATIC_STAR_ODDS = { easy: 0.65, normal: 0.25, hard: 0 };
+
+// Smaller than notable's threshold on purpose: the star pool is inherently
+// narrower (individually-selective honors vs. a top-500 stat cutoff), and
+// its accuracy is still bounded by how much of the awards cache has been
+// warmed (see warm_awards.py) -- 150 is sized to let "All Eras" (currently
+// ~450+ and growing as warming continues) clear it comfortably without
+// requiring every single-era bucket to as well.
+const MIN_STAR_POOL_FOR_FULL_ODDS = 150;
+// Lower than the notable pool's floor (0.7): a narrow era's star subset can
+// be genuinely small (a couple dozen names), and forcing a high star-pool
+// rate against that few names would recreate the exact repetition problem
+// the notable-pool threshold fix (see MIN_NOTABLE_POOL_FOR_FULL_ODDS above)
+// was for -- better to fall back toward the broader notable pool more often
+// than hammer the same handful of stars.
+const STAR_POOL_SCALE_FLOOR = 0.5;
+
+/**
+ * Same shape as computeNotablePoolOdds, for the narrower award-driven star
+ * pool layered in front of it (see rollPlayerForRoom in roomHandlers.js):
+ * try the star pool first at these odds, then the broader notable pool at
+ * computeNotablePoolOdds' odds, then the full era pool.
+ * @param {string} difficulty
+ * @param {number} starPoolSize
+ * @returns {number}
+ */
+export function computeStarPoolOdds(difficulty, starPoolSize) {
+  const base = DIFFICULTY_STATIC_STAR_ODDS[difficulty] ?? DIFFICULTY_STATIC_STAR_ODDS.normal;
+  const poolSizeScale = Math.max(STAR_POOL_SCALE_FLOOR, Math.min(1, starPoolSize / MIN_STAR_POOL_FOR_FULL_ODDS));
+  return base * poolSizeScale;
+}
+
 // "open" (the long-standing default): anyone still active on a nomination
 // can bid or pass whenever they want, first-come-first-served. "orderly":
 // only one specific person may act at a time, cycling through turn order.

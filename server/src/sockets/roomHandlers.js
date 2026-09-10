@@ -19,6 +19,7 @@ import {
   clearVoteKickIfComplete,
   RECONNECT_GRACE_MS,
   computeNotablePoolOdds,
+  computeStarPoolOdds,
 } from "../rooms/roomStore.js";
 import {
   nominatePlayer,
@@ -31,6 +32,7 @@ import {
 import { getPlayers } from "../services/playerCache.js";
 import { getNotablePlayerIds } from "../services/notablePlayers.js";
 import { getTopTeamPlayerIds } from "../services/topTeamPlayers.js";
+import { getStarPlayerIds } from "../services/starPlayers.js";
 import { filterPlayersByEra } from "../services/era.js";
 import { fetchPlayerStats } from "../services/statsClient.js";
 import { saveDraftResults } from "../services/db.js";
@@ -115,16 +117,24 @@ async function drawPlayerWithStats(candidates) {
   return toNominatedPlayer(lastCandidate, null);
 }
 
-// The whole difficulty system, shared by draft:nominate and draft:reroll:
-// narrow to the data-driven "notable" pool (all-time per-game leaders, see
-// notablePlayers.js, UNIONed with this season's #1 team's current roster,
-// see topTeamPlayers.js -- that second pool is what catches a recognizable
-// breakout player this season who hasn't built enough of a career track
-// record to crack an all-time list yet) with odds set by difficulty, then
-// one random draw from whichever pool that leaves. Only one stats-service
+// The whole difficulty system, shared by draft:nominate and draft:reroll.
+// Three nested pools, tried narrowest-first:
+//   1. "star" (award-driven: MVP/All-NBA/a real All-Star selection, see
+//      starPlayers.js) -- genuinely selective honors, not just "was on a
+//      winning roster." This is what makes "easy" actually feel like
+//      stars, not just recognizable journeymen (see computeStarPoolOdds'
+//      own comment in roomStore.js for the Zaza Pachulia case that showed
+//      why the notable pool alone wasn't enough).
+//   2. "notable" (stat-driven: all-time per-game leaders, see
+//      notablePlayers.js, UNIONed with this season's #1 team's current
+//      roster, see topTeamPlayers.js -- that second pool catches a
+//      recognizable breakout player this season who hasn't built enough of
+//      a career track record to crack an all-time list yet)
+//   3. the full era pool
+// Odds for each tier set by difficulty; falls through to the next tier
+// whenever a pool is empty or its coin flip misses. Only one stats-service
 // call per roll, not several in parallel -- keeps rolls fast and resilient
-// to stats.nba.com's rate limiting. Falls back to the full pool if both
-// lists are empty (fetch failure, or this era just has none).
+// to stats.nba.com's rate limiting.
 // `excludeIds` is extra IDs to treat as unavailable beyond what's already
 // drafted -- a reroll needs this to rule out drawing the exact same player
 // it's trying to get away from.
@@ -136,16 +146,30 @@ async function rollPlayerForRoom(room, excludeIds = []) {
 
   if (available.length === 0) return { error: "NO_PLAYERS_LEFT" };
 
-  const [notableIds, topTeamIds] = await Promise.all([getNotablePlayerIds(), getTopTeamPlayerIds()]);
+  const [notableIds, topTeamIds, starIds] = await Promise.all([
+    getNotablePlayerIds(),
+    getTopTeamPlayerIds(),
+    getStarPlayerIds(),
+  ]);
   const notableSet = new Set([...notableIds, ...topTeamIds]);
   const notablePool = notableSet.size > 0 ? available.filter((p) => notableSet.has(p.id)) : [];
+  const starSet = new Set(starIds);
+  const starPool = starSet.size > 0 ? available.filter((p) => starSet.has(p.id)) : [];
 
-  // Threshold math lives in computeNotablePoolOdds (roomStore.js). Both
-  // the coin flip below and drawPlayerWithStats's draw are uniform over
-  // whichever pool this lands in: every player in it has an equal
-  // chance, every era, every roll.
-  const staticOdds = computeNotablePoolOdds(room.difficulty, notablePool.length);
-  const drawPool = notablePool.length > 0 && Math.random() < staticOdds ? notablePool : available;
+  // Threshold math lives in computeStarPoolOdds/computeNotablePoolOdds
+  // (roomStore.js). Both coin flips and drawPlayerWithStats's draw are
+  // uniform over whichever pool this lands in: every player in it has an
+  // equal chance, every era, every roll.
+  const starOdds = computeStarPoolOdds(room.difficulty, starPool.length);
+  const notableOdds = computeNotablePoolOdds(room.difficulty, notablePool.length);
+  let drawPool;
+  if (starPool.length > 0 && Math.random() < starOdds) {
+    drawPool = starPool;
+  } else if (notablePool.length > 0 && Math.random() < notableOdds) {
+    drawPool = notablePool;
+  } else {
+    drawPool = available;
+  }
 
   // The actual draw (with its stats-lookup retries) runs alongside a fixed
   // minimum delay, so the shared rolling animation always plays for at

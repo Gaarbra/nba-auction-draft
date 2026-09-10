@@ -866,6 +866,36 @@ def fetch_top_team_player_ids():
     return team_abbreviation, ids
 
 
+# Individually-selective honors only -- excludes "NBA Champion" and "Olympic
+# Gold" on purpose, since those go to every player on a winning roster
+# (a 12th man who never left the bench is still "2x NBA Champion"; that's
+# exactly why the old top-500-per-game-stat notable pool could surface a
+# journeyman like Zaza Pachulia and call it "easy mode"). Also excludes the
+# lesser honors bundled into the "allstar" tier bucket (All-Defensive Team,
+# All-Rookie Team, Cup honors) -- checked against the real label, not the
+# tier, since that bucket mixes marquee All-Star selection in with those.
+STAR_AWARD_LABELS = {"MVP", "Finals MVP", "All-NBA", "NBA All-Star", "DPOY", "All-Star MVP"}
+
+
+def fetch_star_player_ids():
+    """The award-driven "star" pool: everyone in the already-warmed awards
+    cache with at least one individually-selective honor (MVP, All-NBA,
+    a real All-Star selection, ...). Unlike fetch_notable_player_ids (a
+    per-game STAT-leaderboard cutoff) and fetch_top_team_player_ids (a live
+    nba_api call), this is a pure scan over data already sitting in memory
+    -- no network call, no ON_RENDER guard needed, nothing to cache or warm
+    separately. Its accuracy is entirely bounded by how much of the awards
+    cache has been warmed (see scripts/warm_awards.py); an unwarmed player
+    just doesn't show up here yet, same as an unwarmed player has no stats."""
+    ids = set()
+    for pid, entry in _awards_cache.items():
+        for award in entry.get("awards", []):
+            if award["label"] in STAR_AWARD_LABELS:
+                ids.add(pid)
+                break
+    return ids
+
+
 def _broad_position(position):
     """Collapses a possibly-hyphenated position ('F-C', 'G-F') down to its
     primary (first-listed) component. NBA's own convention lists the
@@ -1220,6 +1250,20 @@ def get_top_team_players():
     # this route 500'd with "Object of type set is not JSON serializable"
     # before this fix.
     return jsonify({"teamAbbreviation": team_abbreviation, "playerIds": list(ids), "count": len(ids)})
+
+
+@app.get("/star-players")
+def get_star_players():
+    """See fetch_star_player_ids's own docstring. Never fails in practice
+    (pure in-memory computation, no network call), but wrapped the same way
+    as every other best-effort pool route for consistency."""
+    try:
+        ids = fetch_star_player_ids()
+    except Exception as e:
+        print(f"[star players fetch failed] ({e.__class__.__name__}: {e})")
+        return jsonify({"error": "STAR_PLAYERS_FETCH_FAILED"}), 502
+
+    return jsonify({"playerIds": list(ids), "count": len(ids)})
 
 
 @app.get("/market-index")
