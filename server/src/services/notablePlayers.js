@@ -94,7 +94,15 @@ export async function getNotablePlayerIds() {
       .catch((err) => {
         console.warn(`[notablePlayers] refresh failed, falling back: ${err.message}`);
         lastRefreshFailureAt = Date.now();
-        return memoryCache || { fetchedAt: 0, ids: [] };
+        // Must assign, not just return a fallback value -- the cooldown
+        // check above only fires when memoryCache is truthy. Currently
+        // unreachable in practice (notablePlayers.json always ships on
+        // disk, so memoryCache is never actually null here), but see
+        // topTeamPlayers.js for what happens when that assumption doesn't
+        // hold: the exact same shape of bug, without a disk cache to mask
+        // it, turned into every roll re-paying a doomed fetch.
+        memoryCache = memoryCache || { fetchedAt: 0, ids: [] };
+        return memoryCache;
       })
       .finally(() => {
         inFlightRefresh = null;

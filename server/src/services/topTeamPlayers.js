@@ -82,7 +82,14 @@ export async function getTopTeamPlayerIds() {
       .catch((err) => {
         console.warn(`[topTeamPlayers] refresh failed, falling back: ${err.message}`);
         lastRefreshFailureAt = Date.now();
-        return memoryCache || { fetchedAt: 0, ids: [] };
+        // Must actually assign memoryCache here, not just return a fallback
+        // value -- the cooldown check above only fires when memoryCache is
+        // truthy. Without this, a persistent failure (e.g. no disk cache
+        // and stats.nba.com unreachable) leaves memoryCache null forever,
+        // the cooldown gate never engages, and every single roll re-pays
+        // this fetch's full timeout instead of backing off for 30 minutes.
+        memoryCache = memoryCache || { fetchedAt: 0, teamAbbreviation: null, ids: [] };
+        return memoryCache;
       })
       .finally(() => {
         inFlightRefresh = null;

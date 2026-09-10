@@ -833,6 +833,17 @@ def fetch_top_team_player_ids():
     if cached is not None and (time.time() - _top_team_cache["fetchedAt"]) < TOP_TEAM_CACHE_TTL_SECONDS:
         return _top_team_cache["teamAbbreviation"], cached
 
+    if ON_RENDER:
+        # Same guard as fetch_stats_for_player/fetch_player_awards/
+        # fetch_usage_pct: stats.nba.com is confirmed unreachable from
+        # Render, so a live attempt here would just be a slow, doomed wait
+        # -- and this one is in the hot path of every single roll (see
+        # rollPlayerForRoom in roomHandlers.js), so skipping fast instead of
+        # timing out is the difference between an instant roll and a ~20s
+        # stall on every nomination. A stale-but-real cached team (if any)
+        # still beats nothing.
+        return (_top_team_cache["teamAbbreviation"], cached) if cached is not None else (None, set())
+
     standings = leaguestandingsv3.LeagueStandingsV3(timeout=15)
     df = standings.get_data_frames()[0]
     if df.empty:
