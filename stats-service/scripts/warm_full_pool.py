@@ -32,7 +32,10 @@ PLAYERS_POOL_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "server", "data", "players.json"
 )
 
-DELAY_RANGE = (1.0, 1.6)  # same jittered pacing as the existing notable-pool warm-up
+DELAY_RANGE = (0.5, 0.9)  # tightened from (1.0, 1.6) for a faster catch-up run; the
+# FAILURE_THRESHOLD/COOLDOWN_SECONDS guard below still backs off hard on
+# real trouble, so this only costs speed, not safety, if stats.nba.com
+# pushes back -- watch the log's failed= count after changing this.
 FAILURE_THRESHOLD = 3
 COOLDOWN_SECONDS = 45
 SAVE_EVERY = 25

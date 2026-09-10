@@ -13,3 +13,4 @@ data/*
 !data/statsCache.json
 !data/usageCache.json
 !data/photoCache.json
+!data/awardsCache.json

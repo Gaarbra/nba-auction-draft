@@ -39,20 +39,21 @@ jobs:
         working-directory: stats-service
         run: pip install -r requirements.txt
 
-      - name: Refresh player pool, notable players, and stats cache
+      - name: Refresh player pool, notable players, stats cache, and awards cache
         working-directory: stats-service
         # No DATABASE_URL on purpose. This only touches the git-shipped
         # JSON caches, not Postgres, and app.py already treats a missing
         # DATABASE_URL as "skip DB persistence" everywhere, not an error.
         env:
           REFRESH_MAX_RUNTIME_SECONDS: "1200"
+          REFRESH_AWARDS_MAX_RUNTIME_SECONDS: "600"
         run: python scripts/refresh_all.py
 
       - name: Commit and push if anything changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add server/data/players.json server/data/notablePlayers.json stats-service/data/statsCache.json
+          git add server/data/players.json server/data/notablePlayers.json stats-service/data/statsCache.json stats-service/data/awardsCache.json
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else

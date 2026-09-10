@@ -1,6 +1,6 @@
-"""Refreshes the three data files stats-service/server ship to production:
-server/data/players.json, server/data/notablePlayers.json, and
-stats-service/data/statsCache.json.
+"""Refreshes the data files stats-service/server ship to production:
+server/data/players.json, server/data/notablePlayers.json,
+stats-service/data/statsCache.json, and stats-service/data/awardsCache.json.
 
 This exists because Render's own outbound IP is confirmed blocked by
 stats.nba.com (every live lookup from there fails outright, see
@@ -46,6 +46,10 @@ SAVE_EVERY = 25
 # just means the run picks up where it left off next time instead of
 # finishing in one shot.
 MAX_RUNTIME_SECONDS = int(os.environ.get("REFRESH_MAX_RUNTIME_SECONDS", 20 * 60))
+# Separate, smaller budget: awards change far less often than "is this
+# rookie in the pool yet," so a scheduled run should spend most of its time
+# on stats and only a modest slice keeping awards topped up.
+AWARDS_MAX_RUNTIME_SECONDS = int(os.environ.get("REFRESH_AWARDS_MAX_RUNTIME_SECONDS", 10 * 60))
 
 
 def refresh_players_pool():
@@ -118,10 +122,65 @@ def warm_missing_stats(all_ids):
     print(f"Stats warm-up done. fetched={fetched} no_stats={no_stats} failed={failed}. Cache now {len(stats_app._cache)} total.")
 
 
+def warm_missing_awards():
+    # Same candidate set as scripts/warm_awards.py: only players with a
+    # confirmed real career (already in the stats cache) are worth an
+    # awards lookup at all.
+    candidate_ids = [pid for pid, entry in stats_app._cache.items() if entry.get("stats")]
+    already_cached = set(stats_app._awards_cache.keys())
+    to_fetch = [pid for pid in candidate_ids if pid not in already_cached]
+    print(f"Awards cache: {len(already_cached)} already cached, {len(to_fetch)} missing.")
+    if not to_fetch:
+        return
+
+    start = time.time()
+    consecutive_failures = 0
+    fetched = 0
+    no_awards = 0
+    failed = 0
+
+    for i, player_id in enumerate(to_fetch, 1):
+        if time.time() - start > AWARDS_MAX_RUNTIME_SECONDS:
+            print(
+                f"  hit the {AWARDS_MAX_RUNTIME_SECONDS}s awards runtime budget, stopping early "
+                f"({i - 1}/{len(to_fetch)} attempted), picks up where it left off next run."
+            )
+            break
+
+        try:
+            # Goes straight to the live fetch (not fetch_player_awards'
+            # public wrapper) so this never silently no-ops if ON_RENDER
+            # were ever accidentally set for a run of this script -- see
+            # scripts/warm_awards.py for the identical reasoning.
+            awards = stats_app._fetch_and_cache_awards(player_id)
+            if awards:
+                fetched += 1
+            else:
+                no_awards += 1
+            consecutive_failures = 0
+        except Exception as e:
+            failed += 1
+            consecutive_failures += 1
+            print(f"  [{i}/{len(to_fetch)}] id={player_id} failed: {e.__class__.__name__}: {e}")
+
+        if i % SAVE_EVERY == 0:
+            print(f"  [{i}/{len(to_fetch)}] fetched={fetched} no_awards={no_awards} failed={failed}")
+
+        if consecutive_failures >= FAILURE_THRESHOLD:
+            print(f"  {consecutive_failures} failures in a row, cooling down {COOLDOWN_SECONDS}s...")
+            time.sleep(COOLDOWN_SECONDS)
+            consecutive_failures = 0
+
+        time.sleep(random.uniform(*DELAY_RANGE))
+
+    print(f"Awards warm-up done. fetched={fetched} no_awards={no_awards} failed={failed}. Cache now {len(stats_app._awards_cache)} total.")
+
+
 def main():
     players = refresh_players_pool()
     refresh_notable_players()
     warm_missing_stats([p["id"] for p in players])
+    warm_missing_awards()
     print("Done.")
 
 
