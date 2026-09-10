@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeNotablePoolOdds, computeStarPoolOdds, DIFFICULTY_STATIC_ODDS, DIFFICULTY_STATIC_STAR_ODDS } from "./roomStore.js";
+import {
+  computeNotablePoolOdds,
+  computeStarPoolOdds,
+  computeSuperstarPoolOdds,
+  DIFFICULTY_STATIC_ODDS,
+  DIFFICULTY_STATIC_STAR_ODDS,
+  DIFFICULTY_STATIC_SUPERSTAR_ODDS,
+} from "./roomStore.js";
 
 test("computeNotablePoolOdds: a large notable pool (e.g. All Eras' ~1,160) gets the difficulty's full base odds", () => {
   assert.strictEqual(computeNotablePoolOdds("easy", 1161), DIFFICULTY_STATIC_ODDS.easy);
@@ -92,4 +99,41 @@ test("computeStarPoolOdds: scales smoothly between the floor and full odds", () 
   const at120 = computeStarPoolOdds("normal", 120);
   assert.ok(Math.abs(at75 - DIFFICULTY_STATIC_STAR_ODDS.normal * 0.5) < 1e-9);
   assert.ok(Math.abs(at120 - DIFFICULTY_STATIC_STAR_ODDS.normal * (120 / 150)) < 1e-9);
+});
+
+// computeSuperstarPoolOdds: only "veryeasy" ("Superstars" in the UI) ever
+// draws from this pool. Threshold 60, floor 0.6.
+
+test("computeSuperstarPoolOdds: only veryeasy is non-zero; every other difficulty is 0", () => {
+  assert.strictEqual(computeSuperstarPoolOdds("easy", 170), 0);
+  assert.strictEqual(computeSuperstarPoolOdds("normal", 170), 0);
+  assert.strictEqual(computeSuperstarPoolOdds("hard", 170), 0);
+  assert.ok(computeSuperstarPoolOdds("veryeasy", 170) > 0);
+});
+
+test("computeSuperstarPoolOdds: a large superstar pool (All Eras' ~170) gets veryeasy's full base odds", () => {
+  assert.strictEqual(computeSuperstarPoolOdds("veryeasy", 170), DIFFICULTY_STATIC_SUPERSTAR_ODDS.veryeasy);
+  assert.strictEqual(computeSuperstarPoolOdds("veryeasy", 60), DIFFICULTY_STATIC_SUPERSTAR_ODDS.veryeasy);
+});
+
+test("computeSuperstarPoolOdds: a narrow pool scales down but never below the 0.6 floor", () => {
+  const odds = computeSuperstarPoolOdds("veryeasy", 10);
+  assert.ok(Math.abs(odds - DIFFICULTY_STATIC_SUPERSTAR_ODDS.veryeasy * 0.6) < 1e-9, `expected ~${DIFFICULTY_STATIC_SUPERSTAR_ODDS.veryeasy * 0.6}, got ${odds}`);
+});
+
+test("computeSuperstarPoolOdds: an empty superstar pool still hits the 0.6 floor, not 0", () => {
+  assert.ok(Math.abs(computeSuperstarPoolOdds("veryeasy", 0) - DIFFICULTY_STATIC_SUPERSTAR_ODDS.veryeasy * 0.6) < 1e-9);
+});
+
+test("computeSuperstarPoolOdds: an unrecognized difficulty is 0 (no superstar pool)", () => {
+  assert.strictEqual(computeSuperstarPoolOdds("bogus", 170), 0);
+});
+
+test("computeSuperstarPoolOdds: scales smoothly between the floor and full odds", () => {
+  // 36/60 = 0.6, exactly at the floor's own threshold.
+  const at36 = computeSuperstarPoolOdds("veryeasy", 36);
+  // 48/60 = 0.8, above the floor, so it reflects the real ratio.
+  const at48 = computeSuperstarPoolOdds("veryeasy", 48);
+  assert.ok(Math.abs(at36 - DIFFICULTY_STATIC_SUPERSTAR_ODDS.veryeasy * 0.6) < 1e-9);
+  assert.ok(Math.abs(at48 - DIFFICULTY_STATIC_SUPERSTAR_ODDS.veryeasy * (48 / 60)) < 1e-9);
 });

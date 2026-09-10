@@ -9,6 +9,7 @@ const MAX_PLAYERS = 4;
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 
 const DIFFICULTIES = [
+  { id: "veryeasy", label: "Superstars", hint: "Nothing but MVPs and perennial All-NBA names" },
   { id: "easy", label: "Easy", hint: "Stars come up often" },
   { id: "normal", label: "Normal", hint: "A healthy mix" },
   { id: "hard", label: "Hard", hint: "True random draw" },

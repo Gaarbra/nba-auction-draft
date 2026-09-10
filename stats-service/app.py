@@ -904,6 +904,40 @@ def fetch_star_player_ids():
     return ids
 
 
+# The tightest pool, for the "superstars only" difficulty: an MVP or Finals
+# MVP, OR sustained perennial-elite status (3+ All-NBA selections or 5+
+# All-Star selections). A single All-Star nod or one All-NBA year clears
+# the broader "star" pool above; this one is meant to be nothing but names
+# a casual fan knows on sight -- Jordan, LeBron, Duncan, Curry, Giannis --
+# not merely very good players.
+SUPERSTAR_MIN_ALLNBA = 3
+SUPERSTAR_MIN_ALLSTAR = 5
+
+
+def fetch_superstar_player_ids():
+    """Same pure-in-memory scan as fetch_star_player_ids, just a stricter
+    membership test (see SUPERSTAR_MIN_* above). Falls back gracefully at
+    the draw site: when a narrow era's superstar subset runs low, the roll
+    drops to the broader star pool, then notable, then the full pool."""
+    ids = set()
+    for pid, entry in _awards_cache.items():
+        allnba = 0
+        allstar = 0
+        is_mvp = False
+        for award in entry.get("awards", []):
+            label = award["label"]
+            if label in ("MVP", "Finals MVP"):
+                is_mvp = True
+                break
+            if label == "All-NBA":
+                allnba = award.get("count", 0)
+            elif label == "NBA All-Star":
+                allstar = award.get("count", 0)
+        if is_mvp or allnba >= SUPERSTAR_MIN_ALLNBA or allstar >= SUPERSTAR_MIN_ALLSTAR:
+            ids.add(pid)
+    return ids
+
+
 def _broad_position(position):
     """Collapses a possibly-hyphenated position ('F-C', 'G-F') down to its
     primary (first-listed) component. NBA's own convention lists the
@@ -1270,6 +1304,19 @@ def get_star_players():
     except Exception as e:
         print(f"[star players fetch failed] ({e.__class__.__name__}: {e})")
         return jsonify({"error": "STAR_PLAYERS_FETCH_FAILED"}), 502
+
+    return jsonify({"playerIds": list(ids), "count": len(ids)})
+
+
+@app.get("/superstar-players")
+def get_superstar_players():
+    """See fetch_superstar_player_ids's own docstring. Same best-effort
+    wrapper as /star-players."""
+    try:
+        ids = fetch_superstar_player_ids()
+    except Exception as e:
+        print(f"[superstar players fetch failed] ({e.__class__.__name__}: {e})")
+        return jsonify({"error": "SUPERSTAR_PLAYERS_FETCH_FAILED"}), 502
 
     return jsonify({"playerIds": list(ids), "count": len(ids)})
 

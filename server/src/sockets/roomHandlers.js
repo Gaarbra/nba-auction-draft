@@ -20,6 +20,7 @@ import {
   RECONNECT_GRACE_MS,
   computeNotablePoolOdds,
   computeStarPoolOdds,
+  computeSuperstarPoolOdds,
 } from "../rooms/roomStore.js";
 import {
   nominatePlayer,
@@ -33,6 +34,7 @@ import { getPlayers } from "../services/playerCache.js";
 import { getNotablePlayerIds } from "../services/notablePlayers.js";
 import { getTopTeamPlayerIds } from "../services/topTeamPlayers.js";
 import { getStarPlayerIds } from "../services/starPlayers.js";
+import { getSuperstarPlayerIds } from "../services/superstarPlayers.js";
 import { filterPlayersByEra } from "../services/era.js";
 import { fetchPlayerStats } from "../services/statsClient.js";
 import { saveDraftResults } from "../services/db.js";
@@ -118,19 +120,22 @@ async function drawPlayerWithStats(candidates) {
 }
 
 // The whole difficulty system, shared by draft:nominate and draft:reroll.
-// Three nested pools, tried narrowest-first:
-//   1. "star" (award-driven: MVP/All-NBA/a real All-Star selection, see
+// Four nested pools, tried narrowest-first:
+//   1. "superstar" (MVPs + perennial-elite: 3+ All-NBA or 5+ All-Star, see
+//      superstarPlayers.js) -- ONLY the "superstars only" difficulty draws
+//      from this; every other one leaves its odds at 0.
+//   2. "star" (award-driven: MVP/All-NBA/a real All-Star selection, see
 //      starPlayers.js) -- genuinely selective honors, not just "was on a
 //      winning roster." This is what makes "easy" actually feel like
 //      stars, not just recognizable journeymen (see computeStarPoolOdds'
 //      own comment in roomStore.js for the Zaza Pachulia case that showed
 //      why the notable pool alone wasn't enough).
-//   2. "notable" (stat-driven: all-time per-game leaders, see
+//   3. "notable" (stat-driven: all-time per-game leaders, see
 //      notablePlayers.js, UNIONed with this season's #1 team's current
 //      roster, see topTeamPlayers.js -- that second pool catches a
 //      recognizable breakout player this season who hasn't built enough of
 //      a career track record to crack an all-time list yet)
-//   3. the full era pool
+//   4. the full era pool
 // Odds for each tier set by difficulty; falls through to the next tier
 // whenever a pool is empty or its coin flip misses. Only one stats-service
 // call per roll, not several in parallel -- keeps rolls fast and resilient
@@ -146,24 +151,30 @@ async function rollPlayerForRoom(room, excludeIds = []) {
 
   if (available.length === 0) return { error: "NO_PLAYERS_LEFT" };
 
-  const [notableIds, topTeamIds, starIds] = await Promise.all([
+  const [notableIds, topTeamIds, starIds, superstarIds] = await Promise.all([
     getNotablePlayerIds(),
     getTopTeamPlayerIds(),
     getStarPlayerIds(),
+    getSuperstarPlayerIds(),
   ]);
   const notableSet = new Set([...notableIds, ...topTeamIds]);
   const notablePool = notableSet.size > 0 ? available.filter((p) => notableSet.has(p.id)) : [];
   const starSet = new Set(starIds);
   const starPool = starSet.size > 0 ? available.filter((p) => starSet.has(p.id)) : [];
+  const superstarSet = new Set(superstarIds);
+  const superstarPool = superstarSet.size > 0 ? available.filter((p) => superstarSet.has(p.id)) : [];
 
-  // Threshold math lives in computeStarPoolOdds/computeNotablePoolOdds
-  // (roomStore.js). Both coin flips and drawPlayerWithStats's draw are
-  // uniform over whichever pool this lands in: every player in it has an
-  // equal chance, every era, every roll.
+  // Threshold math lives in computeSuperstarPoolOdds/computeStarPoolOdds/
+  // computeNotablePoolOdds (roomStore.js). Every coin flip and
+  // drawPlayerWithStats's draw are uniform over whichever pool this lands
+  // in: every player in it has an equal chance, every era, every roll.
+  const superstarOdds = computeSuperstarPoolOdds(room.difficulty, superstarPool.length);
   const starOdds = computeStarPoolOdds(room.difficulty, starPool.length);
   const notableOdds = computeNotablePoolOdds(room.difficulty, notablePool.length);
   let drawPool;
-  if (starPool.length > 0 && Math.random() < starOdds) {
+  if (superstarPool.length > 0 && Math.random() < superstarOdds) {
+    drawPool = superstarPool;
+  } else if (starPool.length > 0 && Math.random() < starOdds) {
     drawPool = starPool;
   } else if (notablePool.length > 0 && Math.random() < notableOdds) {
     drawPool = notablePool;

@@ -9,7 +9,7 @@ const VALID_ERA_IDS = new Set(["all", "active", ...ERA_BUCKETS.map((b) => b.id)]
 // notablePlayers.js), instead of the full era pool. Nobody is ever
 // excluded outright; even on Easy there's a chance of the full pool, and
 // the notable pool itself comes from real leaderboards, not a curated list.
-export const DIFFICULTY_STATIC_ODDS = { easy: 0.92, normal: 0.55, hard: 0 };
+export const DIFFICULTY_STATIC_ODDS = { veryeasy: 0.92, easy: 0.92, normal: 0.55, hard: 0 };
 const VALID_DIFFICULTIES = new Set(Object.keys(DIFFICULTY_STATIC_ODDS));
 
 // A narrow era shouldn't dominate every roll with the same handful of
@@ -59,7 +59,7 @@ export function computeNotablePoolOdds(difficulty, notablePoolSize) {
 // real All-Star selection, and similar individually-selective honors --
 // deliberately excluding "NBA Champion," which every player on a winning
 // roster gets regardless of role.
-export const DIFFICULTY_STATIC_STAR_ODDS = { easy: 0.65, normal: 0.25, hard: 0 };
+export const DIFFICULTY_STATIC_STAR_ODDS = { veryeasy: 0.9, easy: 0.65, normal: 0.25, hard: 0 };
 
 // Smaller than notable's threshold on purpose: the star pool is inherently
 // narrower (individually-selective honors vs. a top-500 stat cutoff), and
@@ -88,6 +88,44 @@ const STAR_POOL_SCALE_FLOOR = 0.5;
 export function computeStarPoolOdds(difficulty, starPoolSize) {
   const base = DIFFICULTY_STATIC_STAR_ODDS[difficulty] ?? DIFFICULTY_STATIC_STAR_ODDS.normal;
   const poolSizeScale = Math.max(STAR_POOL_SCALE_FLOOR, Math.min(1, starPoolSize / MIN_STAR_POOL_FOR_FULL_ODDS));
+  return base * poolSizeScale;
+}
+
+// The "superstars only" difficulty layers one more, even tighter pool in
+// front of the star pool: MVPs and perennial-elite players only (3+
+// All-NBA or 5+ All-Star, see superstarPlayers.js / stats-service's
+// fetch_superstar_player_ids). Only this difficulty ever draws from it;
+// every other one leaves it at 0 and behaves exactly as before.
+// 0.99, not 1.0: keeps the "nobody's ever fully excluded" principle the
+// other difficulties follow (see DIFFICULTY_STATIC_ODDS' comment), but at
+// 1-in-100 it still reads as superstar after superstar. The pool-size
+// scaling below drops the effective rate on its own when a narrow era or a
+// late-draft board leaves few superstars left.
+export const DIFFICULTY_STATIC_SUPERSTAR_ODDS = { veryeasy: 0.99, easy: 0, normal: 0, hard: 0 };
+
+// Small: the superstar pool is ~170 across All Eras (growing as the awards
+// cache warms) and a couple dozen in a single decade. 60 lets All Eras and
+// "Active Now" clear it while a narrow decade scales toward the floor --
+// and when it does run low mid-draft, the roll just falls through to the
+// broader star pool, so a lower rate there isn't a variety problem.
+const MIN_SUPERSTAR_POOL_FOR_FULL_ODDS = 60;
+const SUPERSTAR_POOL_SCALE_FLOOR = 0.6;
+
+/**
+ * Same shape as computeStarPoolOdds, for the tightest pool, tried first of
+ * all in rollPlayerForRoom: superstar pool, then star pool, then notable
+ * pool, then the full era pool.
+ * @param {string} difficulty
+ * @param {number} superstarPoolSize
+ * @returns {number}
+ */
+export function computeSuperstarPoolOdds(difficulty, superstarPoolSize) {
+  const base = DIFFICULTY_STATIC_SUPERSTAR_ODDS[difficulty] ?? DIFFICULTY_STATIC_SUPERSTAR_ODDS.normal;
+  if (base === 0) return 0;
+  const poolSizeScale = Math.max(
+    SUPERSTAR_POOL_SCALE_FLOOR,
+    Math.min(1, superstarPoolSize / MIN_SUPERSTAR_POOL_FOR_FULL_ODDS),
+  );
   return base * poolSizeScale;
 }
 

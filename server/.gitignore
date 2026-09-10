@@ -11,3 +11,4 @@ data/*
 !data/notablePlayers.json
 !data/topTeamPlayers.json
 !data/starPlayers.json
+!data/superstarPlayers.json
