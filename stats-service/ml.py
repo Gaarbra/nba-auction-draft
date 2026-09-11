@@ -45,6 +45,13 @@ NUMERIC_COLS = [
     "usage_pct",
     "minutes_per_game",
     "games_played",
+    # Was already fetched, parsed, and persisted to Postgres by every other
+    # part of this app (see app.py's per_game(total_tov) and db.py's
+    # player_stats upsert) -- just never actually used as a model feature
+    # until now. A genuine, real signal for auction value (careless
+    # ball-handlers are worth less than their counting stats alone suggest)
+    # that cost nothing new to add.
+    "tov_per_game",
 ]
 # Room/pick context, not derived from the player at all, but genuinely
 # predictive: the same player can fetch a different price depending on how
@@ -86,6 +93,13 @@ def extract_numeric_features(stats):
         "usage_pct": stats.get("usagePct"),
         "minutes_per_game": stats.get("minutesPerGame") or 0,
         "games_played": stats.get("gamesPlayed") or 0,
+        # No `or 0` fallback, same reasoning as steals/blocks above: turnovers
+        # weren't tracked as a box-score stat before 1977-78 (see app.py's
+        # total_of()), so None here means "never recorded," not "zero
+        # giveaways." The imputer treats a missing value correctly either way;
+        # coercing it to 0 would tell the model every pre-1978 player had a
+        # flawless handle.
+        "tov_per_game": stats.get("tovPerGame"),
     }
 
 
@@ -142,6 +156,7 @@ _FEATURE_DISPLAY = {
     "usage_pct": ("USG%", "{:.0%}"),
     "minutes_per_game": ("MPG", "{:.1f}"),
     "games_played": ("career games", "{:.0f}"),
+    "tov_per_game": ("TOV", "{:.1f}"),
     "era": ("era", None),
     "slot": ("slot", None),
     "difficulty": ("difficulty", None),

@@ -70,6 +70,7 @@ def load_training_data():
             ps.blocks_per_game,
             ps.fga_per_game,
             ps.fta_per_game,
+            ps.tov_per_game,
             ps.usage_pct,
             ps.minutes_per_game,
             ps.games_played
@@ -108,6 +109,7 @@ def load_training_data():
         "blocks_per_game",
         "fga_per_game",
         "fta_per_game",
+        "tov_per_game",
         "usage_pct",
         "minutes_per_game",
         "games_played",

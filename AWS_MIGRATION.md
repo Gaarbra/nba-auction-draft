@@ -274,7 +274,12 @@ Unset (or never set) the four env vars, or delete the IAM access key -- either o
 ---
 
 ## Phase 3: scikit-learn value model
-*(not started)*
+
+**Turns out this was already done, just not through AWS.** A scikit-learn auction-price predictor already existed before this phase (`stats-service/ml.py` + `scripts/train_price_model.py`), trained on real completed-draft history in Postgres, not on anything from S3 -- it's the "Suggested value" chip shown on every player card during bidding. Building a second value model from scratch would have been pure duplication, so this phase became "enrich the existing one" instead, once that was noticed.
+
+**What actually changed**: added `tov_per_game` (turnovers per game) to the model's feature set. This data was already being fetched, parsed, and persisted to Postgres by the rest of the app (`app.py`'s stats parsing, `db.py`'s `player_stats` upsert) -- it just wasn't included in `NUMERIC_COLS`/the training query until now. Zero new data collection, zero schema changes.
+
+**Honest result, not a success story**: retrained and compared cross-validated MAE before/after on the current 530 labeled picks -- effectively unchanged (best model MAE 1.65 coins either way; R²/Spearman moved by noise-level amounts). The real bottleneck for this model right now is sample size (530 picks, mostly this project's own dev/test drafts), not which features it has. A much richer feature set drawn from the S3 raw archive (3-point shooting, offensive/defensive rebound split, free-throw%, all genuinely available in the raw `PlayerCareerStats` response but not currently parsed anywhere in this app) was considered and explicitly **not** pursued for this reason -- it would need a Postgres schema migration, code changes to the stats-parsing pipeline in three places, and a multi-hour re-warm of the full player pool, for a result that would almost certainly show the same flat outcome the turnover experiment just did. Worth revisiting once real usage (not dev/test drafts) has produced meaningfully more labeled picks -- the data-collection gap, not the feature-engineering gap, is what to fix first.
 
 ## Phase 4: `/players/<id>/value-estimate` endpoint
 *(not started)*
