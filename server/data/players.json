@@ -1,5 +1,5 @@
 {
-  "fetchedAt": 1788934700269,
+  "fetchedAt": 1789116899280,
   "players": [
     {
       "id": 76001,
@@ -2894,7 +2894,7 @@
     },
     {
       "id": 203992,
-      "fullName": "Bogdan Bogdanović",
+      "fullName": "Bogdan Bogdanovi\u0107",
       "isActive": true,
       "fromYear": 2017,
       "toYear": 2026
@@ -4669,6 +4669,13 @@
       "isActive": false,
       "fromYear": 2021,
       "toYear": 2024
+    },
+    {
+      "id": 1642966,
+      "fullName": "Lamont Butler",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 348,
@@ -7073,7 +7080,7 @@
     },
     {
       "id": 1642359,
-      "fullName": "Pacôme Dadiet",
+      "fullName": "Pac\u00f4me Dadiet",
       "isActive": true,
       "fromYear": 2024,
       "toYear": 2026
@@ -7934,7 +7941,7 @@
     },
     {
       "id": 1631217,
-      "fullName": "Moussa Diabaté",
+      "fullName": "Moussa Diabat\u00e9",
       "isActive": true,
       "fromYear": 2022,
       "toYear": 2026
@@ -8277,7 +8284,7 @@
     },
     {
       "id": 1629029,
-      "fullName": "Luka Dončić",
+      "fullName": "Luka Don\u010di\u0107",
       "isActive": true,
       "fromYear": 2018,
       "toYear": 2026
@@ -8830,7 +8837,7 @@
     },
     {
       "id": 1642856,
-      "fullName": "Egor Dëmin",
+      "fullName": "Egor D\u00ebmin",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -11332,7 +11339,7 @@
       "fullName": "Taj Gibson",
       "isActive": true,
       "fromYear": 2009,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 76811,
@@ -11637,7 +11644,7 @@
     },
     {
       "id": 1642864,
-      "fullName": "Hugo González",
+      "fullName": "Hugo Gonz\u00e1lez",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -14121,13 +14128,6 @@
       "toYear": 1997
     },
     {
-      "id": 1642045,
-      "fullName": "Devon Higgs",
-      "isActive": false,
-      "fromYear": 2026,
-      "toYear": 2026
-    },
-    {
       "id": 77021,
       "fullName": "Kenny Higgs",
       "isActive": false,
@@ -15627,7 +15627,7 @@
     },
     {
       "id": 1642857,
-      "fullName": "Kasparas Jakučionis",
+      "fullName": "Kasparas Jaku\u010dionis",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -16565,7 +16565,7 @@
     },
     {
       "id": 203999,
-      "fullName": "Nikola Jokić",
+      "fullName": "Nikola Joki\u0107",
       "isActive": true,
       "fromYear": 2015,
       "toYear": 2026
@@ -17153,7 +17153,7 @@
     },
     {
       "id": 1631107,
-      "fullName": "Nikola Jović",
+      "fullName": "Nikola Jovi\u0107",
       "isActive": true,
       "fromYear": 2022,
       "toYear": 2026
@@ -18238,7 +18238,7 @@
     },
     {
       "id": 1630249,
-      "fullName": "Vít Krejčí",
+      "fullName": "V\u00edt Krej\u010d\u00ed",
       "isActive": true,
       "fromYear": 2021,
       "toYear": 2026
@@ -20282,7 +20282,7 @@
     },
     {
       "id": 1642881,
-      "fullName": "Bogoljub Marković",
+      "fullName": "Bogoljub Markovi\u0107",
       "isActive": false,
       "fromYear": 2026,
       "toYear": 2026
@@ -20653,7 +20653,7 @@
     },
     {
       "id": 1631255,
-      "fullName": "Karlo Matković",
+      "fullName": "Karlo Matkovi\u0107",
       "isActive": true,
       "fromYear": 2024,
       "toYear": 2026
@@ -20807,7 +20807,7 @@
     },
     {
       "id": 1643024,
-      "fullName": "Chris Mañon",
+      "fullName": "Chris Ma\u00f1on",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -23733,7 +23733,7 @@
     },
     {
       "id": 1642949,
-      "fullName": "Yanic Konan Niederhäuser",
+      "fullName": "Yanic Konan Niederh\u00e4user",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -24013,7 +24013,7 @@
     },
     {
       "id": 203994,
-      "fullName": "Jusuf Nurkić",
+      "fullName": "Jusuf Nurki\u0107",
       "isActive": true,
       "fromYear": 2014,
       "toYear": 2026
@@ -25014,7 +25014,7 @@
     },
     {
       "id": 1628394,
-      "fullName": "Anžejs Pasečņiks",
+      "fullName": "An\u017eejs Pase\u010d\u0146iks",
       "isActive": false,
       "fromYear": 2019,
       "toYear": 2020
@@ -26043,7 +26043,7 @@
     },
     {
       "id": 204001,
-      "fullName": "Kristaps Porziņģis",
+      "fullName": "Kristaps Porzi\u0146\u0123is",
       "isActive": true,
       "fromYear": 2015,
       "toYear": 2026
@@ -26449,7 +26449,7 @@
     },
     {
       "id": 1631311,
-      "fullName": "Lester Quiñones",
+      "fullName": "Lester Qui\u00f1ones",
       "isActive": false,
       "fromYear": 2022,
       "toYear": 2024
@@ -28325,7 +28325,7 @@
     },
     {
       "id": 1642275,
-      "fullName": "Tidjane Salaün",
+      "fullName": "Tidjane Sala\u00fcn",
       "isActive": true,
       "fromYear": 2024,
       "toYear": 2026
@@ -28836,7 +28836,7 @@
     },
     {
       "id": 203471,
-      "fullName": "Dennis Schröder",
+      "fullName": "Dennis Schr\u00f6der",
       "isActive": true,
       "fromYear": 2013,
       "toYear": 2026
@@ -32405,6 +32405,13 @@
       "toYear": 1948
     },
     {
+      "id": 1642893,
+      "fullName": "Alex Toohey",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 342,
       "fullName": "Andy Toolson",
       "isActive": false,
@@ -32427,7 +32434,7 @@
     },
     {
       "id": 1642260,
-      "fullName": "Nikola Topić",
+      "fullName": "Nikola Topi\u0107",
       "isActive": true,
       "fromYear": 2024,
       "toYear": 2026
@@ -33393,7 +33400,7 @@
     },
     {
       "id": 202696,
-      "fullName": "Nikola Vučević",
+      "fullName": "Nikola Vu\u010devi\u0107",
       "isActive": true,
       "fromYear": 2011,
       "toYear": 2026
@@ -33634,7 +33641,7 @@
       "fullName": "Lonnie Walker IV",
       "isActive": false,
       "fromYear": 2018,
-      "toYear": 2024
+      "toYear": 2026
     },
     {
       "id": 202322,
