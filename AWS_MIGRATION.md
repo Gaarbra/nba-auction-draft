@@ -198,7 +198,80 @@ we touch the live Render env vars or move to Phase 2.
 ---
 
 ## Phase 2: Raw NBA Stats API responses to S3
-*(not started)*
+
+### What actually changed in the repo (done)
+
+New `stats-service/s3_archive.py`: one function, `archive_raw_response(category, key, raw)`, that uploads a live nba_api response to S3 as-is, before any of it gets parsed down. Wired into the four live per-player/per-season lookups that actually go out to stats.nba.com:
+
+- `fetch_player_bio` → `raw/bio/<player_id>.json`
+- `_fetch_and_cache_stats` → `raw/stats/<player_id>.json` (archived even on the "no career record" path -- a confirmed miss is still worth keeping, so a future run doesn't need to re-ask stats.nba.com to learn the same thing)
+- `_fetch_and_cache_awards` → `raw/awards/<player_id>.json`
+- `fetch_usage_pct` → `raw/usage/<season>.json` (keyed by season, not player: that one call already returns the whole league's table for the season, so archiving it once per season is the complete, non-redundant copy)
+
+Deliberately **not** wired into the pool-building endpoints (`fetch_notable_player_ids`, `fetch_top_team_player_ids`, `fetch_players_pool`) -- those return derived leaderboards/rosters, not per-player source data, and re-archiving a whole-pool response on every cache refresh wouldn't give Phase 3's model anything a snapshot from an hour earlier didn't already have.
+
+This is a **latest-snapshot archive, not a version history**: each key gets overwritten on every live fetch, same as the existing disk caches. If a real history of "how did this player's line change over time" ever becomes worth keeping, that's a one-line change to a timestamped key (`raw/{category}/{key}/{archivedAt}.json`) -- not changed now because it multiplies storage for no current use.
+
+Same best-effort shape as every other secondary system in this app: unconfigured or failing, `archive_raw_response` logs once and returns, never raises, never blocks or slows down the actual response the product needs. You can deploy this whole phase with **no AWS changes yet** and nothing behaves differently.
+
+Also added: `boto3` to `stats-service/requirements.txt`, and four new optional env vars (`S3_RAW_ARCHIVE_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) to `stats-service/.env.example` and `render.yaml` (`sync: false`, same pattern as `DATABASE_URL`).
+
+None of this is pushed yet, same rule as Phase 1: committed locally so you can review the diff before it goes anywhere.
+
+### Steps you do in AWS (I can't provision this for you)
+
+**1. Create the bucket** -- [S3 Console](https://console.aws.amazon.com/s3/) → **Create bucket**:
+- **Bucket name**: something globally unique across *all* AWS accounts, not just yours -- `hoop-bids-raw-nba-data` almost certainly isn't free. A suffix from your account id makes collisions basically impossible: `hoop-bids-raw-nba-data-<last 6 digits of your account id>` (find your account id top-right in the console, click your username).
+- **Region**: `us-east-1` (N. Virginia) -- matches the RDS instance from Phase 1; keeps everything in one region, not required but tidier and avoids any cross-region transfer cost.
+- **Object Ownership**: leave "ACLs disabled" (the default).
+- **Block Public Access**: leave **all four boxes checked** (fully blocked). This data has no reason to ever be public.
+- **Bucket Versioning**: your call -- off is fine (this is an overwrite-in-place archive, see above); on costs a little more storage but gives you undo if something ever writes garbage over a key.
+- **Default encryption**: leave the default (SSE-S3). No extra setup needed.
+- Create it.
+
+**2. Create a scoped IAM user for this bucket** -- don't reuse root account keys or a broad `AmazonS3FullAccess` policy. [IAM Console](https://console.aws.amazon.com/iam/) → **Users** → **Create user**:
+- Name: `hoop-bids-s3-archiver`.
+- **Do not** grant console access -- this is an API-only credential the app uses, not a person who logs in.
+- Skip the "Add to group" / "Attach policies" step for now; you'll attach an inline policy scoped to just this bucket next, not a broad managed policy.
+- After creating the user, open it → **Permissions** tab → **Add permissions** → **Create inline policy** → JSON tab, paste:
+  ```json
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": ["s3:PutObject"],
+        "Resource": "arn:aws:s3:::<your-bucket-name>/raw/*"
+      }
+    ]
+  }
+  ```
+  Replace `<your-bucket-name>` with the exact bucket name from step 1. This grants write access to objects under `raw/` in that one bucket only -- nothing else in your AWS account, and not even read/list/delete on this bucket (the app never needs to read its own archive back).
+- Name the policy `hoop-bids-s3-archive-write`, create it.
+- Open the user → **Security credentials** tab → **Access keys** → **Create access key** → choose **"Application running outside AWS"** → create it. **Copy the Secret access key now** -- AWS shows it exactly once and there's no way to retrieve it again later (you'd have to create a new key pair).
+
+**3. You now have everything for the env vars**:
+```
+S3_RAW_ARCHIVE_BUCKET=<your-bucket-name>
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=<from step 2>
+AWS_SECRET_ACCESS_KEY=<from step 2, the one shown only once>
+```
+
+### Rolling this out
+
+1. Create the bucket and IAM user (above).
+2. Add the four values to your **local** `stats-service/.env`, restart the stats service, and watch its console: the "S3_RAW_ARCHIVE_BUCKET not set" line should be gone, and no `[s3 archive] failed to init...` line should appear. Trigger any real player lookup (open a draft, view a player) and check the bucket in the S3 console for a new `raw/stats/<some-id>.json` object -- that's your local confirmation before touching production.
+3. When ready: Render dashboard → `hoop-bids-stats-service` → Environment tab → set the same four values there. Redeploy, then repeat the same "look for a new object in the bucket" check against production.
+4. That's it -- there's no schema, no migration, nothing else that needs to happen. Archiving is additive and asynchronous to nothing else in the app; every existing feature works identically whether these env vars are set or not.
+
+### Rollback
+
+Unset (or never set) the four env vars, or delete the IAM access key -- either one makes `archive_raw_response` a no-op again (logged, not an error) with zero code changes. Nothing in the rest of the app reads from this bucket, so there's no dependency to unwind. The bucket itself and anything already archived in it are untouched by any of this; delete the bucket yourself in the S3 console whenever you actually want that data gone (a real, hard-to-reverse action -- not something to do as a side effect of turning archiving off).
+
+**Tell me once the bucket and IAM user exist and you've confirmed the local "new object appears in the bucket" check above.** That's the natural checkpoint before touching the live Render env vars or starting Phase 3.
+
+---
 
 ## Phase 3: scikit-learn value model
 *(not started)*
