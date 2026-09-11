@@ -28,18 +28,6 @@ services:
         sync: false
       - key: DATABASE_SSL
         sync: false
-      # Phase 2 of AWS_MIGRATION.md, all optional: archiving raw
-      # stats.nba.com responses to S3. Same sync: false convention --
-      # unset in the dashboard is a supported state (archiving just no-ops,
-      # see s3_archive.py), not a broken one.
-      - key: S3_RAW_ARCHIVE_BUCKET
-        sync: false
-      - key: AWS_REGION
-        sync: false
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
 
   # Node/Express/Socket.IO backend, the only service the frontend talks to.
   - type: web

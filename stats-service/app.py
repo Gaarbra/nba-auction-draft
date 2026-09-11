@@ -29,7 +29,6 @@ from nba_api.stats.endpoints import (
 import db
 import ml
 import photos
-import s3_archive
 
 app = Flask(__name__)
 
@@ -209,7 +208,6 @@ def fetch_player_bio(player_id):
         return cached["bio"]
 
     info = commonplayerinfo.CommonPlayerInfo(player_id=player_id, timeout=15)
-    s3_archive.archive_raw_response("bio", player_id, info.get_normalized_dict())
     df = info.get_data_frames()[0]
 
     if df.empty:
@@ -487,7 +485,6 @@ def _fetch_and_cache_stats(player_id):
     fetch_stats_for_player)."""
     try:
         career = playercareerstats.PlayerCareerStats(player_id=player_id, timeout=15)
-        s3_archive.archive_raw_response("stats", player_id, career.get_normalized_dict())
         df = career.get_data_frames()[0]
     except KeyError:
         # Confirmed by hand on several ids that hit exactly this: the HTTP
@@ -650,9 +647,7 @@ def _fetch_and_cache_awards(player_id):
     stay in the "notable" tier rather than being filtered out entirely --
     a rookie with nothing else yet still gets to show those."""
     result = playerawards.PlayerAwards(player_id=player_id, timeout=15)
-    normalized = result.get_normalized_dict()
-    s3_archive.archive_raw_response("awards", player_id, normalized)
-    rows = normalized["PlayerAwards"]
+    rows = result.get_normalized_dict()["PlayerAwards"]
 
     counts = {}
     for row in rows:
@@ -734,10 +729,6 @@ def fetch_usage_pct(player_id, season):
         measure_type_detailed_defense="Advanced",
         timeout=20,
     )
-    # Keyed by season, not player_id: this one response already covers the
-    # whole league for that season (see the docstring above), so archiving
-    # it once per season is the complete, non-redundant raw copy.
-    s3_archive.archive_raw_response("usage", season, resp.get_normalized_dict())
     df = resp.get_data_frames()[0]
 
     fetched_at = time.time()
