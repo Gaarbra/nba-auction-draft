@@ -18,6 +18,7 @@ import TeamBadge from "./TeamBadge.jsx";
 import { playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
 import { getTeamLogoUrl } from "../teamLogos.js";
+import { getHistoricalTeamName } from "../teamNames.js";
 import { countryFlag } from "../countryFlags.js";
 import useMediaQuery from "../hooks/useMediaQuery.js";
 
@@ -503,7 +504,10 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                           )}
                           {nomination.player.position || "N/A"} ·{" "}
                           {nomination.player.isActive ? "Currently" : "Played for"}{" "}
-                          {nomination.player.team?.abbreviation || "Free Agent"} ·{" "}
+                          {getHistoricalTeamName(nomination.player.team?.abbreviation) ||
+                            nomination.player.team?.abbreviation ||
+                            "Free Agent"}{" "}
+                          ·{" "}
                           {nomination.player.draftYear ? `Drafted ${nomination.player.draftYear}` : "Undrafted"}
                         </p>
                         <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} />

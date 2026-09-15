@@ -8,6 +8,7 @@ import StatRadarChart from "./StatRadarChart.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
 import TeamBadge from "./TeamBadge.jsx";
 import { getTeamColors } from "../teamColors.js";
+import { getHistoricalTeamName } from "../teamNames.js";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 
@@ -191,7 +192,14 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
     for (const p of eraFiltered) counts.set(p.team, (counts.get(p.team) || 0) + 1);
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([abbr, count]) => ({ value: abbr, label: `${abbr} · ${count} player${count === 1 ? "" : "s"}` }));
+      .map(([abbr, count]) => {
+        // A vintage code like MNL or TCB means nothing on its own -- name
+        // the actual franchise when we know it (see teamNames.js), same as
+        // how a current abbreviation like LAL is already recognizable.
+        const historicalName = getHistoricalTeamName(abbr);
+        const label = historicalName ? `${historicalName} (${abbr})` : abbr;
+        return { value: abbr, label: `${label} · ${count} player${count === 1 ? "" : "s"}` };
+      });
   }, [eraFiltered]);
 
   // A team that no longer has any players in the newly-selected era gets
@@ -449,12 +457,16 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                   <PlayerNameLink nbaPlayerId={selectedMeta.id} name={selectedMeta.fullName} />
                 </h1>
                 <p className="market-dossier-meta">
-                  {selectedMeta.position || "N/A"} · {selectedMeta.team} ·{" "}
+                  {selectedMeta.position || "N/A"} ·{" "}
+                  {getHistoricalTeamName(selectedMeta.team) || selectedMeta.team} ·{" "}
                   {selectedMeta.draftYear ? `Drafted ${selectedMeta.draftYear}` : "Undrafted"}
                 </p>
                 {stats?.teamHistory?.length > 1 && (
                   <p className="market-dossier-meta player-team-history">
-                    Career teams: {stats.teamHistory.map((t) => t.abbreviation).join(", ")}
+                    Career teams:{" "}
+                    {stats.teamHistory
+                      .map((t) => getHistoricalTeamName(t.abbreviation) || t.abbreviation)
+                      .join(", ")}
                   </p>
                 )}
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getTeamColors } from "../teamColors.js";
 import { getTeamLogoUrl } from "../teamLogos.js";
+import { getHistoricalTeamName } from "../teamNames.js";
 
 /** A team-identity chip. Prefers the real logo (hotlinked from the NBA's own
  * CDN via teamLogos.js, era-adaptive through that file's relocation/rename
@@ -22,11 +23,15 @@ export default function TeamBadge({ abbreviation, size = 28 }) {
 
   if (!abbreviation) return null;
 
+  // Hovering a vintage franchise's badge (MNL, TCB, SYR...) names the
+  // actual team instead of just the code -- see teamNames.js.
+  const title = getHistoricalTeamName(abbreviation) || abbreviation;
+
   if (logoUrl && !imgFailed) {
     // No inset -- the logo fills the whole circle now, cropped to it via
     // the CSS class's overflow:hidden rather than padded/contained.
     return (
-      <span className="team-badge team-badge-logo" style={{ width: size, height: size }} title={abbreviation}>
+      <span className="team-badge team-badge-logo" style={{ width: size, height: size }} title={title}>
         <img src={logoUrl} alt={abbreviation} onError={() => setImgFailed(true)} />
       </span>
     );
@@ -42,7 +47,7 @@ export default function TeamBadge({ abbreviation, size = 28 }) {
         fontSize: Math.max(9, Math.round(size * 0.36)),
         background: `linear-gradient(160deg, ${colors.primary}, color-mix(in srgb, ${colors.primary} 55%, #000))`,
       }}
-      title={abbreviation}
+      title={title}
     >
       {abbreviation}
     </span>

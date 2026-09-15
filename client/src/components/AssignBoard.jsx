@@ -4,6 +4,7 @@ import PlayerNameLink from "./PlayerNameLink.jsx";
 import StatHighlightRow from "./StatHighlightRow.jsx";
 import StatRadarChart from "./StatRadarChart.jsx";
 import { getTeamColors } from "../teamColors.js";
+import { getHistoricalTeamName } from "../teamNames.js";
 
 /* The focused "you won a player, now place them" screen, matching the
    Stitch "Assign Player to Roster Slot" mock: a hero banner for the won
@@ -74,7 +75,10 @@ export default function AssignBoard({
             </div>
             <p className="won-banner-meta">
               {player.isActive ? "Currently" : "Played for"}{" "}
-              <span className="won-banner-meta-strong">{player.team?.abbreviation || "Free Agent"}</span> ·{" "}
+              <span className="won-banner-meta-strong">
+                {getHistoricalTeamName(player.team?.abbreviation) || player.team?.abbreviation || "Free Agent"}
+              </span>{" "}
+              ·{" "}
               {player.draftYear ? `Drafted ${player.draftYear}` : "Undrafted"}
             </p>
             <p className="won-banner-sub">
