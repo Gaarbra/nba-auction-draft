@@ -23,11 +23,25 @@ export default function RoomLobby({
   connected,
   error,
   isSubmitting,
+  initialJoinCode,
 }) {
   const [name, setName] = useState("");
-  const [joinCode, setJoinCode] = useState("");
-  const [mode, setMode] = useState("public");
-  const [privateSubMode, setPrivateSubMode] = useState("create");
+  const [joinCode, setJoinCode] = useState(initialJoinCode || "");
+  const [mode, setMode] = useState(initialJoinCode ? "private" : "public");
+  const [privateSubMode, setPrivateSubMode] = useState(initialJoinCode ? "join" : "create");
+
+  // Covers the real timing here: App.jsx only learns the invite code from
+  // the URL in its own mount effect, which runs after this component's
+  // first render, so the useState initializers above see it as null on
+  // that very first pass. This is what actually catches the code once it
+  // arrives a moment later.
+  useEffect(() => {
+    if (!initialJoinCode) return;
+    setMode("private");
+    setPrivateSubMode("join");
+    setJoinCode(initialJoinCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialJoinCode]);
   const [localNames, setLocalNames] = useState(["", ""]);
   const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
 

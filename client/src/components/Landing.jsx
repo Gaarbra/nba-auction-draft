@@ -12,7 +12,16 @@ import MarketTicker from "./MarketTicker.jsx";
  * here so its styling can live scoped under .landing-lobby without
  * touching how it looks in the one other place a bare .lobby-card still
  * renders (App.jsx's reconnecting screen). */
-export default function Landing({ onCreateRoom, onJoinRoom, onCreateLocalRoom, onListPublicRooms, connected, error, isSubmitting }) {
+export default function Landing({
+  onCreateRoom,
+  onJoinRoom,
+  onCreateLocalRoom,
+  onListPublicRooms,
+  connected,
+  error,
+  isSubmitting,
+  initialJoinCode,
+}) {
   return (
     <div className="landing-lobby">
       <div className="landing-lobby-main">
@@ -51,6 +60,7 @@ export default function Landing({ onCreateRoom, onJoinRoom, onCreateLocalRoom, o
           connected={connected}
           error={error}
           isSubmitting={isSubmitting}
+          initialJoinCode={initialJoinCode}
         />
       </div>
 

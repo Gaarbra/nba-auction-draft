@@ -10,9 +10,25 @@ import BottomNav from "./components/BottomNav.jsx";
 import RoomFooter from "./components/RoomFooter.jsx";
 import InteractiveBackground from "./components/InteractiveBackground.jsx";
 import HowToPlay from "./components/HowToPlay.jsx";
+import RoomNotFound from "./components/RoomNotFound.jsx";
 
 const SESSION_KEY = "nba-auction-draft:session";
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
+
+// Same alphabet the server generates room codes from (roomStore.js) and
+// RoomLobby.jsx already sanitizes pasted codes against -- a link copied
+// out of a text message can pick up stray whitespace or casing, so this
+// normalizes it the same way before it's ever compared to anything.
+const ROOM_CODE_ALPHABET = /[^ABCDEFGHJKLMNPQRSTUVWXYZ23456789]/g;
+function sanitizeRoomCode(raw) {
+  return raw.toUpperCase().replace(ROOM_CODE_ALPHABET, "").slice(0, 5);
+}
+
+// Errors that mean "this specific room isn't a valid destination anymore"
+// (as opposed to NAME_TAKEN or a rate limit, which are fixable without
+// abandoning the link). Only these trigger the dedicated not-found page
+// when they come from a link-provided code -- see handleJoinRoom below.
+const DEAD_ROOM_ERRORS = new Set(["ROOM_NOT_FOUND", "DRAFT_ALREADY_STARTED", "ROOM_FULL"]);
 
 const ERROR_MESSAGES = {
   NAME_REQUIRED: "Please enter your name.",
@@ -73,8 +89,30 @@ export default function App() {
   // room console) and Market are the only two destinations now that there's
   // no separate landing-page-to-lobby step to track alongside this.
   const [activeTab, setActiveTab] = useState("lobby");
+  // Set once, on first load, from a shared invite link's ?room= query
+  // param (see RoomView.jsx's copyInviteLink). null for a normal visit.
+  const [inviteCode, setInviteCode] = useState(null);
+  // Which room code a failed join attempt was actually for, so the
+  // not-found page can show it even after RoomLobby's own joinCode field
+  // has since been cleared/changed.
+  const [deadRoomCode, setDeadRoomCode] = useState(null);
 
   const sessionRef = useRef(loadSession());
+
+  // A dead invite link is the one real "you tried to go somewhere that
+  // doesn't exist" moment this app has -- there's no client-side router to
+  // 404 on otherwise (render.yaml rewrites every path to this same
+  // index.html). Reads the code once on load and scrubs it from the URL
+  // right away, same as any app that treats a query param as one-time
+  // input rather than durable state.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("room");
+    if (!raw) return;
+    const code = sanitizeRoomCode(raw);
+    if (code) setInviteCode(code);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   // Nudges stats-service awake as soon as the page loads instead of
   // waiting for someone's first roll to discover it's asleep (Render's
@@ -194,6 +232,13 @@ export default function App() {
     socketRef.current.emit("room:join", { code, name }, (response) => {
       setIsSubmitting(false);
       if (response.error) {
+        // Only a link-provided code gets the full not-found page -- a
+        // manually typed one that's just wrong stays a normal inline
+        // error, since there's a fixable typo right there to retry.
+        if (inviteCode && code === inviteCode && DEAD_ROOM_ERRORS.has(response.error)) {
+          setDeadRoomCode(code);
+          return;
+        }
         setError(ERROR_MESSAGES[response.error] || "Could not join room.");
         return;
       }
@@ -203,6 +248,11 @@ export default function App() {
       sessionRef.current = { roomCode: response.room.code, playerId: response.playerId };
       saveSession(sessionRef.current);
     });
+  }
+
+  function handleBackToLobbyFromNotFound() {
+    setDeadRoomCode(null);
+    setInviteCode(null);
   }
 
   function handleCreateLocalRoom(names) {
@@ -275,6 +325,28 @@ export default function App() {
   // Each team drafts on the same fixed purse; CoinRow's meter maxes at 20.
   const teamBudget = 20;
 
+  // The tab title stayed "Hoop Bids" everywhere, which is real friction
+  // with several rooms/tabs open at once and doesn't tell a screen reader
+  // user (title changes get announced) what actually changed. Every real
+  // screen the app can show gets its own line here.
+  useEffect(() => {
+    if (deadRoomCode) {
+      document.title = "Room not found · Hoop Bids";
+    } else if (room?.status === "complete") {
+      document.title = "Results · Hoop Bids";
+    } else if (inDraft) {
+      document.title = isMyNominationTurn ? "Your turn to nominate · Hoop Bids" : "Drafting · Hoop Bids";
+    } else if (room?.status === "waiting") {
+      document.title = room.isLocal ? "Local Game · Hoop Bids" : `Room ${room.code} · Hoop Bids`;
+    } else if (activeTab === "market") {
+      document.title = "Market · Hoop Bids";
+    } else if (activeTab === "how-to-play") {
+      document.title = "How to Play · Hoop Bids";
+    } else {
+      document.title = "Hoop Bids";
+    }
+  }, [deadRoomCode, room?.status, room?.isLocal, room?.code, inDraft, isMyNominationTurn, activeTab]);
+
   return (
     // room-drafting scopes the second Paper-redesigned screen (see
     // .room-drafting in index.css): the live draft board plus the room
@@ -343,6 +415,12 @@ export default function App() {
           <MarketTab socket={socketRef.current} onNavigateToLobby={() => setActiveTab("lobby")} />
         ) : activeTab === "how-to-play" ? (
           <HowToPlay />
+        ) : deadRoomCode ? (
+          <RoomNotFound
+            code={deadRoomCode}
+            reason="This invite link doesn't lead anywhere anymore. The room may have already started, filled up, or the link's just gone stale."
+            onBackToLobby={handleBackToLobbyFromNotFound}
+          />
         ) : (
           <Landing
             onCreateRoom={handleCreateRoom}
@@ -352,6 +430,7 @@ export default function App() {
             connected={connected}
             error={error || kickedMessage}
             isSubmitting={isSubmitting}
+            initialJoinCode={inviteCode}
           />
         )}
       </main>

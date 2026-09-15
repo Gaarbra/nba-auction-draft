@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!-- Same coin-basketball mark as LogoMark.jsx, with a solid dark backing
+       circle added -- LogoMark itself is just transparent outlines, which
+       nearly disappears at 16-32px against a light browser tab. -->
+  <circle cx="60" cy="60" r="60" fill="#131315" />
+  <circle cx="60" cy="60" r="54" stroke="#FF8A00" stroke-width="4" />
+  <circle cx="60" cy="60" r="43" stroke="rgba(255,255,255,0.15)" stroke-width="1" />
+  <path d="M17 60H103" stroke="#FF8A00" stroke-width="4" stroke-linecap="round" />
+  <path d="M60 17V103" stroke="#FF8A00" stroke-width="4" stroke-linecap="round" />
+  <path d="M30 25C44 35 51 47 51 60C51 73 44 85 30 95" stroke="rgba(255,255,255,0.75)" stroke-width="3" stroke-linecap="round" />
+  <path d="M90 25C76 35 69 47 69 60C69 73 76 85 90 95" stroke="rgba(255,255,255,0.75)" stroke-width="3" stroke-linecap="round" />
+  <circle cx="60" cy="60" r="17" fill="#131315" stroke="#FF8A00" stroke-width="3" />
+  <path d="M54 53V67M66 53V67M54 60H66" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
