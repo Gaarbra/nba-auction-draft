@@ -33,6 +33,7 @@ export const PAGES = {
         </p>
         <p>Hoop Bids stores the minimum needed to run a draft: your chosen display name, room membership, and draft results, tied to your session rather than a real-world identity. There's no account system or email collection.</p>
         <p>Player statistics come from public NBA data. Draft history may be stored to power features like past-draft lookups; it is not sold or shared with third parties.</p>
+        <p>Chat messages and reactions sent during a draft are never logged or stored. They only exist in the room while it's open, the same as a live conversation, and nobody running this app reviews them.</p>
         <p>Browser local storage is used only to reconnect you to a room you were already in. It never leaves your device.</p>
       </>
     ),
@@ -58,6 +59,7 @@ export const PAGES = {
         </p>
         <p>Hoop Bids is a free, fan-made project for personal entertainment. It isn't affiliated with, endorsed by, or sponsored by the NBA or any NBA team.</p>
         <p>Play nice. No harassment, hateful names, or abuse of other players. Rooms and player data may be reset or removed at any time without notice; nothing here is guaranteed to persist.</p>
+        <p>In-room chat and reactions aren't monitored or reviewed by anyone running this app. What another player types is theirs, not something Hoop Bids reviews, endorses, or is responsible for. If someone's being disruptive, the host can start a vote to remove them from the room.</p>
         <p>Provided "as is," with no warranty of uptime, accuracy of historical stats, or fitness for any particular purpose.</p>
       </>
     ),
