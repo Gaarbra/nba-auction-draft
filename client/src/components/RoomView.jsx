@@ -90,14 +90,14 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
             </button>
           )}
         </div>
-        {!room.isLocal && (
+        {!room.isLocal && !room.isSolo && (
           <button type="button" onClick={copyInviteLink} className="secondary-btn">
             Copy Invite Link
           </button>
         )}
       </div>
 
-      {!room.isLocal && <VoteKickBanner room={room} currentPlayerId={currentPlayerId} socket={socket} />}
+      {!room.isLocal && !room.isSolo && <VoteKickBanner room={room} currentPlayerId={currentPlayerId} socket={socket} />}
 
       <h3>
         Players ({room.players.length}/{MAX_PLAYERS})
@@ -118,6 +118,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
           </li>
         ))}
         {!room.isLocal &&
+          !room.isSolo &&
           Array.from({ length: emptySlots }).map((_, i) => (
             <li key={`empty-${i}`} className="empty-slot">
               Waiting for player…
@@ -158,30 +159,37 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
               ))}
             </div>
           </label>
-          <label className="era-picker-label">
-            Bidding
-            <div className="difficulty-picker">
-              {BIDDING_MODES.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`difficulty-option ${biddingMode === m.id ? "active" : ""}`}
-                  onClick={() => setBiddingMode(m.id)}
-                  title={m.hint}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          </label>
-          <label className="swap-setting-label">
-            <input
-              type="checkbox"
-              checked={allowPositionSwaps}
-              onChange={(e) => setAllowPositionSwaps(e.target.checked)}
-            />
-            Allow players to swap drafted players' positions later
-          </label>
+          {/* Bidding mode and position-swap-with-others don't mean anything
+              with no one else at the table -- solo never bids and there's
+              no other roster to swap with. */}
+          {!room.isSolo && (
+            <label className="era-picker-label">
+              Bidding
+              <div className="difficulty-picker">
+                {BIDDING_MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`difficulty-option ${biddingMode === m.id ? "active" : ""}`}
+                    onClick={() => setBiddingMode(m.id)}
+                    title={m.hint}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </label>
+          )}
+          {!room.isSolo && (
+            <label className="swap-setting-label">
+              <input
+                type="checkbox"
+                checked={allowPositionSwaps}
+                onChange={(e) => setAllowPositionSwaps(e.target.checked)}
+              />
+              Allow players to swap drafted players' positions later
+            </label>
+          )}
           <motion.button
             type="button"
             onClick={() => onStartDraft(era, allowPositionSwaps, difficulty, biddingMode)}

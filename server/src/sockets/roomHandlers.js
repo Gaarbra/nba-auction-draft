@@ -199,6 +199,7 @@ function toPublicRoom(room) {
     biddingMode: room.biddingMode || null,
     visibility: room.visibility || "private",
     isLocal: room.isLocal || false,
+    isSolo: room.isSolo || false,
     allowPositionSwaps: room.allowPositionSwaps || false,
     resultsStatus: room.resultsStatus || null,
     results: room.results || null,
@@ -268,7 +269,7 @@ export function registerRoomHandlers(io, socket) {
   // any of these events. Each socket gets its own independent counter.
   const allowEvent = createSocketEventLimiter(10_000, 40);
 
-  socket.on("room:create", ({ name, visibility } = {}, callback) => {
+  socket.on("room:create", ({ name, visibility, isSolo } = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     if (typeof name !== "string" || !name.trim()) {
       return callback?.({ error: "NAME_REQUIRED" });
@@ -284,7 +285,7 @@ export function registerRoomHandlers(io, socket) {
       return callback?.({ error: "RATE_LIMITED" });
     }
 
-    const room = createRoom(visibility === "public" ? "public" : "private");
+    const room = createRoom(visibility === "public" ? "public" : "private", isSolo);
     const result = addPlayerToRoom(room.code, { name, socketId: socket.id });
 
     if (result.error) {

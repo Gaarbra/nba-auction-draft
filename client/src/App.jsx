@@ -154,7 +154,7 @@ export default function App() {
     setError("");
     setKickedMessage("");
     setIsSubmitting(true);
-    socketRef.current.emit("room:create", { name, visibility }, (response) => {
+    socketRef.current.emit("room:create", { name, visibility, isSolo }, (response) => {
       setIsSubmitting(false);
       if (response.error) {
         setError(ERROR_MESSAGES[response.error] || "Could not create room.");
@@ -165,25 +165,11 @@ export default function App() {
       setLocalPlayerIds(null);
       sessionRef.current = { roomCode: response.room.code, playerId: response.playerId };
       saveSession(sessionRef.current);
-
-      // Solo has no one to wait for and no real settings choice worth
-      // pausing on -- era/difficulty/bidding mode don't change solo's
-      // flat-price, no-bidding behavior either way -- so skip the waiting
-      // room entirely and start drafting right away with the same defaults
-      // RoomView would otherwise have offered. Uses response.playerId
-      // directly rather than the currentPlayerId state set just above,
-      // since that state update hasn't actually landed yet this tick.
-      if (isSolo) {
-        socketRef.current.emit(
-          "room:start",
-          { era: "all", allowPositionSwaps: false, difficulty: "normal", biddingMode: "open", playerId: response.playerId },
-          (startResponse) => {
-            if (startResponse?.error) {
-              setError(ERROR_MESSAGES[startResponse.error] || "Could not start draft.");
-            }
-          }
-        );
-      }
+      // Bidding mode and position-swap don't change solo's flat-price,
+      // no-bidding behavior, but era and difficulty absolutely do -- they
+      // decide who you might draft, same as any other room. So this lands
+      // on RoomView (room.isSolo trims it to era/difficulty/start) instead
+      // of auto-starting with hardcoded defaults.
     });
   }
 

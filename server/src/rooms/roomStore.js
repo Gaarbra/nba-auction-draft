@@ -159,7 +159,7 @@ function generateRoomCode() {
   return code;
 }
 
-export function createRoom(visibility = "private") {
+export function createRoom(visibility = "private", isSolo = false) {
   const code = generateRoomCode();
   const room = {
     code,
@@ -169,6 +169,10 @@ export function createRoom(visibility = "private") {
     // "private": needs the room code to join (today's long-standing default).
     // "public": also listable via listPublicRooms(), joinable without a code.
     visibility: visibility === "public" ? "public" : "private",
+    // Purely a display flag for RoomView (hides invite/waiting-for-others
+    // chrome and the bidding-mode/swap settings that don't apply to solo),
+    // same role as isLocal below -- doesn't change what the server allows.
+    isSolo: Boolean(isSolo),
     // playerId -> setTimeout handle, for pending disconnect-grace forfeits.
     pendingForfeits: new Map(),
   };
