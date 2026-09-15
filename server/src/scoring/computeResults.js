@@ -55,7 +55,10 @@ export async function computeDraftResults(room) {
   }
   slots.forEach((slot, i) => {
     const { statLine, photoUrl } = fetched[i];
-    rosterByTeam.get(slot.playerId).push(statLine);
+    // position/slot feed scoring.js's position-mismatch penalty; nothing
+    // upstream of this attaches them, so playerScore would silently see
+    // both as missing (and skip the penalty entirely) without this.
+    rosterByTeam.get(slot.playerId).push({ ...statLine, position: slot.drafted?.position ?? null, slot: slot.pos });
     displayByTeam.get(slot.playerId).push({
       slot: slot.pos,
       fullName: slot.drafted?.fullName ?? null,
@@ -92,6 +95,7 @@ export async function computeDraftResults(room) {
         ...slotInfo,
         op: team.breakdown.playerScores[i].op,
         dir: team.breakdown.playerScores[i].dir,
+        penalty: team.breakdown.playerScores[i].penalty,
         total: team.breakdown.playerScores[i].total,
       })),
     };

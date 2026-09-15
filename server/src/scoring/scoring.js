@@ -12,10 +12,12 @@
  *   Op   = (PTS * TS%) + (AST * 1.5) - (TOV * 2.0)
  *   DIR  = (STL * 2.5) + (BLK * 2.0) + (REB * 0.3)      [stats tracked]
  *        = (Season DWS / Games Played) * 100            [stats untracked, pre-1974]
+ *   Pen  = 3.0 if the player's real position doesn't match their roster slot's group
+ *        = 0   if it does, or if either the position or the slot is unknown
  *   Ms   = 1.10 if sum(USG%) <= 105
  *        = 1.00 if 105 < sum(USG%) <= 125
  *        = 0.85 if sum(USG%) > 125
- *   Final Team Score = sum(Op + DIR across 5 starters) * Ms
+ *   Final Team Score = sum(Op + DIR - Pen across 5 starters) * Ms
  *
  * One thing worth knowing if you're new to this file: every stat here
  * (PTS, AST, TOV, STL, BLK, REB) is a PER-GAME average, not a season
@@ -30,10 +32,21 @@
  *   pts: number, fga: number, fta: number, ast: number, tov: number,
  *   stl: number | null, blk: number | null, reb?: number,
  *   seasonDWS?: number | null, gamesPlayed?: number | null,
- *   usagePct?: number
+ *   usagePct?: number, position?: string | null, slot?: string | null
  * }} PlayerStatLine */
 
 const ROSTER_SIZE = 5;
+
+// Same G/F/C grouping the client's AssignBoard.jsx already uses to flag a
+// slot as "recommended" -- reused here rather than reinvented, so a player
+// the UI already marked as a mismatch is exactly the one that gets docked.
+const SLOT_GROUP = { PG: "G", SG: "G", SF: "F", PF: "F", C: "C" };
+
+// A fixed points-off penalty, not a multiplier -- keeps it in the same
+// additive shape as the TOV term inside Op, and roughly comparable in size
+// (2 turnovers/game costs 4.0; this costs a flat 3.0). Meaningful without
+// being able to single-handedly flip a close matchup on its own.
+const POSITION_PENALTY = 3.0;
 
 // This weight is small on purpose. A dominant rebounder pulling down about
 // 15 boards a game only contributes around 4.5 points here, which keeps
@@ -100,19 +113,36 @@ export function synergyMultiplier(sumUsagePct) {
 }
 
 /**
+ * A flat deduction for playing someone out of position -- a real Center
+ * slotted at PG, say. Returns 0 (no penalty, not "can't tell") whenever
+ * either side of the comparison is missing: an unlisted position isn't
+ * evidence of a bad fit, it's just data this app doesn't have, same
+ * reasoning AssignBoard.jsx already uses for its "recommended" slot hint.
+ * @param {{ position?: string | null, slot?: string | null }} stats
+ * @returns {number}
+ */
+export function positionMismatchPenalty({ position, slot }) {
+  if (!position || !slot) return 0;
+  const group = SLOT_GROUP[slot];
+  if (!group) return 0;
+  return position.toUpperCase().includes(group) ? 0 : POSITION_PENALTY;
+}
+
+/**
  * @param {PlayerStatLine} stats
- * @returns {{ op: number, dir: number, total: number }}
+ * @returns {{ op: number, dir: number, penalty: number, total: number }}
  */
 export function playerScore(stats) {
   const op = offenseScore(stats);
   const dir = defensiveImpactRating(stats);
-  return { op, dir, total: op + dir };
+  const penalty = positionMismatchPenalty(stats);
+  return { op, dir, penalty, total: op + dir - penalty };
 }
 
 /**
  * @param {PlayerStatLine[]} roster Exactly 5 starters, no bench.
  * @returns {{
- *   playerScores: Array<{ op: number, dir: number, total: number }>,
+ *   playerScores: Array<{ op: number, dir: number, penalty: number, total: number }>,
  *   sumUsagePct: number,
  *   synergyMultiplier: number,
  *   finalScore: number

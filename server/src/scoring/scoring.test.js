@@ -5,6 +5,7 @@ import {
   offenseScore,
   defensiveImpactRating,
   synergyMultiplier,
+  positionMismatchPenalty,
   playerScore,
   teamScore,
   winProbability,
@@ -155,13 +156,47 @@ test("synergyMultiplier: boundaries are inclusive on the low side of each band",
   assert.strictEqual(synergyMultiplier(150), 0.85);
 });
 
+// --- positionMismatchPenalty -----------------------------------------------
+
+test("positionMismatchPenalty: a Guard at PG (matching group) is not penalized", () => {
+  assert.strictEqual(positionMismatchPenalty({ position: "G", slot: "PG" }), 0);
+});
+
+test("positionMismatchPenalty: a Center forced into PG (mismatched group) costs 3.0", () => {
+  assert.strictEqual(positionMismatchPenalty({ position: "C", slot: "PG" }), 3.0);
+});
+
+test("positionMismatchPenalty: a combo position (e.g. 'F-G') matches either of its groups", () => {
+  assert.strictEqual(positionMismatchPenalty({ position: "F-G", slot: "SG" }), 0);
+  assert.strictEqual(positionMismatchPenalty({ position: "F-G", slot: "PF" }), 0);
+  assert.strictEqual(positionMismatchPenalty({ position: "F-G", slot: "C" }), 3.0);
+});
+
+test("positionMismatchPenalty: an unlisted position isn't evidence of a bad fit, so no penalty", () => {
+  assert.strictEqual(positionMismatchPenalty({ position: null, slot: "PG" }), 0);
+  assert.strictEqual(positionMismatchPenalty({ position: undefined, slot: "C" }), 0);
+});
+
+test("positionMismatchPenalty: a missing/unknown slot also skips the penalty rather than guessing", () => {
+  assert.strictEqual(positionMismatchPenalty({ position: "C", slot: null }), 0);
+  assert.strictEqual(positionMismatchPenalty({ position: "C", slot: "SIXTH_MAN" }), 0);
+});
+
 // --- playerScore ---------------------------------------------------------------
 
-test("playerScore: total is the sum of op and dir", () => {
+test("playerScore: total is the sum of op and dir when there's no position mismatch", () => {
   const result = playerScore(modernStarter);
   assert.strictEqual(result.op, offenseScore(modernStarter));
   assert.strictEqual(result.dir, defensiveImpactRating(modernStarter));
+  assert.strictEqual(result.penalty, 0);
   assert.strictEqual(result.total, result.op + result.dir);
+});
+
+test("playerScore: total subtracts the position penalty for a real mismatch", () => {
+  const centerAtPG = { ...modernStarter, position: "C", slot: "PG" };
+  const result = playerScore(centerAtPG);
+  assert.strictEqual(result.penalty, 3.0);
+  assert.strictEqual(result.total, result.op + result.dir - 3.0);
 });
 
 // --- teamScore -------------------------------------------------------------------

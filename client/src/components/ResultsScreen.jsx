@@ -107,6 +107,15 @@ function TeamCard({ team, index, isYou }) {
                       </span>
                     )}
                   </span>
+                  {/* Only shown when it actually applies -- a well-fit
+                      roster (the common case) has nothing to call out
+                      here, same reasoning as the usagePctEstimated flag
+                      above. */}
+                  {p.penalty > 0 && (
+                    <span title={`Played out of position (${p.realPosition || "unlisted"} at ${p.slot})`}>
+                      <span className="lbl">Pen</span>-{formatScore(p.penalty)}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
