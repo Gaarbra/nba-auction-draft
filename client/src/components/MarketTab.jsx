@@ -89,7 +89,13 @@ const SEARCH_RESULTS_LIMIT = 50;
  * player currently on screen: one point per time the price model actually
  * ran (a difficulty switch, or a fresh player load), never a fabricated
  * trend. Starts as a single flat point and grows during the session. */
-function ValueHistoryChart({ points }) {
+/** Same drawing approach as StatRadarChart (raw SVG, Motion for the
+ * entrance, colored by the player's own real team instead of a fixed
+ * accent) -- these two charts sit right next to each other on the same
+ * dossier, and used to be the only mismatched pair: one animated and
+ * team-colored, the other static and always orange regardless of who was
+ * on screen. */
+function ValueHistoryChart({ points, color = "var(--accent)" }) {
   if (points.length < 2) {
     return (
       <p className="hint-text market-chart-empty">
@@ -118,9 +124,34 @@ function ValueHistoryChart({ points }) {
 
   return (
     <svg className="market-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <path d={path} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <motion.path
+        // Re-keyed on the point count so a fresh reading (a new difficulty
+        // switch or player load) replays the draw-in instead of Motion
+        // treating it as the same path animating a mid-flight endpoint.
+        key={points.length}
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+      />
       {coords.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === coords.length - 1 ? 5 : 3} fill={i === coords.length - 1 ? "var(--accent)" : "var(--bg-void)"} stroke="var(--accent)" strokeWidth="2" />
+        <motion.circle
+          key={i}
+          cx={x}
+          cy={y}
+          r={i === coords.length - 1 ? 5 : 3}
+          fill={i === coords.length - 1 ? color : "var(--bg-void)"}
+          stroke={color}
+          strokeWidth="2"
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 + (i / coords.length) * 0.4, type: "spring", stiffness: 300, damping: 14 }}
+        />
       ))}
       <text x={last[0]} y={Math.max(14, last[1] - 10)} textAnchor="end" className="market-chart-label">
         {points[points.length - 1].value.toFixed(1)}c
@@ -538,7 +569,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                   Real readings recorded this session, one per difficulty switch or player load.
                 </p>
               </div>
-              <ValueHistoryChart points={valueHistory} />
+              <ValueHistoryChart points={valueHistory} color={teamColors?.primary} />
             </div>
 
             <div className="market-panel">
