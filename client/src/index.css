@@ -5950,6 +5950,11 @@ button.topnav-brand-link:focus-visible {
   --htp-success: #3ecf6e;
   --htp-font-display: "Space Grotesk", "Inter", -apple-system, "Segoe UI", sans-serif;
   --htp-font-mono: "Space Mono", "SFMono-Regular", monospace;
+  /* Equation display only (.how-to-play-eq-line). STIX Two is the
+     Google Fonts equivalent of LaTeX's own math typesetting (built to
+     pair with Computer Modern/Latin Modern), so a formula reads like an
+     actual equation instead of a code snippet. */
+  --htp-font-math: "STIX Two Text", "Cambria Math", Georgia, serif;
 
   width: 100%;
   max-width: 900px;
@@ -6011,9 +6016,34 @@ button.topnav-brand-link:focus-visible {
 }
 
 .how-to-play-steps {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding-left: 20px;
+}
+
+/* A continuous, scroll-linked fill (see HowToPlay.jsx's useScroll/
+   useTransform) instead of another whileInView trigger -- the one place on
+   this page that actually scrubs with scroll position rather than firing
+   once, closer to how a modern product page's scroll storytelling reads. */
+.how-to-play-rail {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--htp-border);
+  overflow: hidden;
+}
+
+.how-to-play-rail-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--htp-accent);
+  transform-origin: top center;
 }
 
 .how-to-play-step {
@@ -6066,6 +6096,243 @@ button.topnav-brand-link:focus-visible {
   color: var(--htp-text-muted);
 }
 
+/* ---- The actual math: two real systems, kept visually distinct ---- */
+.how-to-play-math {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  margin-top: 56px;
+  padding-top: 40px;
+  border-top: 1px solid var(--htp-border);
+}
+
+.how-to-play-math-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 0 12px;
+}
+
+.how-to-play-math-h2 {
+  margin: 0;
+  font-family: var(--htp-font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--htp-text);
+}
+
+.how-to-play-math-intro p {
+  margin: 0;
+  max-width: 48ch;
+  font-size: 15px;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-math-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 12px;
+}
+
+.how-to-play-math-group h3 {
+  margin: 0;
+  font-family: var(--htp-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--htp-text);
+}
+
+.how-to-play-math-group > p {
+  margin: 0;
+  max-width: 64ch;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-math-detail {
+  margin: 0;
+  max-width: 64ch;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-math-detail code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--htp-surface-raised);
+  font-family: var(--htp-font-mono);
+  font-size: 12px;
+  color: var(--htp-accent);
+}
+
+.how-to-play-eq-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  border-radius: var(--radius-md);
+  background: var(--htp-surface-raised);
+  border: 1px solid var(--htp-border);
+}
+
+.how-to-play-eq-label {
+  font-family: var(--htp-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-eq-line {
+  font-family: var(--htp-font-math);
+  font-style: italic;
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--htp-accent);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.how-to-play-var {
+  position: relative;
+  cursor: help;
+  border-bottom: 1px dotted color-mix(in srgb, var(--htp-accent) 70%, transparent);
+}
+
+.how-to-play-var-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  width: max-content;
+  max-width: 220px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--htp-surface);
+  border: 1px solid var(--htp-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--htp-text);
+  text-align: left;
+  white-space: normal;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.how-to-play-countup {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Worked example: a real starting five ---- */
+.how-to-play-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.how-to-play-showcase-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--htp-surface-raised);
+  border: 1px solid var(--htp-border);
+}
+
+.how-to-play-showcase-slot {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--htp-surface);
+  border: 1px solid var(--htp-border);
+  font-family: var(--htp-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--htp-accent);
+}
+
+.how-to-play-showcase-name {
+  font-family: var(--htp-font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--htp-text);
+}
+
+.how-to-play-showcase-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12px;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-showcase-line b {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-showcase-computed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--htp-border);
+  font-family: var(--htp-font-mono);
+  font-size: 12px;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-showcase-computed .total {
+  color: var(--htp-accent);
+  font-weight: 700;
+}
+
+.how-to-play-showcase-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  background: var(--htp-surface-raised);
+  border: 1px solid var(--htp-border);
+}
+
+.how-to-play-showcase-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--htp-font-mono);
+  font-size: 13px;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-showcase-summary-row.final {
+  padding-top: 8px;
+  border-top: 1px solid var(--htp-border);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--htp-accent);
+}
+
+.how-to-play-eq-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--htp-text-muted);
+}
+
 @media (max-width: 600px) {
   .how-to-play-hero h1 {
     font-size: 34px;
@@ -6075,5 +6342,13 @@ button.topnav-brand-link:focus-visible {
     flex-direction: column;
     gap: 14px;
     padding: 22px;
+  }
+
+  .how-to-play-math-h2 {
+    font-size: 26px;
+  }
+
+  .how-to-play-eq-line {
+    font-size: 15px;
   }
 }
