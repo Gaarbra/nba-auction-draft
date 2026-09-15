@@ -1,0 +1,8 @@
+# Scopes graphify's knowledge graph to the actual Hoop Bids app, excluding
+# AI-agent tooling config that isn't part of the product itself.
+.claude/
+.agents/
+.github/
+.codex/
+.impeccable/
+graphify-out/

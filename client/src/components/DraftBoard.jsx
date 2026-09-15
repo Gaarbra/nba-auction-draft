@@ -53,10 +53,6 @@ function friendlyError(code) {
   return ERROR_MESSAGES[code] || "Something went wrong.";
 }
 
-function formatStat(value) {
-  return value === null || value === undefined ? "N/A" : value;
-}
-
 const SLOT_GROUP = { PG: "G", SG: "G", SF: "F", PF: "F", C: "C" };
 
 function positionMatchesSlot(playerPosition, slot) {
