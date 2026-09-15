@@ -65,7 +65,13 @@ body {
 /* The scrollable middle band between the sticky TopNav and the footer.
    `safe center` keeps short screens (the lobby) vertically centred while
    still letting a taller screen (the draft board) scroll from the top
-   instead of clipping. */
+   instead of clipping. padding-bottom reserves real room for .site-footer,
+   which is position: fixed (out of flow) -- without it, a page tall enough
+   to scroll (the Market tab's player list, in particular) scrolls its last
+   ~46px of content straight under the footer's legal links instead of
+   above them. The <900px media query below already covers narrow widths
+   (footer stacked above the mobile bottom-nav, needs more room); this is
+   the >=900px case that had nothing reserving the space at all. */
 .app-main {
   flex: 1;
   display: flex;
@@ -74,11 +80,13 @@ body {
   justify-content: safe center;
   gap: 12px;
   padding: 24px;
+  padding-bottom: 88px;
 }
 
 @media (min-width: 900px) {
   .app-main {
     padding: 32px;
+    padding-bottom: 88px;
   }
 }
 
@@ -4080,6 +4088,29 @@ button.topnav-brand-link:focus-visible {
   }
 }
 
+/* A phone-width "room" TopNav (clock + coins + sound + help + leave +
+   connection dot, all at once) genuinely doesn't fit in ~375px even after
+   the 600px trims above -- measured a real 419px vs. a ~300px budget,
+   which was pushing the whole page 69px wider than the viewport. Trims
+   the lowest-value width first: the on-the-clock name (the pulsing dot
+   alone still shows whose turn it is), the coins progress bar (the number
+   next to it already says the same thing), and "Leave room" down to just
+   "Leave". Nothing here removes a whole control -- every icon/button/pill
+   stays tappable, just narrower. */
+@media (max-width: 480px) {
+  .topnav-clock-name,
+  .topnav-coins-bar,
+  .topnav-leave-suffix {
+    display: none;
+  }
+  .topnav-clock {
+    padding: 6px 10px;
+  }
+  .topnav-leave-btn {
+    padding: 7px 10px;
+  }
+}
+
 .room-footer {
   border-top: 1px solid var(--line);
   padding: 12px 24px;
@@ -4488,6 +4519,24 @@ button.topnav-brand-link:focus-visible {
 @media (max-width: 460px) {
   .assign-slots {
     grid-template-columns: 1fr;
+  }
+}
+
+/* At phone width the title ("Gabriel's roster (0/5 filled)") is long
+   enough to wrap onto two lines on its own, and .assign-board-head's
+   flex-wrap + space-between then left the segment bar and "Nc left"
+   floating oddly next to it instead of clearing below. A plain column
+   stack reads cleanly regardless of how long the title gets. */
+@media (max-width: 480px) {
+  .assign-board-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .assign-board-progress {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 }
 

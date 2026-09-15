@@ -171,7 +171,7 @@ export default function TopNav({
               </button>
 
               <button type="button" onClick={onLeaveRoom} className="topnav-leave-btn">
-                Leave room
+                Leave<span className="topnav-leave-suffix"> room</span>
               </button>
             </>
           )}
