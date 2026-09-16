@@ -22,18 +22,28 @@ export default function RosterGrid({
   assigningSlot = false,
   onAssignSlot,
   hideCost = false,
+  onlyPlayerId = null,
 }) {
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   const canSwap = Boolean(room.allowPositionSwaps) && room.status === "drafting";
+  const players = onlyPlayerId ? room.players.filter((p) => p.id === onlyPlayerId) : room.players;
 
   // Right after winning a bid, the open slot the player taps IS the pick.
   // No separate row of position buttons duplicating the same five labels
   // already shown here. Swapping (after the roster's built out) stays a
-  // distinct flow below; the two never overlap in practice.
+  // distinct flow below; the two never overlap in practice. Assigning is a
+  // deliberate two-tap: the first tap arms a slot (visible "tap again"
+  // state), the second tap on that same slot confirms it -- a stray tap
+  // while scrolling a phone screen shouldn't spend a pick.
   function handleSlotClick(pos, isMine, occupant) {
     if (isMine && assigningSlot && !occupant) {
-      onAssignSlot?.(pos);
+      if (selectedSlot === pos) {
+        setSelectedSlot(null);
+        onAssignSlot?.(pos);
+      } else {
+        setSelectedSlot(pos);
+      }
       return;
     }
 
@@ -54,7 +64,10 @@ export default function RosterGrid({
 
   return (
     <div className="roster-grid">
-      {room.players.map((player) => {
+      {canSwap && !assigningSlot && (
+        <p className="roster-grid-swap-hint">Tap a slot, then tap another to swap them.</p>
+      )}
+      {players.map((player) => {
         const roster = room.draft?.rosters?.[player.id] || {};
         const isMine = player.id === currentPlayerId;
         const floating = floatingByPlayer[player.id];
@@ -95,6 +108,7 @@ export default function RosterGrid({
               {POSITIONS.map((pos) => {
                 const occupant = roster[pos];
                 const assignable = isMine && assigningSlot && !occupant;
+                const armed = assignable && selectedSlot === pos;
                 const interactive = assignable || (isMine && canSwap);
                 const colors = occupant ? getTeamColors(occupant.team?.abbreviation) : null;
                 // A plain div, not a <button>. The hover tooltip nests a
@@ -108,7 +122,7 @@ export default function RosterGrid({
                     key={pos}
                     role={interactive ? "button" : undefined}
                     tabIndex={interactive ? 0 : undefined}
-                    aria-label={assignable ? `Add to ${pos}` : undefined}
+                    aria-label={armed ? `Tap again to confirm ${pos}` : assignable ? `Add to ${pos}` : undefined}
                     onClick={() => handleSlotClick(pos, isMine, occupant)}
                     onKeyDown={(e) => {
                       if (!interactive) return;
@@ -122,7 +136,8 @@ export default function RosterGrid({
                       occupant ? "filled" : "open",
                       interactive ? "interactive" : "",
                       assignable ? "assignable" : "",
-                      selectedSlot === pos ? "selected" : "",
+                      armed ? "armed" : "",
+                      !assignable && selectedSlot === pos ? "selected" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -155,6 +170,7 @@ export default function RosterGrid({
                       </AnimatePresence>
                     </div>
                     <span className="slot-label">{pos}</span>
+                    {armed && <span className="slot-armed-hint">Tap again</span>}
                     {/* Solo prices every pick the same flat amount -- a cost
                         tag that never varies isn't telling you anything, so
                         it's dropped rather than repeated five times over. */}

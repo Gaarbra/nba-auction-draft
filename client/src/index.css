@@ -2943,6 +2943,51 @@ form input {
   box-shadow: 0 0 0 2px var(--accent) inset;
 }
 
+/* The armed state (mobile's two-tap assign: first tap arms, second
+   confirms) needs to read as clearly "different" from the plain pulsing
+   .assignable state it's layered on top of -- a faster, tighter glow plus
+   a "tap again" label, not just a color change that's easy to miss on a
+   small phone slot. */
+.roster-slot.armed {
+  animation: armed-pulse 0.9s ease-in-out infinite;
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-panel));
+}
+
+@keyframes armed-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 138, 0, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 138, 0, 0);
+  }
+}
+
+.slot-armed-hint {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: #0b0b0d;
+  background: var(--accent);
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  z-index: 1;
+}
+
+.roster-grid-swap-hint {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 .roster-slot-media {
   position: absolute;
   inset: 0;
@@ -4863,20 +4908,26 @@ button.topnav-brand-link:focus-visible {
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
-  /* Legal links ride just above the tab bar instead of behind it. Keeps a
-     solid backing (not "none") -- this is a fixed-position overlay sitting
-     on top of whatever's scrolled underneath, and without an opaque
-     background the links and the page content behind them render on top of
-     each other, unreadable. */
+  /* Static (normal flow) instead of fixed on mobile. Fixed meant the
+     footer permanently covered the bottom ~119px of every screen (its own
+     height plus the tab bar's), no matter how far you'd scrolled --
+     .app-main's padding-bottom only protects the very end of a long page,
+     it does nothing when a short page's own content (the Lobby card's
+     "Start Draft" button, in particular) lands in that band at the
+     initial scroll position. In normal flow it just renders after
+     whatever's above it, so nothing can end up hidden behind it; the
+     always-fixed .bottom-nav below still needs its own clearance, which
+     now lives on the footer's own bottom padding instead of .app-main
+     having to guess two different fixed elements' combined height. */
   .site-footer {
-    bottom: 58px;
-    background: var(--bg-panel-raised);
+    position: static;
+    background: none;
     border-top: 1px solid var(--line);
-    padding-block: 10px;
+    padding: 14px 20px calc(14px + 53px + env(safe-area-inset-bottom, 0px));
   }
 
   .app-main {
-    padding-bottom: 112px;
+    padding-bottom: 24px;
   }
 }
 
@@ -5721,6 +5772,39 @@ button.topnav-brand-link:focus-visible {
   }
 }
 
+/* Mobile's compact stand-in for AssignBoard: one summary line plus the
+   RosterGrid slot row itself does the picking, so there's no separate big
+   card layout to scroll through on a phone screen. */
+.mobile-assign-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--bg-inset);
+}
+
+.mobile-assign-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-assign-headshot {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.mobile-assign-summary p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
 /* ============ Draft Board console (room-drafting scope) ============
    The second Paper-redesigned screen (see .landing-lobby for the first and
    the same reasoning). Scoped, not global: .room-drafting only goes on
@@ -6055,27 +6139,82 @@ button.topnav-brand-link:focus-visible {
   padding-left: 20px;
 }
 
-/* A continuous, scroll-linked fill (see HowToPlay.jsx's useScroll/
-   useTransform) instead of another whileInView trigger -- the one place on
-   this page that actually scrubs with scroll position rather than firing
-   once, closer to how a modern product page's scroll storytelling reads. */
-.how-to-play-rail {
-  position: absolute;
-  left: 0;
-  top: 4px;
-  bottom: 4px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--htp-border);
+/* The Apple-style pinned sequence (see HowToPlay.jsx's PinStep): each step
+   is its own tall .how-to-play-pin-track, with a .how-to-play-pin-frame
+   inside it that sticks to the viewport top for that track's whole height.
+   As you scroll through one track, its frame stays put while the step's
+   own scroll-driven opacity/scale bring it closer, then it releases and
+   the next track's frame takes over. Reduced motion skips this entirely
+   (see the JSX) and falls back to the plain .how-to-play-step list below. */
+.how-to-play-pin-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.how-to-play-pin-track {
+  position: relative;
+  /* One full viewport of scroll room per step -- enough for the zoom to
+     read clearly without dragging on. */
+  height: 100vh;
+}
+
+.how-to-play-pin-frame {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
 
-.how-to-play-rail-fill {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: var(--htp-accent);
-  transform-origin: top center;
+.how-to-play-pin-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.how-to-play-pin-step-n {
+  font-family: var(--htp-font-display);
+  font-size: 140px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--htp-surface-raised);
+  /* A giant ghost numeral behind the copy, not a UI chip -- the same
+     "huge faint number" move Apple's own feature call-outs use. */
+  -webkit-text-stroke: 1px var(--htp-border);
+}
+
+.how-to-play-pin-step h2 {
+  margin: -64px 0 0;
+  font-family: var(--htp-font-display);
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--htp-text);
+}
+
+.how-to-play-pin-step p {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--htp-text-muted);
+}
+
+@media (max-width: 640px) {
+  .how-to-play-pin-step-n {
+    font-size: 96px;
+  }
+
+  .how-to-play-pin-step h2 {
+    margin-top: -44px;
+    font-size: 26px;
+  }
 }
 
 .how-to-play-step {
@@ -6329,6 +6468,214 @@ button.topnav-brand-link:focus-visible {
 .how-to-play-showcase-computed .total {
   color: var(--htp-accent);
   font-weight: 700;
+}
+
+/* ---- Assembling the team (see HowToPlay.jsx's TeamAssembleSequence):
+   one continuous pinned frame for all five players, each one's own
+   spotlight-then-dock arc driven by --beat (a clamp()'d slice of --p, the
+   single scroll-linked value set once on .how-to-play-team-scene). --beat
+   reaches 1 at the end of a player's own turn and simply STAYS 1 for
+   every beat after -- that's what keeps them sitting in the row instead
+   of disappearing once the next player's spotlight starts. The final
+   beat (--sum) pulls each docked number down and fades it as the total
+   pops in with a two-stage overshoot-then-settle scale, the closest a
+   pure calc()/clamp() approach gets to a spring "bam" without an actual
+   easing curve. */
+.how-to-play-team-track {
+  position: relative;
+  /* 5 player beats + 1 sum beat + 1 silent trailing buffer (see
+     TEAM_BEATS in HowToPlay.jsx for why that last one has to exist). */
+  height: calc(100vh * 7);
+}
+
+.how-to-play-team-frame {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.how-to-play-team-scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  --slot-spacing: 150px;
+  /* Row lands a third of the way down the frame, not hugging the very
+     top -- tall enough above the sum's own centered position to leave it
+     room, but with real clearance below the nav on short viewports. */
+  --dock-y: -140px;
+  /* Beat index 5 of 7 (5 players + this + the trailing buffer beat) --
+     start 5/7, size 1/7. */
+  --sum: clamp(0, calc((var(--p) - 0.714286) / 0.142857), 1);
+  --pull: clamp(0, calc(var(--sum) / 0.4), 1);
+  --total-grow: clamp(0, calc((var(--sum) - 0.3) / 0.15), 1);
+  --total-settle: clamp(0, calc((var(--sum) - 0.45) / 0.15), 1);
+}
+
+.how-to-play-team-player {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 220px;
+  --beat: clamp(0, calc((var(--p) - var(--beat-start)) / var(--beat-size)), 1);
+  --enter: clamp(0, calc(var(--beat) / 0.2), 1);
+  --dock: clamp(0, calc((var(--beat) - 0.5) / 0.5), 1);
+  opacity: var(--enter);
+  transform: translate(-50%, -50%)
+    translate(calc(var(--dock) * var(--slot-index) * var(--slot-spacing)), calc(var(--dock) * var(--dock-y)))
+    scale(calc(0.85 + var(--enter) * 0.15 - var(--dock) * 0.53));
+}
+
+.how-to-play-team-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 260px;
+  height: 260px;
+  transform: translate(-50%, -55%);
+  object-fit: contain;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.how-to-play-team-photo {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--team-primary, var(--htp-border));
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--team-primary) 18%, transparent);
+}
+
+.how-to-play-team-slot {
+  position: relative;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--htp-surface-raised);
+  border: 1px solid var(--htp-border);
+  font-family: var(--htp-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--htp-accent);
+}
+
+.how-to-play-team-name {
+  position: relative;
+  font-family: var(--htp-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--htp-text);
+  white-space: nowrap;
+}
+
+.how-to-play-team-breakdown {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  font-family: var(--htp-font-mono);
+  font-size: 13px;
+  color: var(--htp-text-muted);
+  /* Visible only while the card's big enough to read it -- fades in with
+     the spotlight (--enter) and back out as soon as docking starts
+     (--dock), rather than shrinking down to illegible text in the row. */
+  opacity: calc(var(--enter) * (1 - var(--dock)));
+}
+
+.how-to-play-team-breakdown b {
+  color: var(--htp-text);
+  font-weight: 700;
+}
+
+.how-to-play-team-number {
+  position: relative;
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--team-primary) 20%, var(--htp-surface));
+  border: 1px solid color-mix(in srgb, var(--team-primary) 45%, var(--htp-border));
+  font-family: var(--htp-font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--htp-text);
+  opacity: calc(var(--dock) * (1 - var(--pull)));
+  transform: translateY(calc(var(--pull) * 40px));
+}
+
+.how-to-play-team-sum {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 34px;
+  border-radius: var(--radius-lg);
+  background: var(--htp-surface-raised);
+  border: 1px solid var(--htp-accent);
+  opacity: var(--total-grow);
+  /* Below center, not dead-center -- groups with the docked row (which
+     sits above center) instead of splitting the two apart with empty
+     space in between. */
+  transform: translate(-50%, -50%) translateY(90px)
+    scale(calc(var(--total-grow) * 1.15 - var(--total-settle) * 0.15));
+  box-shadow: 0 0 calc(var(--total-grow) * 40px - var(--total-settle) * 25px)
+    rgba(255, 176, 32, calc(var(--total-grow) * 0.6 - var(--total-settle) * 0.4));
+}
+
+.how-to-play-team-sum-label {
+  font-family: var(--htp-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--htp-text-muted);
+}
+
+.how-to-play-team-sum-value {
+  font-family: var(--htp-font-display);
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--htp-accent);
+}
+
+@media (max-width: 640px) {
+  .how-to-play-team-scene {
+    /* 5 slots at the desktop spacing would run wider than the screen
+       itself (the frame clips overflow, so they'd just vanish off the
+       edges) -- narrow enough here, paired with the smaller player width
+       below, that the docked row's total width comfortably fits a phone
+       viewport even at the bigger docked scale. */
+    --slot-spacing: 72px;
+    --dock-y: -110px;
+  }
+
+  .how-to-play-team-photo {
+    width: 92px;
+    height: 92px;
+  }
+
+  .how-to-play-team-logo {
+    width: 200px;
+    height: 200px;
+  }
+
+  .how-to-play-team-name {
+    font-size: 16px;
+  }
+
+  .how-to-play-team-player {
+    width: 150px;
+  }
+
+  .how-to-play-team-sum-value {
+    font-size: 30px;
+  }
 }
 
 .how-to-play-showcase-summary {

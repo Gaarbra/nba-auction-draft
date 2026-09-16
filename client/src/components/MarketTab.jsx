@@ -365,7 +365,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
         <div className="market-ticker-sep" aria-hidden="true" />
         <div className="market-ticker-item">
           <span className="market-ticker-label">Top sale this session</span>
-          <span className="market-ticker-value accent">{topSaleOverall != null ? `${topSaleOverall}c` : "—"}</span>
+          <span className="market-ticker-value accent">{topSaleOverall != null ? `${topSaleOverall}c` : "N/A"}</span>
         </div>
       </div>
 
@@ -675,7 +675,7 @@ function SimilarPlayersGrid({ playerId, index, onJump }) {
         return (
           <button key={p.id} type="button" className="market-similar-card" onClick={() => onJump(p.id)}>
             <div className="market-similar-top">
-              <span className="market-similar-pos">{meta?.position || "—"}</span>
+              <span className="market-similar-pos">{meta?.position || "N/A"}</span>
               <span className="market-similar-value">{p.predictedPrice != null ? `~${p.predictedPrice.toFixed(1)}c` : "N/A"}</span>
             </div>
             <span className="market-similar-name">
@@ -683,7 +683,7 @@ function SimilarPlayersGrid({ playerId, index, onJump }) {
               {p.fullName}
             </span>
             <span className="market-similar-meta">
-              {meta?.team || "—"}
+              {meta?.team || "N/A"}
               {meta?.pointsPerGame ? ` · ${meta.pointsPerGame.toFixed(1)} PPG` : ""}
             </span>
             <span className="market-similar-btn">View player</span>

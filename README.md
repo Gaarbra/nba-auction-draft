@@ -128,6 +128,7 @@ The results screen also ranks all the teams by Final Team Score and shows a simp
 4. Once all three have deployed at least once, each one has a real URL under its own **Settings** tab (something like `https://hoop-bids-client.onrender.com`). Go to each service's **Environment** tab and fill in the placeholder vars that `render.yaml` left blank:
    - `hoop-bids-server`: `STATS_SERVICE_URL` set to the stats service's URL, `CLIENT_ORIGIN` set to the client's URL
    - `hoop-bids-client`: `VITE_SERVER_URL` set to the server's URL (this one gets baked in at build time, so saving it triggers a full rebuild, not just a restart)
+   - Optional: `VITE_POSTHOG_KEY`/`VITE_POSTHOG_HOST` on `hoop-bids-client` for PostHog analytics (draft nominations, bids, assignments, results viewed). Get the key from your PostHog project's **Project settings > API keys** (the public one, not a personal API key). Left unset, PostHog just doesn't load.
 5. Give friends the client's URL. That's the one people actually open.
 
 Free-tier services spin down after 15 minutes idle and take roughly 30-50 seconds to wake back up on the next request, so expect a slow first load if nobody's used the room in a while. There's no persistent disk needed either way, since the player-pool cache and every room live in memory and rebuild themselves, so the free tier's lack of storage isn't actually a problem here.

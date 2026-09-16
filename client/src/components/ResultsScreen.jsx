@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
+import { trackEvent } from "../analytics.js";
 
 const RANK_LABELS = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
 
@@ -214,6 +215,10 @@ function PostGameActions({ room, currentPlayerId, socket, onLeaveRoom }) {
 
 export default function ResultsScreen({ room, currentPlayerId, socket, onLeaveRoom }) {
   const { resultsStatus, results } = room;
+
+  useEffect(() => {
+    if (resultsStatus === "ready" && results) trackEvent("draft_results_viewed");
+  }, [resultsStatus, results]);
 
   if (resultsStatus === "failed") {
     return (

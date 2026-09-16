@@ -47,7 +47,7 @@ export default function AssignBoard({
     hasStats && stats.firstSeason === stats.lastSeason
       ? stats.firstSeason
       : hasStats
-        ? `${stats.firstSeason}–${stats.lastSeason}`
+        ? `${stats.firstSeason}-${stats.lastSeason}`
         : null;
   const teamColor = getTeamColors(player.team?.abbreviation).primary;
 

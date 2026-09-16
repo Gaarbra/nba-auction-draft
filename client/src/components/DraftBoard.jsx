@@ -20,6 +20,7 @@ import { getTeamColors } from "../teamColors.js";
 import { getTeamLogoUrl } from "../teamLogos.js";
 import { getHistoricalTeamName } from "../teamNames.js";
 import { countryFlag } from "../countryFlags.js";
+import { trackEvent } from "../analytics.js";
 import useMediaQuery from "../hooks/useMediaQuery.js";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
@@ -229,6 +230,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
     setNominateError("");
     socket.emit("draft:nominate", { playerId: currentPlayerId }, (res) => {
       if (res?.error) setNominateError(friendlyError(res.error));
+      else trackEvent("draft_nominate");
     });
   }
 
@@ -261,7 +263,10 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
     const amount = Number(bidInput);
     socket.emit("draft:bid", { amount, playerId: currentPlayerId }, (res) => {
       if (res?.error) setBidError(friendlyError(res.error));
-      else setBidInput("");
+      else {
+        setBidInput("");
+        trackEvent("draft_bid", { amount });
+      }
     });
   }
 
@@ -276,6 +281,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
     setAssignError("");
     socket.emit("draft:assign", { position, playerId: currentPlayerId }, (res) => {
       if (res?.error) setAssignError(friendlyError(res.error));
+      else trackEvent("draft_assign", { position });
     });
     setPendingAssignment(null);
   }
@@ -312,6 +318,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   // own use of this: they hide the per-pick coin readouts rather than
   // repeat a number that's identical for every single pick).
   const isSolo = draft?.turnOrder?.length === 1;
+  const rerollAvailable = isSolo && !draft?.soloRerollUsed;
 
   return (
     <div className="draft-layout">
@@ -346,7 +353,90 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           this same nomination points at rather than clearing it. Without
           this guard the old player's assign screen would render right on
           top of the rolling panel instead of stepping aside for it. */}
-      {isAssigningAsWinner && !isRolling && (
+      {isAssigningAsWinner && !isRolling && (isMobileViewport ? (
+        // Mobile gets a compact one-row picker instead of AssignBoard's
+        // stacked full-card grid, which forces a scroll-then-scroll-more
+        // sequence at phone width (see .assign-slots' 1-column breakpoint).
+        // Reuses RosterGrid's own slot row (already a single line of 5 at
+        // any width) filtered to just this player, with assigningSlot's
+        // two-tap arm/confirm doing the "pick a spot" job in place.
+        <div className="mobile-assign-strip">
+          <div className="mobile-assign-summary">
+            <PlayerHeadshot
+              nbaPlayerId={nomination.player.nbaPlayerId}
+              photoUrl={nomination.player.stats?.photoUrl}
+              alt={nomination.player.fullName}
+              className="mobile-assign-headshot"
+            />
+            <p>
+              {isSolo ? (
+                <>
+                  You picked <strong>{nomination.player.fullName}</strong>.
+                </>
+              ) : (
+                <>
+                  You won <strong>{nomination.player.fullName}</strong> for {nomination.currentBid}{" "}
+                  {nomination.currentBid === 1 ? "coin" : "coins"}.
+                </>
+              )}{" "}
+              Tap a slot, tap it again to confirm.
+            </p>
+          </div>
+
+          <RosterGrid
+            room={room}
+            currentPlayerId={currentPlayerId}
+            socket={socket}
+            nominatingId={draft?.currentNominatorId}
+            floatingByPlayer={floatingByPlayer}
+            assigningSlot
+            onAssignSlot={handlePickPosition}
+            hideCost={isSolo}
+            onlyPlayerId={currentPlayerId}
+          />
+
+          {pendingAssignment && (
+            <div className="budget-warning">
+              {pendingAssignment.positionMismatch && (
+                <p>
+                  Put <strong>{nomination.player.fullName}</strong> in <strong>{pendingAssignment.position}</strong>?
+                  Their listed position is {nomination.player.position || "unknown"}.
+                </p>
+              )}
+              {pendingAssignment.budgetTight && (
+                <p>
+                  Locking this in leaves you {currentPlayer.budget - nomination.currentBid} coins for{" "}
+                  {myOpenSlots.length - 1} remaining slot(s). That's tight, you'll need at least 1 coin per slot.
+                </p>
+              )}
+              <button type="button" onClick={() => submitAssign(pendingAssignment.position)} className="primary-btn">
+                Lock in {pendingAssignment.position} anyway
+              </button>
+              <button type="button" onClick={() => setPendingAssignment(null)} className="secondary-btn">
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {assignError && <p className="error-text">{assignError}</p>}
+
+          {isSolo && (
+            <div className="won-banner-reroll">
+              {rerollAvailable ? (
+                <>
+                  <p className="hint-text">Not feeling this one? You've got one reroll for the whole draft.</p>
+                  <button type="button" onClick={handleReroll} className="secondary-btn">
+                    Reroll {nomination.player.fullName}
+                  </button>
+                </>
+              ) : (
+                <p className="hint-text">Reroll already used for this draft.</p>
+              )}
+              {rerollError && <p className="error-text">{rerollError}</p>}
+            </div>
+          )}
+        </div>
+      ) : (
         <AssignBoard
           ownerName={currentPlayer?.name || "Your"}
           roster={myRoster}
@@ -354,7 +444,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           nomination={nomination}
           nominatedByName={playerName(nomination.nominatedBy)}
           isSolo={isSolo}
-          rerollAvailable={isSolo && !draft?.soloRerollUsed}
+          rerollAvailable={rerollAvailable}
           onReroll={handleReroll}
           rerollError={rerollError}
           pendingAssignment={pendingAssignment}
@@ -363,7 +453,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           onConfirmPending={submitAssign}
           onCancelPending={() => setPendingAssignment(null)}
         />
-      )}
+      ))}
 
       {!isRolling && nomination && !isAssigningAsWinner && (
         // No AnimatePresence/exit animation here on purpose. This panel is
@@ -526,7 +616,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                               {nomination.player.stats.seasonsPlayed === 1 ? "" : "s"}:{" "}
                               {nomination.player.stats.firstSeason === nomination.player.stats.lastSeason
                                 ? nomination.player.stats.firstSeason
-                                : `${nomination.player.stats.firstSeason}–${nomination.player.stats.lastSeason}`}
+                                : `${nomination.player.stats.firstSeason}-${nomination.player.stats.lastSeason}`}
                             </p>
                             <StatHighlightRow stats={nomination.player.stats} />
                           </>

@@ -87,6 +87,12 @@ services:
       # above.
       - key: VITE_SERVER_URL
         sync: false
+      # Optional. PostHog project API key (client/src/analytics.js). Leave
+      # unset and PostHog just doesn't init -- no error, no events.
+      - key: VITE_POSTHOG_KEY
+        sync: false
+      - key: VITE_POSTHOG_HOST
+        sync: false
     routes:
       - type: rewrite
         source: /*
