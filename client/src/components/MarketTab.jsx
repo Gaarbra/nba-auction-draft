@@ -175,6 +175,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
   const [team, setTeam] = useState("");
   const [search, setSearch] = useState("");
   const [positionTag, setPositionTag] = useState(null);
+  const [showFilters, setShowFilters] = useState(true);
   const [playerId, setPlayerId] = useState(null);
   const [difficulty, setDifficulty] = useState("normal");
 
@@ -250,19 +251,21 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamPlayers]);
 
-  // The filter bar's three real inputs (team picked, a name typed, or a
-  // quick position tag) all feed the same results list below it -- pick a
-  // team and its roster appears, type a name to search the whole era, tap
-  // a tag for a fast position-only cut, or combine them.
+  // Typing a name searches the entire catalogue on its own, ignoring era,
+  // franchise, and position -- those filters exist for browsing without a
+  // specific player in mind, and stacking them with a name search meant a
+  // leftover team/era pick from earlier browsing silently zeroed out an
+  // unrelated search. Leave the search box empty and the era/team/position
+  // filters below take over as before.
   const isBrowsing = Boolean(team) || search.trim().length > 0 || Boolean(positionTag);
   const searchResults = useMemo(() => {
     if (!isBrowsing) return [];
     const q = search.trim().toLowerCase();
+    if (q) return index.filter((p) => p.fullName.toLowerCase().includes(q)).sort(byPointsPerGame);
     let pool = team ? teamPlayers : eraFiltered;
     if (positionTag) pool = pool.filter((p) => p.position === positionTag);
-    if (q) pool = pool.filter((p) => p.fullName.toLowerCase().includes(q));
     return pool.slice().sort(byPointsPerGame);
-  }, [isBrowsing, search, team, teamPlayers, eraFiltered, positionTag]);
+  }, [isBrowsing, search, team, teamPlayers, eraFiltered, positionTag, index]);
   const shownResults = searchResults.slice(0, SEARCH_RESULTS_LIMIT);
 
   const selectedMeta = index.find((p) => String(p.id) === String(playerId));
@@ -369,35 +372,76 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
         </div>
       </div>
 
-      <div className="market-filterbar">
-        <div className="market-era-pills">
-          {ERA_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              className={`market-pill ${era === opt.value ? "active" : ""}`}
-              onClick={() => setEra(opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <div className="market-franchise-chip">
-          <TeamDropdown
-            options={teamOptions}
-            value={team}
-            onChange={setTeam}
-            placeholder={indexLoading ? "Loading…" : "Any franchise"}
-          />
-        </div>
+      {/* Its own row, ahead of the era/franchise filters below -- typing a
+          name is a complete way to find a player on its own (isBrowsing
+          triggers on search text alone), not one more filter to combine
+          with the others. */}
+      <div className="market-searchbar">
+        <svg
+          className="market-searchbar-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" strokeLinecap="round" />
+          <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+        </svg>
         <input
           type="search"
-          className="market-search-input market-search-input-wide"
+          className="market-searchbar-input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search players by name…"
+          placeholder="Search any player by name…"
         />
+        <button
+          type="button"
+          className={`market-filters-toggle ${showFilters ? "open" : ""}`}
+          onClick={() => setShowFilters((v) => !v)}
+          aria-expanded={showFilters}
+        >
+          Filters
+          <motion.span animate={{ rotate: showFilters ? 180 : 0 }} transition={{ duration: 0.15 }} aria-hidden="true">
+            ▾
+          </motion.span>
+        </button>
       </div>
+
+      {/* No AnimatePresence/exit, same reasoning as Dropdown's menu and
+          DraftBoard's nomination panel: an exit animation that never
+          resolves would leave era/team filters stuck half-visible. Search
+          above is unaffected either way -- it's always shown and already
+          searches independent of these. */}
+      {showFilters && (
+        <motion.div
+          className="market-filterbar"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          <div className="market-era-pills">
+            {ERA_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`market-pill ${era === opt.value ? "active" : ""}`}
+                onClick={() => setEra(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <div className="market-franchise-chip">
+            <TeamDropdown
+              options={teamOptions}
+              value={team}
+              onChange={setTeam}
+              placeholder={indexLoading ? "Loading…" : "Any franchise"}
+            />
+          </div>
+        </motion.div>
+      )}
 
       <div className="market-quicktags">
         <span className="market-quicktags-label">Quick filters</span>
@@ -418,7 +462,9 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
           <span className="market-filter-label">
             {indexLoading
               ? "Loading the player pool…"
-              : `${searchResults.length} player${searchResults.length === 1 ? "" : "s"}${team ? ` on ${team}` : " match"}`}
+              : `${searchResults.length} player${searchResults.length === 1 ? "" : "s"}${
+                  team && !search.trim() ? ` on ${team}` : " match"
+                }`}
           </span>
           {!indexLoading && searchResults.length === 0 && (
             <p className="hint-text">No players match this filter.</p>

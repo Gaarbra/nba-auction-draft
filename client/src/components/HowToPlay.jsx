@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform, useInView, animate } from "motion/react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import { getTeamColors } from "../teamColors.js";
 import { getTeamLogoUrl } from "../teamLogos.js";
+
+gsap.registerPlugin(ScrollTrigger);
 
 /** The four-step explainer, designed in Paper as its own scrolling page
  * (not a modal -- see App.jsx's activeTab === "how-to-play" branch) so it
@@ -469,9 +473,43 @@ function TeamAssembleSequence() {
 }
 
 export default function HowToPlay() {
+  const pageRef = useRef(null);
+  const progressFillRef = useRef(null);
+
+  // A slim reading-progress bar for the whole page -- genuinely new
+  // storytelling value (state indication: "how far into the explainer am I")
+  // that doesn't compete with the existing pinned step/team sequences above,
+  // and the first real use of GSAP/ScrollTrigger in this app (Lenis already
+  // covers the rest of the site's inertial scroll; this page opts out of
+  // that via data-lenis-prevent, so ScrollTrigger reads native scroll here
+  // same as the Motion useScroll hooks elsewhere in this file already do).
+  useEffect(() => {
+    const page = pageRef.current;
+    const fill = progressFillRef.current;
+    if (!page || !fill) return undefined;
+
+    const trigger = ScrollTrigger.create({
+      trigger: page,
+      start: "top top",
+      end: "bottom bottom",
+      onUpdate: (self) => {
+        gsap.set(fill, { scaleX: self.progress });
+        // Drives .how-to-play::before's gradient position (see index.css) --
+        // a single ambient glow drifting down the page as you scroll, so the
+        // four pinned steps and the math/worked-example sections that follow
+        // read as one continuous scene instead of separately-styled blocks.
+        page.style.setProperty("--htp-scroll-progress", self.progress);
+      },
+    });
+
+    return () => trigger.kill();
+  }, []);
 
   return (
-    <div className="how-to-play">
+    <div className="how-to-play" data-lenis-prevent ref={pageRef}>
+      <div className="how-to-play-progress" aria-hidden="true">
+        <div className="how-to-play-progress-fill" ref={progressFillRef} />
+      </div>
       <motion.section
         className="how-to-play-hero"
         initial={{ opacity: 0, transform: prefersReducedMotion ? "translateY(0px)" : "translateY(16px)" }}

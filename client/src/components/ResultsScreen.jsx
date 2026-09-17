@@ -3,6 +3,14 @@ import { motion } from "motion/react";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
 import { trackEvent } from "../analytics.js";
+import { recordDraftResult } from "../winStreak.js";
+
+// Same module-level check as HowToPlay.jsx. TeamCard's entrance below is
+// the one automatic (not gesture-triggered) motion on this screen -- a
+// staggered slide-up on every standings card -- so it's the one place
+// here that actually needs the reduced-motion gate.
+const prefersReducedMotion =
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 const RANK_LABELS = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
 
@@ -52,9 +60,13 @@ function TeamCard({ team, index, isYou }) {
   return (
     <motion.div
       className={`results-team-card ${isYou ? "you" : ""} ${index === 0 ? "leader" : ""} ${open ? "open" : ""}`}
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, type: "spring", stiffness: 260, damping: 24 }}
+      transition={
+        prefersReducedMotion
+          ? { duration: 0.2 }
+          : { delay: index * 0.1, type: "spring", stiffness: 260, damping: 24 }
+      }
     >
       <div className="results-team-header">
         <span className="results-rank-chip">{RANK_LABELS[team.rank] || `#${team.rank}`}</span>
@@ -217,8 +229,11 @@ export default function ResultsScreen({ room, currentPlayerId, socket, onLeaveRo
   const { resultsStatus, results } = room;
 
   useEffect(() => {
-    if (resultsStatus === "ready" && results) trackEvent("draft_results_viewed");
-  }, [resultsStatus, results]);
+    if (resultsStatus !== "ready" || !results) return;
+    trackEvent("draft_results_viewed");
+    const myTeam = results.teams.find((t) => t.id === currentPlayerId);
+    if (myTeam) recordDraftResult(room.code, myTeam.rank === 1);
+  }, [resultsStatus, results, room.code, currentPlayerId]);
 
   if (resultsStatus === "failed") {
     return (

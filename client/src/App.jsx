@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSocket } from "./hooks/useSocket.js";
+import { useSmoothScroll } from "./hooks/useSmoothScroll.js";
 import Landing from "./components/Landing.jsx";
 import MarketTab from "./components/MarketTab.jsx";
 import RoomView from "./components/RoomView.jsx";
@@ -77,6 +78,7 @@ function clearSession() {
 }
 
 export default function App() {
+  useSmoothScroll();
   const { socketRef, connected } = useSocket();
   const [room, setRoom] = useState(null);
   const [currentPlayerId, setCurrentPlayerId] = useState(null);

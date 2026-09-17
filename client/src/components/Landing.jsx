@@ -1,5 +1,7 @@
+import { useState } from "react";
 import RoomLobby from "./RoomLobby.jsx";
 import MarketTicker from "./MarketTicker.jsx";
+import { getStreak } from "../winStreak.js";
 
 /** The front door: hero + the actual room-creation console on one screen,
  * replacing the old multi-section scrolling pitch (LandingPage.jsx) that
@@ -22,6 +24,11 @@ export default function Landing({
   isSubmitting,
   initialJoinCode,
 }) {
+  // Read once per mount: this screen remounts fresh every time a draft
+  // finishes and returns here, which is exactly when the streak just
+  // changed, so a stale value never lingers.
+  const [streak] = useState(getStreak);
+
   return (
     <div className="landing-lobby">
       <div className="landing-lobby-main">
@@ -30,6 +37,11 @@ export default function Landing({
             <span className="landing-lobby-eyebrow-dot" />
             Live bidding, real NBA stats
           </div>
+          {streak >= 2 && (
+            <div className="landing-lobby-streak">
+              {streak}-draft win streak on this device
+            </div>
+          )}
           <h1 className="landing-lobby-title">Draft the greatest team basketball has ever seen.</h1>
           <p className="landing-lobby-subtitle">
             Bid on real NBA players from any era with friends, live. Every gauge on this dashboard reads the truth,

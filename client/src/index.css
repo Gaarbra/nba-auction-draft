@@ -521,6 +521,22 @@ body {
   box-shadow: 0 0 0 3px rgba(62, 207, 110, 0.2);
 }
 
+/* Browser-local streak (see winStreak.js) -- amber like the eyebrow dot is
+   green, so it reads as a distinct, celebratory signal rather than a repeat
+   of the "live" status pill right above it. */
+.landing-lobby-streak {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 176, 32, 0.12);
+  border: 1px solid rgba(255, 176, 32, 0.35);
+  color: var(--ll-accent);
+  font-family: var(--ll-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .landing-lobby-title {
   margin: 0;
   max-width: 16ch;
@@ -1052,7 +1068,11 @@ form input {
   font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: -0.01em;
-  padding: 11px 16px;
+  /* 15px vertical clears Apple HIG's 44pt default tap-target height at this
+     font-size/line-height -- these are the most-tapped controls in the app
+     (Raise/Pass mid-bid, Confirm rematch), so the height matters more here
+     than on a desktop-only control. */
+  padding: 15px 16px;
   font-size: 14px;
   transition: box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
@@ -3234,7 +3254,26 @@ form input {
    (matches the Stitch "Final Standings & Results" mock)
    ============================================================ */
 
+/* Results was explicitly left out of the room-drafting redesign pass (see
+   that scope's own comment), which meant the one screen every draft ends
+   on was the only major surface still on the old plain-Inter, #ff8a00
+   palette while the room you just drafted in, the lobby you started from,
+   and How to Play had all moved to Space Grotesk + #ffb020. Same fix as
+   .room-drafting: redefine the same token names already used throughout
+   .results-* -- continuing straight from the draft's own palette, since
+   this screen is its direct continuation. */
 .results-screen {
+  --bg-panel: #17191d;
+  --bg-panel-raised: #1f2126;
+  --bg-inset: #101114;
+  --line: #2a2d33;
+  --text: #f2eee4;
+  --text-dim: #8b8d93;
+  --text-faint: #8b8d93;
+  --accent: #ffb020;
+  --accent-bright: #ffc352;
+  --win: #3ecf6e;
+  --font-display: "Space Grotesk", "Inter", -apple-system, "Segoe UI", sans-serif;
   width: 100%;
   max-width: 1120px;
   margin: 0 auto;
@@ -3620,6 +3659,27 @@ form input {
   text-transform: uppercase;
   color: var(--text-faint);
   transition: color 0.15s ease;
+}
+
+/* One-thumb-reach primary action on phones (Stitch's Apple-modernization
+   pass on this screen): the rematch decision is the one thing worth
+   fighting for screen space, so it pins to the bottom edge instead of
+   competing with the standings list for scroll position. Everything else
+   in the rematch panel -- vote list, host/leave actions -- stays in normal
+   flow above it. */
+@media (max-width: 640px) {
+  .results-screen {
+    padding-bottom: 84px;
+  }
+
+  .rematch-confirm {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 30;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
 }
 
 .rematch-leave:hover {
@@ -5144,9 +5204,81 @@ button.topnav-brand-link:focus-visible {
   min-width: 220px;
 }
 
-.market-search-input-wide {
-  flex: 1 1 260px;
-  min-width: 220px;
+/* Standalone, ahead of .market-filterbar -- deliberately NOT styled like
+   the pills below it (see that block's own comment): this is the primary
+   "just find a player" entry point, not one filter among several. */
+.market-searchbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.market-searchbar-icon {
+  position: absolute;
+  left: 16px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.market-searchbar-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 48px;
+  padding: 0 16px 0 44px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--bg-panel-raised);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.market-searchbar-input::placeholder {
+  color: var(--text-faint);
+}
+
+.market-searchbar-input:hover {
+  border-color: var(--line-bright);
+}
+
+.market-searchbar-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* Shows/hides .market-filterbar (era + franchise) below -- search above
+   stays put either way, it never depended on those filters being open. */
+.market-filters-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--bg-panel-raised);
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.market-filters-toggle:hover {
+  border-color: var(--line-bright);
+  color: var(--text);
+}
+
+.market-filters-toggle.open {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .market-quicktags {
@@ -5933,15 +6065,38 @@ button.topnav-brand-link:focus-visible {
   }
 
   /* Explicitly requested: on a phone this card boils down to the photo,
-     the name, and the stat grid -- bold and readable without a scroll --
-     not also accolades, the career-teams/career-seasons lines, and
+     the name, the stat grid, and accolades -- bold and readable without a
+     scroll -- not also the career-teams/career-seasons lines and
      "Nominated by". Those stay fully present on desktop, where there's
-     room for them; here they'd just push the bid controls below the fold. */
-  .room-drafting .active-nomination-cinematic .player-accolades,
+     room for them; here they'd just push the bid controls below the fold.
+     Accolades stay: a career MVP/champion chip is exactly the kind of
+     signal a bidder wants at a glance, and the horizontal-scroll treatment
+     below keeps it from doing the same layout damage the removed lines
+     would have. */
   .room-drafting .active-nomination-cinematic .player-team-history,
   .room-drafting .active-nomination-cinematic .stats-season,
   .room-drafting .active-nomination-cinematic .nominated-by {
     display: none;
+  }
+
+  /* Chips shrink and go single-row-scrollable instead of wrapping -- five
+     of them at desktop size wrapped to 2-3 rows and pushed the bid
+     controls below the fold, the exact regression this file's other
+     phone-width rules exist to avoid. */
+  .room-drafting .active-nomination-cinematic .player-accolades {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-bottom: 8px;
+  }
+
+  .room-drafting .active-nomination-cinematic .player-accolades::-webkit-scrollbar {
+    display: none;
+  }
+
+  .room-drafting .active-nomination-cinematic .accolade-chip {
+    padding: 2px 7px;
+    font-size: 10px;
   }
 
   .room-drafting .active-nomination-cinematic .stat-highlight-value {
@@ -6077,6 +6232,53 @@ button.topnav-brand-link:focus-visible {
   display: flex;
   flex-direction: column;
   color: var(--htp-text);
+}
+
+/* One ambient glow drifting down the page with scroll progress (driven by
+   the same ScrollTrigger that fills .how-to-play-progress-fill, see
+   HowToPlay.jsx), instead of each section supplying its own separate
+   background treatment -- the "one continuous scene" half of the
+   Apple-modernization pass's scroll-storytelling note. Fixed + negative
+   z-index so it sits behind every section without needing to be re-added
+   per section or interfere with the pinned sticky frames above it. */
+.how-to-play::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    640px circle at 50% calc(var(--htp-scroll-progress, 0) * 100%),
+    rgba(255, 176, 32, 0.07),
+    transparent 70%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .how-to-play::before {
+    display: none;
+  }
+}
+
+/* Fixed at the very top edge of the viewport, in front of .topnav (z-index
+   40) -- a slim overlay line, not a layout element, so it needs no offset
+   math against the nav's own height. */
+.how-to-play-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 41;
+  pointer-events: none;
+}
+
+.how-to-play-progress-fill {
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: var(--htp-accent);
 }
 
 .how-to-play-hero {
