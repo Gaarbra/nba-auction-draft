@@ -34,6 +34,7 @@
   --radius-sm: 12px;
   --radius-lg: 20px;
   --radius-pill: 999px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   font-family: var(--font-body);
 }
 
@@ -6608,18 +6609,59 @@ button.topnav-brand-link:focus-visible {
 /* ---- Worked example: a real starting five ---- */
 .how-to-play-showcase-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .how-to-play-showcase-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
+  min-width: 0;
+  padding: 12px;
   border-radius: var(--radius-md);
   background: var(--htp-surface-raised);
   border: 1px solid var(--htp-border);
+}
+
+.how-to-play-showcase-visual {
+  position: relative;
+  height: 148px;
+  overflow: hidden;
+  margin: -12px -12px 2px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--team-primary) 24%, var(--htp-surface)), var(--htp-surface));
+}
+
+.how-to-play-showcase-logo {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  opacity: 0.16;
+}
+
+.how-to-play-showcase-photo {
+  position: absolute;
+  right: 50%;
+  bottom: 0;
+  width: 132px;
+  height: 132px;
+  transform: translateX(50%);
+  object-fit: contain;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.how-to-play-showcase-visual .how-to-play-showcase-slot {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
 }
 
 .how-to-play-showcase-slot {
@@ -6931,5 +6973,344 @@ button.topnav-brand-link:focus-visible {
 
   .how-to-play-eq-line {
     font-size: 15px;
+  }
+}
+
+/* Roster movement uses pointer capture for touch, mouse and pen. */
+.roster-slot.draggable { touch-action: none; cursor: grab; user-select: none; }
+.roster-slot.draggable:active { cursor: grabbing; }
+.roster-slot.drop-target { outline: 3px solid var(--accent); outline-offset: 2px; }
+.roster-slot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.roster-drag-preview {
+  position: fixed; z-index: 1000; pointer-events: none;
+  transform: translate(-50%, -110%); width: 100px;
+  background: var(--bg-panel); border: 2px solid var(--accent);
+  border-radius: 8px; text-align: center;
+}
+.roster-drag-preview img { width: 100%; height: 70px; object-fit: contain; }
+.roster-drag-preview span { display: block; padding: 4px; font-size: 12px; }
+.roster-move-status { grid-column: 1 / -1; margin: 0; font-size: 13px; }
+.roster-move-status:empty { display: none; }
+.roster-player-details { margin-top: 12px; min-width: 0; }
+.roster-details-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.roster-details-heading strong { overflow-wrap: anywhere; }
+.roster-player-details button { min-height: 44px; }
+.roster-player-details .stat-highlight-row { gap: 8px; }
+.roster-player-details .stat-highlight { min-width: 0; }
+@media (max-width: 640px) {
+  .room-drafting .stat-highlight-row {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+    width: 100%; min-width: 0;
+  }
+  .room-drafting .stat-highlight { min-width: 0; padding: 8px 6px; }
+  .room-drafting .stat-highlight-value,
+  .room-drafting .active-nomination-cinematic .stat-highlight-value { font-size: 24px; }
+  .roster-slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .roster-slot { min-width: 0; min-height: 44px; }
+  .roster-slot .slot-tooltip { display: none; }
+  .mobile-pick-stats .hint-text { margin: 0 0 6px; }
+  .mobile-assign-summary p { min-width: 0; overflow-wrap: anywhere; }
+}
+@media (hover: none) {
+  .roster-slot .slot-tooltip { display: none; }
+}
+
+/* The nomination needs one readable stat instrument, not five competing cards.
+   Keeping the metrics on a single shared surface makes the player and current
+   auction state read first; dividers retain fast scanability. */
+.room-drafting .active-nomination-cinematic .stat-highlight-row,
+.room-drafting .mobile-pick-stats .stat-highlight-row,
+.room-drafting .won-banner-bio .stat-highlight-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  width: min(100%, 520px);
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.room-drafting .active-nomination-cinematic .stat-highlight,
+.room-drafting .mobile-pick-stats .stat-highlight,
+.room-drafting .won-banner-bio .stat-highlight {
+  min-width: 0;
+  padding: 4px 14px;
+  background: transparent;
+  border: 0;
+}
+
+.room-drafting .active-nomination-cinematic .stat-highlight + .stat-highlight,
+.room-drafting .mobile-pick-stats .stat-highlight + .stat-highlight,
+.room-drafting .won-banner-bio .stat-highlight + .stat-highlight {
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.room-drafting .active-nomination-cinematic .stat-highlight:first-child,
+.room-drafting .mobile-pick-stats .stat-highlight:first-child,
+.room-drafting .won-banner-bio .stat-highlight:first-child {
+  padding-left: 0;
+}
+
+.room-drafting .active-nomination-cinematic .stat-highlight-value,
+.room-drafting .mobile-pick-stats .stat-highlight-value,
+.room-drafting .won-banner-bio .stat-highlight-value {
+  font-size: clamp(26px, 2.3vw, 34px);
+}
+
+.room-drafting .active-nomination-cinematic .stat-highlight-label,
+.room-drafting .mobile-pick-stats .stat-highlight-label,
+.room-drafting .won-banner-bio .stat-highlight-label {
+  margin-top: 2px;
+  color: var(--text-dim);
+}
+
+/* A guide is reference material. It should answer the next question in a
+   glance instead of requiring a long, animated tour before reaching the rules. */
+.how-to-play {
+  max-width: 980px;
+  gap: 0;
+}
+
+.how-to-play::before,
+.how-to-play-progress {
+  display: none;
+}
+
+.how-to-play-hero {
+  align-items: flex-start;
+  padding: 20px 0 32px;
+  text-align: left;
+}
+
+.how-to-play-hero h1 {
+  max-width: none;
+  font-size: clamp(34px, 5vw, 48px);
+}
+
+.how-to-play-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0;
+}
+
+.how-to-play-step {
+  gap: 16px;
+  min-height: 156px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+}
+
+.how-to-play-step-n {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 13px;
+}
+
+.how-to-play-step-copy h2 {
+  font-size: 19px;
+}
+
+.how-to-play-step-copy p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.how-to-play-math {
+  gap: 36px;
+  margin-top: 44px;
+  padding-top: 32px;
+}
+
+.how-to-play-math-intro {
+  align-items: flex-start;
+  padding: 0;
+  text-align: left;
+}
+
+.how-to-play-math-group {
+  padding: 0;
+}
+
+@media (max-width: 640px) {
+  .room-drafting .active-nomination-cinematic .stat-highlight-row,
+  .room-drafting .mobile-pick-stats .stat-highlight-row,
+  .room-drafting .won-banner-bio .stat-highlight-row {
+    width: 100%;
+    padding: 6px 2px;
+  }
+
+  .room-drafting .active-nomination-cinematic .stat-highlight,
+  .room-drafting .mobile-pick-stats .stat-highlight,
+  .room-drafting .won-banner-bio .stat-highlight {
+    padding: 4px 8px;
+  }
+
+  .room-drafting .active-nomination-cinematic .stat-highlight-value,
+  .room-drafting .mobile-pick-stats .stat-highlight-value,
+  .room-drafting .won-banner-bio .stat-highlight-value {
+    font-size: clamp(20px, 6.8vw, 26px);
+  }
+
+  .room-drafting .active-nomination-cinematic .stat-highlight-label,
+  .room-drafting .mobile-pick-stats .stat-highlight-label,
+  .room-drafting .won-banner-bio .stat-highlight-label {
+    font-size: 8px;
+  }
+
+  .how-to-play-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .how-to-play-step {
+    min-height: 0;
+    padding: 18px;
+  }
+}
+
+.accolade-mobile-trigger,
+.accolade-dialog {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .player-accolades {
+    display: none;
+  }
+
+  .accolade-mobile-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font: 600 12px/1 var(--font-display);
+  }
+
+  .accolade-mobile-trigger span {
+    min-width: 20px;
+    padding: 4px 6px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent-bright);
+    font-variant-numeric: tabular-nums;
+  }
+
+  dialog.accolade-dialog[open] {
+    display: flex;
+    width: min(calc(100% - 24px), 430px);
+    max-height: min(76vh, 600px);
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius-lg);
+    background: var(--bg-panel-raised);
+    color: var(--text);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
+  }
+
+  dialog.accolade-dialog[open]::backdrop {
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(4px);
+  }
+
+  @starting-style {
+    dialog.accolade-dialog[open] {
+      opacity: 0;
+      transform: translateY(12px) scale(0.96);
+    }
+  }
+
+  .accolade-dialog-panel {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .accolade-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .accolade-dialog-header h2 {
+    margin: 0;
+    font: 700 20px/1.2 var(--font-display);
+  }
+
+  .accolade-dialog-close {
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-dim);
+  }
+
+  .accolade-dialog-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  .accolade-dialog-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg-inset);
+    font-size: 13px;
+  }
+
+  .accolade-dialog-row strong {
+    color: var(--accent-bright);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .how-to-play-showcase-grid {
+    display: flex;
+    gap: 12px;
+    margin-inline: -16px;
+    padding: 0 16px 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .how-to-play-showcase-card {
+    flex: 0 0 min(78vw, 280px);
+    scroll-snap-align: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog.accolade-dialog[open] {
+    transition: opacity 200ms var(--ease-out);
+  }
+
+  @starting-style {
+    dialog.accolade-dialog[open] {
+      opacity: 0;
+      transform: none;
+    }
   }
 }

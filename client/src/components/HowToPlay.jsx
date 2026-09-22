@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { motion, useScroll, useTransform, useInView, animate } from "motion/react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { motion, useInView, animate } from "motion/react";
 import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import { getTeamColors } from "../teamColors.js";
 import { getTeamLogoUrl } from "../teamLogos.js";
-
-gsap.registerPlugin(ScrollTrigger);
 
 /** The four-step explainer, designed in Paper as its own scrolling page
  * (not a modal -- see App.jsx's activeTab === "how-to-play" branch) so it
@@ -296,16 +292,23 @@ function CountUpStat({ value, decimals = 1, prefix = "", suffix = "" }) {
 }
 
 function ShowcasePlayerCard({ player, index }) {
+  const colors = getTeamColors(player.team);
+  const logoUrl = getTeamLogoUrl(player.team);
+
   return (
     <motion.div
       className="how-to-play-showcase-card"
-      initial={{ opacity: 0, transform: "translateY(24px) scale(0.94) rotateX(8deg)" }}
-      whileInView={{ opacity: 1, transform: "translateY(0px) scale(1) rotateX(0deg)" }}
+      initial={{ opacity: 0, transform: prefersReducedMotion ? "none" : "translateY(16px) scale(0.97)" }}
+      whileInView={{ opacity: 1, transform: "translateY(0px) scale(1)" }}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.5, ease: EASE_OUT, delay: index * 0.08 }}
-      style={{ transformPerspective: 600 }}
+      transition={{ duration: 0.5, ease: EASE_OUT, delay: Math.min(index, 4) * 0.06 }}
+      style={{ "--team-primary": colors.primary, "--team-secondary": colors.secondary }}
     >
-      <span className="how-to-play-showcase-slot">{player.slot}</span>
+      <div className="how-to-play-showcase-visual">
+        {logoUrl && <img src={logoUrl} alt="" aria-hidden="true" className="how-to-play-showcase-logo" />}
+        <PlayerHeadshot nbaPlayerId={player.nbaPlayerId} alt={player.name} className="how-to-play-showcase-photo" />
+        <span className="how-to-play-showcase-slot">{player.slot}</span>
+      </div>
       <span className="how-to-play-showcase-name">{player.name}</span>
       <div className="how-to-play-showcase-line">
         <span>
@@ -342,222 +345,40 @@ function ShowcasePlayerCard({ player, index }) {
 const prefersReducedMotion =
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-// The Apple product-page move (iPhone camera page, in particular): a
-// visual stays pinned in place while you scroll, and the scroll position
-// itself drives it closer/bigger before the next one takes over. Each step
-// is its own tall track (.how-to-play-pin-track) with a `position: sticky`
-// frame inside it -- sticky pins the content for exactly that track's
-// height, then releases it as the next track's own sticky frame takes
-// over. Each step tracks its OWN scroll range via its own ref, rather than
-// one shared progress value sliced into per-step fractions: simpler, and
-// it sidesteps a real bug where Motion's native scroll-timeline
-// optimization didn't clamp several piecewise transforms sharing one
-// scrollYProgress correctly (steps kept bleeding back to visible well past
-// where they should've been fully faded out).
-function PinStep({ step, index, total }) {
-  const ref = useRef(null);
-  const isFirst = index === 0;
-  const isLast = index === total - 1;
-  // "start start" -> 0 the instant the track's top hits the viewport top;
-  // "end start" -> 1 the instant the track's BOTTOM hits the viewport top
-  // (i.e. right as it's about to release). That's exactly the sticky
-  // frame's own pinned lifetime.
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-
-  const opacity = useTransform(
-    scrollYProgress,
-    isFirst ? [0, 0.3, 0.85, 1] : isLast ? [0, 0.15, 1] : [0, 0.15, 0.85, 1],
-    isFirst ? [1, 1, 1, 0] : isLast ? [0, 1, 1] : [0, 1, 1, 0],
-  );
-  const scale = useTransform(
-    scrollYProgress,
-    isFirst ? [0, 1] : isLast ? [0, 0.15] : [0, 0.15, 1],
-    isFirst ? [1, 1.08] : isLast ? [0.85, 1] : [0.85, 1, 1.08],
-  );
-
-  return (
-    <div className="how-to-play-pin-track" ref={ref}>
-      <div className="how-to-play-pin-frame">
-        <motion.div className="how-to-play-pin-step" style={{ opacity, scale }}>
-          <span className="how-to-play-pin-step-n" aria-hidden="true">
-            {step.n}
-          </span>
-          <h2>{step.title}</h2>
-          <p>{step.body}</p>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
-
-// The "assembling the team" sequence: one continuous pinned frame (not
-// five separate ones) so each player who's already had their moment can
-// stay docked in the row while the next one takes the spotlight, ending
-// with all five lined up and their numbers pulling together into the
-// team total. Needs every player's position/opacity/scale driven off the
-// SAME scroll progress at once -- exactly the shape that reads cleanest
-// as one CSS custom property (--p) plus plain calc()/clamp() math per
-// player (see .how-to-play-team-* in index.css), the same technique
-// proven out on the earlier nomination-card experiment, rather than a
-// pile of separate per-player Motion transforms.
-// One beat per player, one for the sum reveal, and one silent trailing
-// buffer. That last one matters more than it looks: a `position: sticky`
-// frame exactly as tall as its own track has no room to stay stuck for
-// the very last stretch of scroll -- it naturally starts "unsticking" and
-// sliding away right as the track's bottom approaches, which without this
-// buffer landed exactly on top of the sum reveal (the total popping in
-// while the whole frame was already sliding off-screen, cutting it off
-// with the docked row nowhere in view). The extra beat pushes that
-// natural release into scroll room where nothing's supposed to be moving
-// anyway, so the reveal gets to sit still and be seen.
-const TEAM_BEATS = SHOWCASE_SCORED.length + 2;
-
-function TeamAssemblePlayer({ player, index }) {
-  const colors = getTeamColors(player.team);
-  const logoUrl = getTeamLogoUrl(player.team);
-  // A plain centered index (-2..2 for 5 players), not a pixel offset --
-  // the actual spacing lives in --slot-spacing (index.css), which shrinks
-  // at narrow widths so the docked row doesn't overflow a phone screen.
-  const slotIndex = index - (SHOWCASE_SCORED.length - 1) / 2;
-
-  return (
-    <div
-      className="how-to-play-team-player"
-      style={{
-        "--beat-start": index / TEAM_BEATS,
-        "--beat-size": 1 / TEAM_BEATS,
-        "--slot-index": slotIndex,
-        "--team-primary": colors.primary,
-        "--team-secondary": colors.secondary,
-      }}
-    >
-      {logoUrl && <img src={logoUrl} alt="" aria-hidden="true" className="how-to-play-team-logo" />}
-      <PlayerHeadshot nbaPlayerId={player.nbaPlayerId} alt={player.name} className="how-to-play-team-photo" />
-      <span className="how-to-play-team-slot">{player.slot}</span>
-      <span className="how-to-play-team-name">{player.name}</span>
-      {/* Only legible while big (see .how-to-play-team-breakdown's opacity:
-          fades in with the spotlight, back out once docked) -- the single
-          Total pill below is what stays readable at the row's small size. */}
-      <div className="how-to-play-team-breakdown">
-        <span>
-          Op <b>{player.op.toFixed(1)}</b>
-        </span>
-        <span>
-          DIR <b>{player.dir.toFixed(1)}</b>
-        </span>
-      </div>
-      <span className="how-to-play-team-number">{player.total.toFixed(1)}</span>
-    </div>
-  );
-}
-
-function TeamAssembleSequence() {
-  const ref = useRef(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-
-  return (
-    <div className="how-to-play-team-track" ref={ref}>
-      <div className="how-to-play-team-frame">
-        <motion.div className="how-to-play-team-scene" style={{ "--p": scrollYProgress }}>
-          {SHOWCASE_SCORED.map((player, i) => (
-            <TeamAssemblePlayer key={player.name} player={player} index={i} />
-          ))}
-          <div className="how-to-play-team-sum">
-            <span className="how-to-play-team-sum-label">Sum(Op + DIR &minus; Pen)</span>
-            <span className="how-to-play-team-sum-value">{SHOWCASE_SUM_TOTAL.toFixed(1)}</span>
-          </div>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
-
 export default function HowToPlay() {
-  const pageRef = useRef(null);
-  const progressFillRef = useRef(null);
-
-  // A slim reading-progress bar for the whole page -- genuinely new
-  // storytelling value (state indication: "how far into the explainer am I")
-  // that doesn't compete with the existing pinned step/team sequences above,
-  // and the first real use of GSAP/ScrollTrigger in this app (Lenis already
-  // covers the rest of the site's inertial scroll; this page opts out of
-  // that via data-lenis-prevent, so ScrollTrigger reads native scroll here
-  // same as the Motion useScroll hooks elsewhere in this file already do).
-  useEffect(() => {
-    const page = pageRef.current;
-    const fill = progressFillRef.current;
-    if (!page || !fill) return undefined;
-
-    const trigger = ScrollTrigger.create({
-      trigger: page,
-      start: "top top",
-      end: "bottom bottom",
-      onUpdate: (self) => {
-        gsap.set(fill, { scaleX: self.progress });
-        // Drives .how-to-play::before's gradient position (see index.css) --
-        // a single ambient glow drifting down the page as you scroll, so the
-        // four pinned steps and the math/worked-example sections that follow
-        // read as one continuous scene instead of separately-styled blocks.
-        page.style.setProperty("--htp-scroll-progress", self.progress);
-      },
-    });
-
-    return () => trigger.kill();
-  }, []);
-
   return (
-    <div className="how-to-play" data-lenis-prevent ref={pageRef}>
-      <div className="how-to-play-progress" aria-hidden="true">
-        <div className="how-to-play-progress-fill" ref={progressFillRef} />
-      </div>
+    <div className="how-to-play">
       <motion.section
         className="how-to-play-hero"
         initial={{ opacity: 0, transform: prefersReducedMotion ? "translateY(0px)" : "translateY(16px)" }}
         animate={{ opacity: 1, transform: "translateY(0px)" }}
         transition={{ duration: 0.5, ease: EASE_OUT }}
       >
-        <div className="how-to-play-eyebrow">
-          <span className="how-to-play-eyebrow-dot" />
-          Four steps, one draft
-        </div>
         <h1>How Hoop Bids works</h1>
         <p>
           A fantasy-style auction draft using real NBA players from any era. No fantasy stats, no made-up prices.
-          Scroll for the full rundown.
+          Create a room, bid for five players, then see whose roster scores best.
         </p>
       </motion.section>
 
-      {prefersReducedMotion ? (
-        // No pinning, no scroll-linked scale/opacity -- just the plain
-        // stacked list, each step fading in once as it's scrolled to.
-        <div className="how-to-play-steps">
-          {STEPS.map((step, i) => {
-            const variant = stepVariant(i, true);
-            return (
-              <motion.div
-                className="how-to-play-step"
-                key={step.n}
-                initial={variant.initial}
-                whileInView={variant.whileInView}
-                viewport={{ once: true, margin: "-80px" }}
-                transition={variant.transition}
-              >
-                <span className="how-to-play-step-n">{step.n}</span>
-                <div className="how-to-play-step-copy">
-                  <h2>{step.title}</h2>
-                  <p>{step.body}</p>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="how-to-play-pin-wrap">
-          {STEPS.map((step, i) => (
-            <PinStep key={step.n} step={step} index={i} total={STEPS.length} />
-          ))}
-        </div>
-      )}
+      <div className="how-to-play-steps">
+        {STEPS.map((step, index) => (
+          <motion.div
+            className="how-to-play-step"
+            key={step.n}
+            initial={{ opacity: 0, transform: prefersReducedMotion ? "none" : "translateY(12px)" }}
+            whileInView={{ opacity: 1, transform: "translateY(0px)" }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.45, ease: EASE_OUT, delay: index * 0.05 }}
+          >
+            <span className="how-to-play-step-n">{step.n}</span>
+            <div className="how-to-play-step-copy">
+              <h2>{step.title}</h2>
+              <p>{step.body}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
 
       <section className="how-to-play-math">
         <motion.div
@@ -567,10 +388,6 @@ export default function HowToPlay() {
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.5, ease: EASE_OUT }}
         >
-          <div className="how-to-play-eyebrow">
-            <span className="how-to-play-eyebrow-dot" />
-            The actual math
-          </div>
           <h2 className="how-to-play-math-h2">How the numbers work</h2>
           <p>
             Two separate systems, not one. Here's exactly what each does, no hand-waving. Hover (or tap) any bolded
@@ -648,17 +465,12 @@ export default function HowToPlay() {
             above, run for real instead of with letters. Each one is shown in their real position here, so the
             position penalty comes out to 0 for all five below (see the Olajuwon-at-PG example above for what it
             looks like when it doesn't).
-            {!prefersReducedMotion && " Keep scrolling: each starter gets their own moment before the final tally."}
           </p>
-          {prefersReducedMotion ? (
-            <div className="how-to-play-showcase-grid">
-              {SHOWCASE_SCORED.map((player, i) => (
-                <ShowcasePlayerCard key={player.name} player={player} index={i} />
-              ))}
-            </div>
-          ) : (
-            <TeamAssembleSequence />
-          )}
+          <div className="how-to-play-showcase-grid">
+            {SHOWCASE_SCORED.map((player, i) => (
+              <ShowcasePlayerCard key={player.name} player={player} index={i} />
+            ))}
+          </div>
           <motion.div
             className="how-to-play-showcase-summary"
             initial={{ opacity: 0, transform: "translateY(20px)" }}

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { nominatePlayer, placeBid, passOnNomination, removePlayerFromDraft } from "./draftStore.js";
+import { nominatePlayer, placeBid, passOnNomination, removePlayerFromDraft, swapRosterPositions } from "./draftStore.js";
 
 function emptyRoster() {
   return { PG: null, SG: null, SF: null, PF: null, C: null };
@@ -107,4 +107,32 @@ test("orderly mode: a player leaving who wasn't on turn doesn't disturb whose tu
   nominatePlayer(room, "A", player); // turn=B
   removePlayerFromDraft(room, "D"); // D leaves, not their turn
   assert.strictEqual(room.draft.nomination.currentBidTurnId, "B");
+});
+
+
+test("roster drag moves into empty slots, exchanges occupied slots, and respects swap settings", () => {
+  const room = makeRoom();
+  room.allowPositionSwaps = true;
+  const guard = { nbaPlayerId: 30, fullName: "Guard", acquiredFor: 5 };
+  const center = { nbaPlayerId: 34, fullName: "Center", acquiredFor: 7 };
+  room.draft.rosters.A.PG = guard;
+  room.draft.rosters.A.C = center;
+  const untouched = structuredClone(room.draft.rosters.B);
+  assert.equal(swapRosterPositions(room, "A", "PG", "SG").error, undefined);
+  assert.equal(room.draft.rosters.A.PG, null);
+  assert.equal(room.draft.rosters.A.SG, guard);
+  assert.equal(swapRosterPositions(room, "A", "SG", "C").error, undefined);
+  assert.equal(room.draft.rosters.A.SG, center);
+  assert.equal(room.draft.rosters.A.C, guard);
+  assert.deepEqual(room.draft.rosters.B, untouched);
+  assert.equal(room.players[0].budget, 20);
+  const before = structuredClone(room.draft.rosters);
+  assert.equal(swapRosterPositions(room, "A", "C", "C").error, "INVALID_SLOTS");
+  assert.equal(swapRosterPositions(room, "A", "C", "invalid").error, "INVALID_SLOTS");
+  room.allowPositionSwaps = false;
+  assert.equal(swapRosterPositions(room, "A", "C", "PG").error, "SWAPS_NOT_ALLOWED");
+  room.allowPositionSwaps = true;
+  room.status = "complete";
+  assert.equal(swapRosterPositions(room, "A", "C", "PG").error, "NOT_DRAFTING");
+  assert.deepEqual(room.draft.rosters, before);
 });

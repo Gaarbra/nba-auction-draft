@@ -383,6 +383,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
             </p>
           </div>
 
+          <div className="mobile-pick-stats">
+            <p className="hint-text">{nomination.player.position || "Position unknown"} · Career averages</p>
+            {nomination.player.stats && !nomination.player.stats.unavailable
+              ? <StatHighlightRow stats={nomination.player.stats} />
+              : <p className="hint-text">Stats unavailable for this player.</p>}
+          </div>
+
           <RosterGrid
             room={room}
             currentPlayerId={currentPlayerId}
