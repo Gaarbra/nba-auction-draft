@@ -7302,6 +7302,130 @@ button.topnav-brand-link:focus-visible {
   }
 }
 
+/* Keep the live auction compact enough to scan while bids are moving. */
+@media (min-width: 861px) {
+  .room-drafting .draft-layout {
+    max-width: 1240px;
+  }
+
+  .room-drafting .active-nomination-cinematic {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    padding: 0;
+  }
+
+  .room-drafting .active-nomination-cinematic .nominated-player-card {
+    min-width: 0;
+    min-height: 272px;
+    padding: 24px;
+  }
+
+  .room-drafting .active-nomination-cinematic .nominated-player-header {
+    min-height: 224px;
+  }
+
+  .room-drafting .active-nomination-cinematic .stat-radar {
+    width: 140px;
+    height: 140px;
+  }
+
+  .room-drafting .active-nomination-cinematic .bidding-panel,
+  .room-drafting .active-nomination-cinematic .assign-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    margin: 0;
+    padding: 24px;
+    border: 0;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
+    background: rgba(8, 9, 12, 0.72);
+  }
+}
+
+@media (max-width: 640px) {
+  .room-drafting .active-nomination-cinematic {
+    padding: 0;
+    background: color-mix(in srgb, var(--team-secondary, var(--bg-panel)) 10%, var(--bg-panel));
+    border-color: var(--line-bright);
+  }
+
+  .room-drafting .active-nomination-cinematic .nominated-player-card {
+    padding: 16px;
+  }
+
+  .room-drafting .active-nomination-cinematic .nomination-team-wash {
+    opacity: 0.18;
+    background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--team-primary, transparent) 48%, transparent),
+      transparent 62%
+    );
+  }
+
+  .room-drafting .active-nomination-cinematic .nomination-big-logo {
+    display: none;
+  }
+
+  .room-drafting .active-nomination-cinematic .nominated-player-header {
+    display: block;
+    min-height: 132px;
+    padding: 0;
+  }
+
+  .room-drafting .active-nomination-cinematic .nomination-photo-wrap {
+    float: left;
+    width: 100px;
+    height: 132px;
+    margin: 0 14px 8px 0;
+  }
+
+  .room-drafting .active-nomination-cinematic .player-headshot.player-headshot-cinematic {
+    width: 100px;
+    height: 132px;
+  }
+
+  .room-drafting .active-nomination-cinematic .nomination-content-fade {
+    display: block;
+    margin: 0;
+    padding: 0;
+    background: none;
+  }
+
+  .room-drafting .active-nomination-cinematic .nominated-player-card h3 {
+    font-size: 20px;
+    line-height: 1.1;
+  }
+
+  .room-drafting .active-nomination-cinematic .player-meta {
+    line-height: 1.35;
+  }
+
+  .room-drafting .active-nomination-cinematic .stat-highlight-row {
+    clear: both;
+    margin-top: 16px;
+  }
+
+  .room-drafting .active-nomination-cinematic .bidding-panel,
+  .room-drafting .active-nomination-cinematic .assign-panel {
+    margin: 0;
+    padding: 18px 16px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--bg-inset);
+  }
+
+  .room-drafting .active-nomination-cinematic .current-bid {
+    margin-bottom: 10px;
+  }
+
+  .room-drafting .active-nomination-cinematic .current-bid strong {
+    font-size: 28px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   dialog.accolade-dialog[open] {
     transition: opacity 200ms var(--ease-out);
