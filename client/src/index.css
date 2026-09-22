@@ -6997,6 +6997,18 @@ button.topnav-brand-link:focus-visible {
 .roster-player-details button { min-height: 44px; }
 .roster-player-details .stat-highlight-row { gap: 8px; }
 .roster-player-details .stat-highlight { min-width: 0; }
+.roster-detail-position { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--text-dim); font-size: 12px; }
+.roster-detail-position strong { color: var(--text); font-family: var(--font-display); }
+.roster-position-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.roster-position-actions p, .roster-position-note, .roster-stats-label { margin: 0; font-size: 12px; line-height: 1.35; color: var(--text-dim); }
+.roster-position-actions p { flex: 1; }
+.roster-position-note { margin-top: 10px; }
+.roster-stats-label { margin-top: 14px; font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.roster-player-details .stat-highlight-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; width: 100%; margin: 6px 0 0; }
+.roster-player-details .stat-highlight { padding: 7px 5px; background: transparent; border: 0; }
+.roster-player-details .stat-highlight + .stat-highlight { border-left: 1px solid var(--line); }
+.roster-player-details .stat-highlight-value { font-size: clamp(20px, 2.2vw, 28px); }
+.roster-player-details .stat-highlight-label { margin-top: 2px; font-size: 8px; }
 @media (max-width: 640px) {
   .room-drafting .stat-highlight-row {
     display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
@@ -7008,6 +7020,13 @@ button.topnav-brand-link:focus-visible {
   .roster-slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .roster-slot { min-width: 0; min-height: 44px; }
   .roster-slot .slot-tooltip { display: none; }
+  .roster-player-details .stat-highlight-row { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; }
+  .roster-player-details .stat-highlight { padding: 7px 5px; background: transparent; border: 0; }
+  .roster-player-details .stat-highlight + .stat-highlight { border-left: 1px solid var(--line); }
+  .roster-player-details .stat-highlight-value { font-size: clamp(20px, 6.8vw, 26px); }
+  .roster-player-details .stat-highlight-label { font-size: 8px; }
+  .roster-position-actions { align-items: flex-start; }
+  .roster-position-actions .secondary-btn { flex-shrink: 0; }
   .mobile-pick-stats .hint-text { margin: 0 0 6px; }
   .mobile-assign-summary p { min-width: 0; overflow-wrap: anywhere; }
 }

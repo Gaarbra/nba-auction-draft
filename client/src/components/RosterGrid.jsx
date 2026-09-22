@@ -292,16 +292,23 @@ export default function RosterGrid({
                   <strong>{inspectedPlayer.fullName}</strong>
                   <button type="button" className="secondary-btn" onClick={() => { setInspected(null); setSelectedSlot(null); }}>Close</button>
                 </div>
-                <p className="hint-text">{inspected.pos} · Listed position: {inspectedPlayer.position || "Unknown"} · Career averages</p>
+                <div className="roster-detail-position">
+                  <span>Draft slot <strong>{inspected.pos}</strong></span>
+                  <span>Listed {inspectedPlayer.position || "Unknown"}</span>
+                </div>
+                {isMine && canSwap && !assigningSlot && (
+                  <div className="roster-position-actions">
+                    <button type="button" className="secondary-btn" disabled={moving} onClick={() => setSelectedSlot(selectedSlot ? null : inspected.pos)}>
+                      {selectedSlot ? "Cancel change" : "Change position"}
+                    </button>
+                    {selectedSlot && <p role="status">Choose a slot above. An occupied slot swaps both players.</p>}
+                  </div>
+                )}
+                {isMine && !canSwap && !assigningSlot && <p className="roster-position-note">Position changes are disabled for this draft.</p>}
+                <p className="roster-stats-label">Career averages</p>
                 {inspectedPlayer.stats && !inspectedPlayer.stats.unavailable
                   ? <StatHighlightRow stats={inspectedPlayer.stats} />
                   : <p className="hint-text">Stats unavailable for this player.</p>}
-                {isMine && canSwap && !assigningSlot && (
-                  <button type="button" className="secondary-btn" disabled={moving} onClick={() => setSelectedSlot(selectedSlot ? null : inspected.pos)}>
-                    {selectedSlot ? "Cancel move" : "Move player"}
-                  </button>
-                )}
-                {isMine && selectedSlot && !assigningSlot && <p role="status" className="hint-text">Choose a position in the row above. An occupied position swaps both players.</p>}
               </section>
             )}
           </div>

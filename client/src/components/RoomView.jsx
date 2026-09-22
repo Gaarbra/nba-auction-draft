@@ -46,7 +46,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
   const [era, setEra] = useState("all");
   const [difficulty, setDifficulty] = useState("normal");
   const [biddingMode, setBiddingMode] = useState("open");
-  const [allowPositionSwaps, setAllowPositionSwaps] = useState(false);
+  const [allowPositionSwaps, setAllowPositionSwaps] = useState(true);
 
   useEffect(() => {
     if (!isHost) return;
@@ -187,7 +187,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
                 checked={allowPositionSwaps}
                 onChange={(e) => setAllowPositionSwaps(e.target.checked)}
               />
-              Allow players to swap drafted players' positions later
+              Allow position changes after a player is drafted
             </label>
           )}
           <motion.button
