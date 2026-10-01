@@ -1,5 +1,46 @@
 # Affordable deployment and AWS migration
 
+## girma.me/hoopbids on the existing Render site
+
+The frontend build places Hoop Bids and its assets in `dist/hoopbids/`.
+`dist/index.html` is a separate portfolio placeholder, edited in
+`client/portfolio.html`. Both Render and Docker use this layout. `/hoopbids`
+redirects to `/hoopbids/`; room invites preserve the page path and query string.
+
+If nothing else is hosted at `girma.me`:
+
+1. In the existing **frontend static site's** Render Settings, add `girma.me`
+   as a custom domain (no protocol or path). Follow the DNS values Render
+   displays at your domain provider, then verify the domain in Render.
+2. Sync the updated `render.yaml` blueprint. If the service is managed manually,
+   set its build command to `npm install && npm run build` and publish directory
+   to `dist` (relative to its `client` root directory).
+   Replace the previous routes with only these two rules, in order:
+   redirect `/hoopbids` to `/hoopbids/`, then rewrite `/hoopbids/*` to
+   `/hoopbids/index.html`. Remove the old `/*` rewrite and asset rewrites.
+3. On the Node backend set `CLIENT_ORIGIN=https://girma.me` (no path or trailing
+   slash). Keep the frontend's `VITE_SERVER_URL` pointing to the existing Node
+   service URL, and retain `TRUST_PROXY=1` on Render. Socket.IO still connects
+   directly to that backend, using its existing `/socket.io/` endpoint.
+4. Add `girma.me` to the Turnstile widget's allowed hostnames. Set
+   `TURNSTILE_SECRET_KEY` on **hoop-bids-server** and the matching
+   `VITE_TURNSTILE_SITE_KEY` on **hoop-bids-client**. Production deliberately
+   blocks connections without the secret; do not disable this protection.
+   Rebuild the
+   frontend and redeploy the backend after environment changes.
+5. Open `https://girma.me/hoopbids/`, verify asset loading, complete human
+   verification, create a room, and test a copied invite in another browser.
+
+Replace `client/portfolio.html` with your portfolio when ready. If you later
+host the portfolio on a different service, that host must proxy `/hoopbids`
+and `/hoopbids/*` to this app. DNS cannot split one domain by URL path.
+
+Changing `CLIENT_ORIGIN` makes `girma.me` the supported gameplay origin; the
+old frontend `onrender.com` address will no longer be authorized for gameplay.
+No DNS or Render settings have been changed by the repository update itself.
+See [Render custom domains](https://render.com/docs/custom-domains) and
+[Render rewrites](https://render.com/docs/redirects-rewrites).
+
 Recommendation: one small Linux VM with Docker Compose, Caddy HTTPS, Node,
 Python and Postgres. Start with 2 CPU / 4 GB RAM and measure memory during stats
 warmups; this is a starting estimate, not a load-tested capacity promise. There

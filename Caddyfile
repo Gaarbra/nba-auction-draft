@@ -10,9 +10,14 @@
   handle @backend {
     reverse_proxy server:4000
   }
+  redir /hoopbids /hoopbids/ 308
+  handle /hoopbids/* {
+    root * /srv
+    try_files {path} /hoopbids/index.html
+    file_server
+  }
   handle {
     root * /srv
-    try_files {path} /index.html
     file_server
   }
 }

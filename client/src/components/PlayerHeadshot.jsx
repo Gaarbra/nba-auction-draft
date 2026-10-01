@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-const PLACEHOLDER_SRC = "/player-placeholder.svg";
+const PLACEHOLDER_SRC = `${import.meta.env.BASE_URL}player-placeholder.svg`;
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 // Long enough that the server-side background resolve (see
 // get_fallback_photo_url in app.py) has almost always already finished by
