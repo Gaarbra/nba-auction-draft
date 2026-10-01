@@ -70,6 +70,7 @@ const HISTORICAL_ALIASES = {
   MIH: "ATL", // Milwaukee Hawks -> ... -> Atlanta Hawks
   STL: "ATL", // St. Louis Hawks -> Atlanta Hawks, 1968
   SDC: "LAC", // San Diego Clippers -> Los Angeles Clippers, 1984
+  BUF: "LAC", // Buffalo Braves -> San Diego Clippers -> Los Angeles Clippers
   SDR: "HOU", // San Diego Rockets -> Houston Rockets, 1971
 };
 

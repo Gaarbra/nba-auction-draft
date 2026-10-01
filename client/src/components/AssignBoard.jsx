@@ -3,6 +3,8 @@ import PlayerHeadshot from "./PlayerHeadshot.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
 import StatHighlightRow from "./StatHighlightRow.jsx";
 import StatRadarChart from "./StatRadarChart.jsx";
+import PlayerAccolades from "./PlayerAccolades.jsx";
+import TeamRevealBackdrop from "./TeamRevealBackdrop.jsx";
 import { getTeamColors } from "../teamColors.js";
 import { getHistoricalTeamName } from "../teamNames.js";
 
@@ -55,6 +57,7 @@ export default function AssignBoard({
     <div className="assign-screen">
       {/* ---- Won-player hero banner ---- */}
       <section className="won-banner">
+        <TeamRevealBackdrop team={player.team?.abbreviation} playerId={player.nbaPlayerId} />
         <div className="won-banner-main">
           <div className="won-banner-avatar">
             <PlayerHeadshot
@@ -115,6 +118,9 @@ export default function AssignBoard({
             </div>
           )}
           {hasStats && <StatRadarChart stats={stats} color={teamColor} />}
+          <div className="won-banner-honors">
+            <PlayerAccolades nbaPlayerId={player.nbaPlayerId} showHeading compact />
+          </div>
         </div>
 
         <div className="won-banner-prompt">

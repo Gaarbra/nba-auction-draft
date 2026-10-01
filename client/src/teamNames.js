@@ -25,6 +25,7 @@ const HISTORICAL_TEAM_NAMES = {
   MIH: "Milwaukee Hawks",
   STL: "St. Louis Hawks",
   SDC: "San Diego Clippers",
+  BUF: "Buffalo Braves",
   SDR: "San Diego Rockets",
 };
 

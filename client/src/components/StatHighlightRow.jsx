@@ -60,6 +60,7 @@ export default function StatHighlightRow({ stats }) {
   if (!stats || stats.unavailable) return null;
 
   return (
+    <>
     <div className="stat-highlight-row">
       {STATS.map((s) => (
         <div className="stat-highlight" key={s.key}>
@@ -70,5 +71,7 @@ export default function StatHighlightRow({ stats }) {
         </div>
       ))}
     </div>
+    {stats.savedAt && <p className="stats-snapshot-note">Saved career stats · {new Date(stats.savedAt * 1000).toLocaleDateString()}</p>}
+    </>
   );
 }

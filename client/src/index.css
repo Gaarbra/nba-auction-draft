@@ -1546,6 +1546,7 @@ form input {
     writing-mode: horizontal-tb;
     flex-direction: row;
     height: auto;
+    min-height: 44px;
     padding: 10px 14px;
   }
 }
@@ -2826,7 +2827,7 @@ form input {
 
 .roster-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: 14px;
   margin-top: 12px;
 }
@@ -3742,7 +3743,8 @@ form input {
   flex-direction: column;
   justify-content: center;
   gap: 10px;
-  height: 100%;
+  flex: 1;
+  min-height: 140px;
   padding: 16px 0;
   border-bottom: none;
   writing-mode: vertical-rl;
@@ -4301,7 +4303,7 @@ button.topnav-brand-link:focus-visible {
 .assign-screen {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
   width: 100%;
 }
 
@@ -4313,7 +4315,7 @@ button.topnav-brand-link:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 12px 20px;
   padding: 24px;
   background: var(--bg-panel);
   border: 1px solid var(--line);
@@ -4335,11 +4337,37 @@ button.topnav-brand-link:focus-visible {
 }
 
 .won-banner-main {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 20px;
   min-width: 0;
   flex: 1;
+}
+
+.team-reveal-backdrop {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: min(42%, 240px);
+  height: 220px;
+  object-fit: contain;
+  opacity: 0.2;
+  pointer-events: none;
+  z-index: 0;
+  animation: team-reveal-in 650ms var(--ease-out) both;
+}
+@keyframes team-reveal-in {
+  from { opacity: 0; transform: translateY(8px) scale(.96); }
+  to { opacity: .2; transform: translateY(0) scale(1); }
+}
+.mobile-assign-strip { position: relative; isolation: isolate; }
+.mobile-assign-strip > :not(.team-reveal-backdrop),
+.won-banner-prompt, .won-banner-reroll { position: relative; z-index: 1; }
+.mobile-assign-strip .team-reveal-backdrop { width: 160px; height: 160px; top: 0; left: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .team-reveal-backdrop { animation: none; }
 }
 
 .won-banner-avatar {
@@ -4446,12 +4474,30 @@ button.topnav-brand-link:focus-visible {
 }
 
 .won-banner-aside {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: flex-start;
   gap: 12px;
   flex-shrink: 0;
+  width: 330px;
 }
+.won-banner-aside .won-banner-bid { grid-column: 1 / -1; }
+.won-banner-honors:empty { display: none; }
+.accolade-more summary { cursor: pointer; font-size: 12px; padding-block: 12px; min-height: 44px; }
+@media (max-width: 1100px) {
+  .won-banner-aside { width: 100%; grid-template-columns: 140px minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .accolade-more { display: none; }
+}
+
+.won-banner-aside .stat-radar { display: block; width: 140px; height: 140px; margin: 0 auto; }
+.won-banner-honors { width: 100%; min-width: 0; }
+.career-honors-heading { font-size: 12px; font-weight: 600; margin: 10px 0 8px; color: var(--text-dim); }
+.won-banner-honors .player-accolades { gap: 6px; margin: 0; }
+.won-banner-honors .accolade-chip { white-space: normal; overflow-wrap: anywhere; }
 
 .won-banner-bid {
   display: flex;
@@ -4510,12 +4556,15 @@ button.topnav-brand-link:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 20px;
-  padding-top: 20px;
+  margin-top: 0;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
   font-size: 14px;
   color: var(--text-dim);
 }
+.won-banner-prompt p { margin: 0; }
+.won-banner .won-banner-reroll { margin-top: 0; padding-top: 10px; }
+.won-banner-reroll .hint-text { margin: 0; }
 
 .won-banner-prompt-icon {
   width: 24px;
@@ -4684,7 +4733,7 @@ button.topnav-brand-link:focus-visible {
   flex-direction: column;
   justify-content: space-between;
   gap: 12px;
-  min-height: 280px;
+  min-height: 220px;
   padding: 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
@@ -5939,6 +5988,23 @@ button.topnav-brand-link:focus-visible {
   color: var(--text-dim);
 }
 
+.room-drafting .app-main { justify-content: flex-start; }
+.draft-layout.is-rolling { align-items: flex-start; }
+.draft-layout.is-rolling .chat-panel.collapsed .chat-panel-header { height: auto; min-height: 140px; }
+.mobile-player-details { margin-top: 12px; min-width: 0; }
+.mobile-player-details summary { cursor: pointer; min-height: 44px; padding-block: 12px; }
+.mobile-player-details .stat-radar { display: block; max-width: 100%; margin: 12px auto; }
+.mobile-pick-stats { min-width: 0; overflow-wrap: anywhere; }
+.stats-snapshot-note { margin: 8px 0 0; color: var(--text-dim); font-size: 12px; }
+@media (max-width: 860px) {
+  .room-drafting .app-main { padding: 16px 12px 88px; }
+  .room-drafting .draft-board { padding: 12px; width: 100%; }
+  .mobile-assign-strip { padding: 0; border: 0; background: transparent; }
+  .mobile-assign-strip .roster-card { padding: 10px; min-width: 0; }
+  .mobile-assign-strip .roster-slots { gap: 3px; }
+  .draft-layout.is-rolling .chat-panel.collapsed .chat-panel-header { min-height: 44px; }
+}
+
 /* ============ Draft Board console (room-drafting scope) ============
    The second Paper-redesigned screen (see .landing-lobby for the first and
    the same reasoning). Scoped, not global: .room-drafting only goes on
@@ -6066,19 +6132,11 @@ button.topnav-brand-link:focus-visible {
     font-size: 28px;
   }
 
-  /* Explicitly requested: on a phone this card boils down to the photo,
-     the name, the stat grid, and accolades -- bold and readable without a
-     scroll -- not also the career-teams/career-seasons lines and
-     "Nominated by". Those stay fully present on desktop, where there's
-     room for them; here they'd just push the bid controls below the fold.
-     Accolades stay: a career MVP/champion chip is exactly the kind of
-     signal a bidder wants at a glance, and the horizontal-scroll treatment
-     below keeps it from doing the same layout damage the removed lines
-     would have. */
+  /* Keep career context on phones; normal flow gives each line its own space. */
   .room-drafting .active-nomination-cinematic .player-team-history,
   .room-drafting .active-nomination-cinematic .stats-season,
   .room-drafting .active-nomination-cinematic .nominated-by {
-    display: none;
+    display: block;
   }
 
   /* Chips shrink and go single-row-scrollable instead of wrapping -- five
@@ -7085,6 +7143,24 @@ button.topnav-brand-link:focus-visible {
 .room-drafting .won-banner-bio .stat-highlight-label {
   margin-top: 2px;
   color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .room-drafting .mobile-pick-stats .stat-highlight-row,
+  .room-drafting .active-nomination-cinematic .stat-highlight-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .room-drafting .mobile-pick-stats .stat-highlight,
+  .room-drafting .active-nomination-cinematic .stat-highlight {
+    padding: 4px 0;
+    border: 0;
+  }
+  .room-drafting .mobile-pick-stats .stat-highlight-value,
+  .room-drafting .active-nomination-cinematic .stat-highlight-value {
+    font-size: 24px;
+    white-space: nowrap;
+  }
 }
 
 /* A guide is reference material. It should answer the next question in a

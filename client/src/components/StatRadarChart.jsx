@@ -42,7 +42,7 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
   const polygonPoints = points.map((p) => p.point.join(",")).join(" ");
 
   return (
-    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="stat-radar" role="img" aria-label="Career per-game stat radar">
+    <svg viewBox={`-10 -10 ${SIZE + 20} ${SIZE + 20}`} className="stat-radar" role="img" aria-label="Career per-game stat radar">
       {[0.33, 0.66, 1].map((f) => (
         <polygon
           key={f}

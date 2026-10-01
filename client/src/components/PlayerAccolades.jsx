@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 
@@ -9,7 +9,8 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
  * sort order and which tier each award belongs to, so this component only
  * has to turn a tier string into a color). Best-effort like PlayerInsights:
  * an empty or failed lookup just renders nothing, not an error state. */
-export default function PlayerAccolades({ nbaPlayerId }) {
+export default function PlayerAccolades({ nbaPlayerId, showHeading = false, compact = false }) {
+  const reduceMotion = useReducedMotion();
   const [awards, setAwards] = useState([]);
   const dialogRef = useRef(null);
 
@@ -34,19 +35,31 @@ export default function PlayerAccolades({ nbaPlayerId }) {
 
   return (
     <>
+      {showHeading && <h3 className="career-honors-heading">Career honors</h3>}
       <div className="player-accolades">
-        {awards.map((award, i) => (
+        {(compact ? awards.slice(0, 4) : awards).map((award, i) => (
           <motion.span
             key={award.label}
             className={`accolade-chip accolade-${award.tier}`}
-            initial={{ opacity: 0, transform: "translateY(6px)" }}
+            initial={reduceMotion ? false : { opacity: 0, transform: "translateY(6px)" }}
             animate={{ opacity: 1, transform: "translateY(0px)" }}
-            transition={{ duration: 0.3, delay: Math.min(i, 6) * 0.04 }}
+            transition={{ duration: reduceMotion ? 0 : 0.3, delay: reduceMotion ? 0 : Math.min(i, 6) * 0.04 }}
           >
             {award.count > 1 ? `${award.count}× ${award.label}` : award.label}
           </motion.span>
         ))}
       </div>
+
+      {compact && awards.length > 4 && (
+        <details className="accolade-more">
+          <summary>{awards.length - 4} more honors</summary>
+          <div className="player-accolades">
+            {awards.slice(4).map((award) => <span className={`accolade-chip accolade-${award.tier}`} key={award.label}>
+              {award.count > 1 ? `${award.count}× ${award.label}` : award.label}
+            </span>)}
+          </div>
+        </details>
+      )}
 
       <button type="button" className="accolade-mobile-trigger" onClick={() => dialogRef.current?.showModal()}>
         View awards <span>{awards.length}</span>

@@ -14,6 +14,7 @@ import ChatPanel from "./ChatPanel.jsx";
 import LocalBiddingRows from "./LocalBiddingRows.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
 import PlayerAccolades from "./PlayerAccolades.jsx";
+import TeamRevealBackdrop from "./TeamRevealBackdrop.jsx";
 import TeamBadge from "./TeamBadge.jsx";
 import { playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
@@ -321,7 +322,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   const rerollAvailable = isSolo && !draft?.soloRerollUsed;
 
   return (
-    <div className="draft-layout">
+    <div className={`draft-layout${isRolling ? " is-rolling" : ""}`}>
       <div className="draft-board">
       {(room.draftEra && room.draftEra !== "all") || room.biddingMode === "orderly" ? (
         <div className="draft-meta">
@@ -361,6 +362,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         // any width) filtered to just this player, with assigningSlot's
         // two-tap arm/confirm doing the "pick a spot" job in place.
         <div className="mobile-assign-strip">
+          <TeamRevealBackdrop team={nomination.player.team?.abbreviation} playerId={nomination.player.nbaPlayerId} />
           <div className="mobile-assign-summary">
             <PlayerHeadshot
               nbaPlayerId={nomination.player.nbaPlayerId}
@@ -384,10 +386,27 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           </div>
 
           <div className="mobile-pick-stats">
-            <p className="hint-text">{nomination.player.position || "Position unknown"} · Career averages</p>
+            <p className="hint-text">
+              {nomination.player.position || "Position unavailable"}
+              {nomination.player.team?.abbreviation && ` · ${getHistoricalTeamName(nomination.player.team.abbreviation) || nomination.player.team.abbreviation}`}
+              {nomination.player.draftYear && ` · Drafted ${nomination.player.draftYear}`}
+            </p>
             {nomination.player.stats && !nomination.player.stats.unavailable
-              ? <StatHighlightRow stats={nomination.player.stats} />
-              : <p className="hint-text">Stats unavailable for this player.</p>}
+              ? <>
+                  <p className="hint-text">
+                    Career averages · {nomination.player.stats.firstSeason}–{nomination.player.stats.lastSeason}
+                    {` · ${nomination.player.stats.gamesPlayed} games`}
+                  </p>
+                  <StatHighlightRow stats={nomination.player.stats} />
+                  <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} showHeading />
+                  <details className="mobile-player-details">
+                    <summary>Player profile &amp; career chart</summary>
+                    {nomination.player.teamHistory?.length > 0 && <p className="hint-text">Career teams: {nomination.player.teamHistory.map((team) => getHistoricalTeamName(team.abbreviation) || team.abbreviation).join(", ")}</p>}
+                    {nomination.player.stats.country && <p className="hint-text">Country: {nomination.player.stats.country}</p>}
+                    <StatRadarChart stats={nomination.player.stats} color={getTeamColors(nomination.player.team?.abbreviation).primary} />
+                  </details>
+                </>
+              : <p className="hint-text">Career stats are currently unavailable. You can still place this player.</p>}
           </div>
 
           <RosterGrid
@@ -504,11 +523,6 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
             // (see the animate skill's --ease-out token) for this one
             // specific "big logo slides into place" moment.
             const logoEase = [0.25, 1, 0.5, 1];
-            // Same slide as the headshot's own -- bottom-anchored via CSS
-            // (see .nomination-big-logo), so unlike the earlier vertically-
-            // centered version this doesn't need a translateY baked into
-            // every animated frame, just the horizontal slide.
-            const bigLogoFrom = prefersReducedMotion ? "translateX(0px)" : "translateX(-40px)";
 
             return (
               <>
@@ -533,17 +547,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                       itself now allows overflow (see that rule) so the logo
                       can still bleed out past ITS edges; only the true outer
                       card (.active-nomination-cinematic) clips it for real. */}
-                  {logoUrl && isOfficialPhoto && (
-                    <motion.img
-                      src={logoUrl}
-                      alt=""
-                      aria-hidden="true"
-                      className="nomination-big-logo"
-                      initial={{ opacity: 0, transform: bigLogoFrom }}
-                      animate={{ opacity: 1, transform: "translateX(0px)" }}
-                      transition={{ duration: 0.6, ease: logoEase }}
-                    />
-                  )}
+                  <TeamRevealBackdrop team={nomination.player.team?.abbreviation} playerId={nomination.player.nbaPlayerId} />
                   <div className="nominated-player-header">
                     <div className="nomination-photo-wrap">
                       <motion.div
