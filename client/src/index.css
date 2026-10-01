@@ -5401,6 +5401,7 @@ button.topnav-brand-link:focus-visible {
 }
 
 .market-result-meta {
+  overflow-wrap: anywhere;
   font-size: 12px;
   color: var(--text-faint);
   flex-shrink: 0;
@@ -5410,7 +5411,7 @@ button.topnav-brand-link:focus-visible {
    the Stitch mock's own 8/4-column split. */
 .market-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -5439,7 +5440,7 @@ button.topnav-brand-link:focus-visible {
 .market-dossier-photo {
   position: relative;
   flex-shrink: 0;
-  width: 220px;
+  width: clamp(140px, 16vw, 220px);
   height: 280px;
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -5714,7 +5715,7 @@ button.topnav-brand-link:focus-visible {
 /* Similar player assets grid. */
 .market-similar-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
   gap: 10px;
 }
 
@@ -7457,3 +7458,23 @@ button.topnav-brand-link:focus-visible {
     }
   }
 }
+
+/* Content must fit the grid, including long names and narrow phones. */
+.market-dossier-name a { min-width: 0; overflow-wrap: anywhere; }
+.market-panel-header { flex-wrap: wrap; }
+.market-panel-header > *, .market-sale-meta { min-width: 0; overflow-wrap: anywhere; }
+.connection-verification { margin-bottom: 20px; max-width: 440px; }
+@media (max-width: 700px) {
+  .market-result-row { flex-wrap: wrap; }
+  .market-result-meta { flex-basis: 100%; padding-left: 32px; }
+  .market-dossier { padding: 16px; }
+  .market-dossier-name { font-size: clamp(24px, 7vw, 30px); }
+  .market-difficulty-picker .difficulty-option { min-height: 44px; }
+  .market-dossier-difficulty { min-width: 0; width: 100%; }
+}
+
+.market-value-history .market-chart { display: block; width: 100%; height: auto; min-height: 150px; max-height: 260px; }
+.market-value-history .market-chart-label { font-size: 14px; fill: var(--text-dim); }
+.market-reading-select { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--text-dim); font-size: 14px; }
+.market-reading-select select { min-height: 44px; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--bg-panel); }
+.market-reading-detail { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

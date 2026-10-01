@@ -79,7 +79,7 @@ function clearSession() {
 
 export default function App() {
   useSmoothScroll();
-  const { socketRef, connected } = useSocket();
+  const { socketRef, connected, verificationRef, needsVerification, connectionError, retryConnection } = useSocket();
   const [room, setRoom] = useState(null);
   const [currentPlayerId, setCurrentPlayerId] = useState(null);
   const [localPlayerIds, setLocalPlayerIds] = useState(null);
@@ -139,7 +139,7 @@ export default function App() {
 
       setIsReconnecting(true);
       if (session.localPlayerIds) {
-        socket.emit("room:rejoin-local", { code: session.roomCode, playerIds: session.localPlayerIds }, (response) => {
+        socket.emit("room:rejoin-local", { code: session.roomCode, playerIds: session.localPlayerIds, reconnectToken: session.reconnectToken }, (response) => {
           setIsReconnecting(false);
           if (response.error) {
             sessionRef.current = null;
@@ -153,7 +153,7 @@ export default function App() {
         return;
       }
 
-      socket.emit("room:rejoin", { code: session.roomCode, playerId: session.playerId }, (response) => {
+      socket.emit("room:rejoin", { code: session.roomCode, playerId: session.playerId, reconnectToken: session.reconnectToken }, (response) => {
         setIsReconnecting(false);
         if (response.error) {
           sessionRef.current = null;
@@ -203,7 +203,7 @@ export default function App() {
       setRoom(response.room);
       setCurrentPlayerId(response.playerId);
       setLocalPlayerIds(null);
-      sessionRef.current = { roomCode: response.room.code, playerId: response.playerId };
+      sessionRef.current = { roomCode: response.room.code, playerId: response.playerId, reconnectToken: response.reconnectToken };
       saveSession(sessionRef.current);
       // Bidding mode and position-swap don't change solo's flat-price,
       // no-bidding behavior, but era and difficulty absolutely do -- they
@@ -247,7 +247,7 @@ export default function App() {
       setRoom(response.room);
       setCurrentPlayerId(response.playerId);
       setLocalPlayerIds(null);
-      sessionRef.current = { roomCode: response.room.code, playerId: response.playerId };
+      sessionRef.current = { roomCode: response.room.code, playerId: response.playerId, reconnectToken: response.reconnectToken };
       saveSession(sessionRef.current);
     });
   }
@@ -270,7 +270,7 @@ export default function App() {
       setRoom(response.room);
       setLocalPlayerIds(response.playerIds);
       setCurrentPlayerId(response.playerIds[0]);
-      sessionRef.current = { roomCode: response.room.code, localPlayerIds: response.playerIds };
+      sessionRef.current = { roomCode: response.room.code, localPlayerIds: response.playerIds, reconnectToken: response.reconnectToken };
       saveSession(sessionRef.current);
     });
   }
@@ -390,6 +390,10 @@ export default function App() {
       )}
 
       <main className="app-main">
+        <div className="connection-verification" hidden={connected || (!needsVerification && !connectionError)}>
+          {needsVerification && <><p>Verify you're human to join a draft.</p><div ref={verificationRef} /></>}
+          {connectionError && <><p role="alert">{connectionError}</p><button type="button" className="secondary-button" onClick={retryConnection}>Retry connection</button></>}
+        </div>
         {isReconnecting && !room ? (
           <div className="lobby-card">
             <p className="hint-text">Reconnecting to your room…</p>

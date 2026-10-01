@@ -280,7 +280,7 @@ export function registerRoomHandlers(io, socket) {
     if (containsProfanity(name)) {
       return callback?.({ error: "NAME_INAPPROPRIATE" });
     }
-    const clientIp = socket.handshake.address;
+    const clientIp = socket.data.clientIp || socket.handshake.address;
     if (clientIp && !roomCreateLimiter(clientIp)) {
       return callback?.({ error: "RATE_LIMITED" });
     }
@@ -296,7 +296,8 @@ export function registerRoomHandlers(io, socket) {
     socket.data.roomCode = room.code;
     socket.data.playerId = result.player.id;
 
-    callback?.({ room: toPublicRoom(result.room), playerId: result.player.id });
+    result.player.reconnectToken = randomUUID();
+    callback?.({ room: toPublicRoom(result.room), playerId: result.player.id, reconnectToken: result.player.reconnectToken });
     io.to(room.code).emit("room:update", toPublicRoom(result.room));
   });
 
@@ -332,18 +333,19 @@ export function registerRoomHandlers(io, socket) {
     socket.data.roomCode = roomCode;
     socket.data.playerId = result.player.id;
 
-    callback?.({ room: toPublicRoom(result.room), playerId: result.player.id });
+    result.player.reconnectToken = randomUUID();
+    callback?.({ room: toPublicRoom(result.room), playerId: result.player.id, reconnectToken: result.player.reconnectToken });
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("room:rejoin", ({ code, playerId } = {}, callback) => {
+  socket.on("room:rejoin", ({ code, playerId, reconnectToken } = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = (code || "").trim().toUpperCase();
     if (!roomCode || typeof playerId !== "string" || !playerId) {
       return callback?.({ error: "RECONNECT_FAILED" });
     }
 
-    const result = reconnectPlayer(roomCode, playerId, socket.id);
+    const result = reconnectPlayer(roomCode, playerId, socket.id, reconnectToken);
     if (result.error) {
       return callback?.({ error: "RECONNECT_FAILED" });
     }
@@ -378,7 +380,7 @@ export function registerRoomHandlers(io, socket) {
       if (n.trim().length > MAX_NAME_LENGTH) return callback?.({ error: "NAME_TOO_LONG" });
       if (containsProfanity(n)) return callback?.({ error: "NAME_INAPPROPRIATE" });
     }
-    const clientIp = socket.handshake.address;
+    const clientIp = socket.data.clientIp || socket.handshake.address;
     if (clientIp && !roomCreateLimiter(clientIp)) {
       return callback?.({ error: "RATE_LIMITED" });
     }
@@ -393,21 +395,28 @@ export function registerRoomHandlers(io, socket) {
     socket.data.localPlayerIds = result.players.map((p) => p.id);
     socket.data.playerId = result.players[0].id;
 
-    callback?.({ room: toPublicRoom(result.room), playerIds: socket.data.localPlayerIds });
+    const reconnectToken = randomUUID();
+    for (const player of result.players) player.reconnectToken = reconnectToken;
+    callback?.({ room: toPublicRoom(result.room), playerIds: socket.data.localPlayerIds, reconnectToken });
     io.to(result.room.code).emit("room:update", toPublicRoom(result.room));
   });
 
-  socket.on("room:rejoin-local", ({ code, playerIds } = {}, callback) => {
+  socket.on("room:rejoin-local", ({ code, playerIds, reconnectToken } = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     const roomCode = (code || "").trim().toUpperCase();
     if (!roomCode || !Array.isArray(playerIds) || playerIds.length === 0) {
       return callback?.({ error: "RECONNECT_FAILED" });
     }
 
+    const localRoom = getRoom(roomCode);
+    if (!localRoom?.isLocal || playerIds.length !== localRoom.players.length || new Set(playerIds).size !== playerIds.length ||
+        !playerIds.every((id) => localRoom.players.some((p) => p.id === id && !p.forfeited && p.reconnectToken && p.reconnectToken === reconnectToken))) {
+      return callback?.({ error: "RECONNECT_FAILED" });
+    }
     let room = null;
     const previousSocketIds = new Set();
     for (const pid of playerIds) {
-      const result = reconnectPlayer(roomCode, pid, socket.id);
+      const result = reconnectPlayer(roomCode, pid, socket.id, reconnectToken);
       if (result.error) return callback?.({ error: "RECONNECT_FAILED" });
       room = result.room;
       if (result.previousSocketId) previousSocketIds.add(result.previousSocketId);
@@ -569,14 +578,9 @@ export function registerRoomHandlers(io, socket) {
 
     callback?.({ room: toPublicRoom(result.room) });
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
-    // Global, not room-scoped. The Market tab (browsing outside any room)
-    // is the listener, showing real completed sale prices for whichever
-    // player it's looking at as they happen across every active draft.
-    // Deliberately carries no player-facing identity (no player name/id
-    // from this room, just the NBA player and price) beyond the room code,
-    // which is already public/joinable by anyone with it.
-    if (result.sale) {
-      io.emit("market:sale", { ...result.sale, roomCode, at: Date.now() });
+    // Public competitive sales only; never expose private invite codes or local/solo prices.
+    if (result.sale && room.visibility === "public" && !room.isLocal && !room.isSolo) {
+      io.emit("market:sale", { ...result.sale, at: Date.now() });
     }
     maybeComputeResults(io, result.room, roomCode);
   });
@@ -724,6 +728,7 @@ export function registerRoomHandlers(io, socket) {
     socket.data.playerId = undefined;
     socket.data.localPlayerIds = undefined;
     if (!roomCode || playerIds.length === 0) return;
+    socket.leave(roomCode);
 
     let room = getRoom(roomCode);
     if (!room) return;

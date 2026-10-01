@@ -85,79 +85,43 @@ const LIVE_SALE_HISTORY_LIMIT = 60;
 // dropdown's worth of scrolling in disguise.
 const SEARCH_RESULTS_LIMIT = 50;
 
-/** A small inline line chart of real suggested-value readings for the
- * player currently on screen: one point per time the price model actually
- * ran (a difficulty switch, or a fresh player load), never a fabricated
- * trend. Starts as a single flat point and grows during the session. */
-/** Same drawing approach as StatRadarChart (raw SVG, Motion for the
- * entrance, colored by the player's own real team instead of a fixed
- * accent) -- these two charts sit right next to each other on the same
- * dossier, and used to be the only mismatched pair: one animated and
- * team-colored, the other static and always orange regardless of who was
- * on screen. */
 function ValueHistoryChart({ points, color = "var(--accent)" }) {
-  if (points.length < 2) {
-    return (
-      <p className="hint-text market-chart-empty">
-        {points.length === 1
-          ? "Switch difficulty to see how the suggested value moves."
-          : "No suggested-value reading yet."}
-      </p>
-    );
-  }
-
+  const [selection, setSelection] = useState(null);
+  if (!points.length) return <p className="hint-text">No suggested-value reading yet.</p>;
+  const active = Math.min(selection ?? points.length - 1, points.length - 1);
   const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const W = 600;
-  const H = 140;
-  const pad = 12;
-
-  const coords = points.map((p, i) => {
-    const x = points.length === 1 ? W / 2 : (i / (points.length - 1)) * (W - pad * 2) + pad;
-    const y = H - pad - ((p.value - min) / span) * (H - pad * 2);
-    return [x, y];
-  });
-  const path = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
-  const last = coords[coords.length - 1];
-
-  return (
-    <svg className="market-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <motion.path
-        // Re-keyed on the point count so a fresh reading (a new difficulty
-        // switch or player load) replays the draw-in instead of Motion
-        // treating it as the same path animating a mid-flight endpoint.
-        key={points.length}
-        d={path}
-        fill="none"
-        stroke={color}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
-      />
-      {coords.map(([x, y], i) => (
-        <motion.circle
-          key={i}
-          cx={x}
-          cy={y}
-          r={i === coords.length - 1 ? 5 : 3}
-          fill={i === coords.length - 1 ? color : "var(--bg-void)"}
-          stroke={color}
-          strokeWidth="2"
-          initial={{ opacity: 0, scale: 0 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 + (i / coords.length) * 0.4, type: "spring", stiffness: 300, damping: 14 }}
-        />
-      ))}
-      <text x={last[0]} y={Math.max(14, last[1] - 10)} textAnchor="end" className="market-chart-label">
-        {points[points.length - 1].value.toFixed(1)}c
-      </text>
+  const min = Math.max(0, Math.min(...values) - 1);
+  const max = Math.max(...values) + 1;
+  const coords = points.map((p, i) => [
+    points.length === 1 ? 200 : 40 + i * 320 / (points.length - 1),
+    155 - (p.value - min) / (max - min) * 130,
+  ]);
+  const reading = points[active];
+  const chartColor = `color-mix(in srgb, ${color} 55%, white)`;
+  return <div className="market-value-history">
+    <svg className="market-chart" viewBox="0 0 400 190" role="img" aria-label="Suggested value readings in chronological order. Select a reading below for details.">
+      {[min, (min + max) / 2, max].map((value) => {
+        const y = 155 - (value - min) / (max - min) * 130;
+        return <g key={value}><line x1="40" x2="360" y1={y} y2={y} className="stat-radar-axis" /><text x="34" y={y + 4} textAnchor="end" className="market-chart-label">{value.toFixed(1)}</text></g>;
+      })}
+      <path d={coords.map(([x, y], i) => `${i ? "L" : "M"} ${x} ${y}`).join(" ")} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinejoin="round" />
+      <line x1={coords[active][0]} x2={coords[active][0]} y1="20" y2="160" stroke={chartColor} strokeDasharray="4 4" opacity="0.5" />
+      {coords.map(([x, y], i) => <g key={i} onPointerEnter={() => setSelection(i)} onClick={() => setSelection(i)}>
+        <circle cx={x} cy={y} r="14" fill="transparent" />
+        <circle cx={x} cy={y} r={i === active ? 6 : 4} fill={i === active ? chartColor : "var(--bg-panel)"} stroke={chartColor} strokeWidth="2" pointerEvents="none" />
+        <title>{points[i].difficulty} - {points[i].value.toFixed(1)} coins</title>
+      </g>)}
+      <text x="40" y="181" className="market-chart-label">First reading</text>
+      <text x="360" y="181" textAnchor="end" className="market-chart-label">Latest reading</text>
     </svg>
-  );
+    <label className="market-reading-select">Explore readings
+      <select value={active} onChange={(event) => setSelection(Number(event.target.value))}>
+        {points.map((p, i) => <option key={i} value={i}>{i + 1}. {p.difficulty} - {p.value.toFixed(1)}c</option>)}
+      </select>
+    </label>
+    <p className="market-reading-detail" aria-live="polite"><strong>{reading.value.toFixed(1)}c</strong>  -  {reading.difficulty}  -  {reading.era}  -  {new Date(reading.at).toLocaleTimeString()}</p>
+    {points.length === 1 && <p className="hint-text">Switch difficulty to add another reading.</p>}
+  </div>;
 }
 
 /** The Market tab: a "luxury exchange" browse of the same real player pool
@@ -307,7 +271,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
     const eraLabel = ERA_OPTIONS.find((o) => o.value === era)?.label || era;
     const difficultyLabel = DIFFICULTY_OPTIONS.find((o) => o.value === difficulty)?.label || difficulty;
     lastValueByPlayer.current.set(playerId, { era, difficulty, eraLabel, difficultyLabel, value });
-    setValueHistory((prevHistory) => [...prevHistory, { value, at: Date.now() }].slice(-20));
+    setValueHistory((prevHistory) => [...prevHistory, { value, at: Date.now(), difficulty: difficultyLabel, era: eraLabel }].slice(-20));
   }
 
   // Jumping from a "similar players" chip (or a search result) can land on
@@ -554,9 +518,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                 {stats && !stats.unavailable && !statsLoading && <StatHighlightRow stats={stats} />}
 
                 <div className="market-dossier-archetype-row">
-                  {stats && !stats.unavailable && !statsLoading && (
-                    <StatRadarChart stats={stats} color={teamColors?.primary} />
-                  )}
+                  {stats && !stats.unavailable && !statsLoading && <StatRadarChart stats={stats} color={teamColors?.primary} />}
                   <div className="market-dossier-difficulty">
                     <span className="market-filter-label">Suggested value under</span>
                     <div className="difficulty-picker market-difficulty-picker">
@@ -612,10 +574,10 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
               <div className="market-panel-header">
                 <h4 className="market-panel-title">Suggested value over time</h4>
                 <p className="market-panel-subtitle">
-                  Real readings recorded this session, one per difficulty switch or player load.
+                  Model readings this session, not completed sale prices. Hover, tap, or select a reading.
                 </p>
               </div>
-              <ValueHistoryChart points={valueHistory} color={teamColors?.primary} />
+              <ValueHistoryChart key={playerId} points={valueHistory} color={teamColors?.primary} />
             </div>
 
             <div className="market-panel">
@@ -630,7 +592,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
           <div className="market-grid-side">
             <div className="market-panel market-livebids-panel">
               <div className="market-panel-header">
-                <h4 className="market-panel-title">Live bids on this player</h4>
+                <h4 className="market-panel-title">Completed auctions</h4>
                 <span className="market-live-chip">
                   <span className="market-pulse-dot" aria-hidden="true" />
                   Streaming
@@ -638,15 +600,14 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
               </div>
               {salesForPlayer.length === 0 ? (
                 <p className="hint-text">
-                  No completed bids on {selectedMeta.fullName} yet this session. This fills in live as any room,
-                  anywhere, wins them.
+                  No completed auctions for {selectedMeta.fullName} yet this session. Public online drafts appear here as they finish.
                 </p>
               ) : (
                 <ul className="market-sale-list">
                   {salesForPlayer.map((s, i) => (
-                    <li key={`${s.roomCode}-${s.at}-${i}`} className="market-sale-row">
+                    <li key={`${s.at}-${i}`} className="market-sale-row">
                       <span className="market-sale-time-chip">{timeAgo(s.at)}</span>
-                      <span className="market-sale-meta">Room {s.roomCode}</span>
+                      <span className="market-sale-meta">{s.bidderCount ?? "N/A"} bidders  -  {s.bidCount ?? "N/A"} bids</span>
                       <span className="market-sale-right">
                         <span className="market-sale-price">{s.price}c</span>
                         <span className="market-sale-status">Sold</span>

@@ -80,6 +80,7 @@ def load_training_data():
         JOIN players p ON p.id = dp.player_id
         JOIN player_stats ps ON ps.player_id = p.id
         WHERE dp.acquired_for IS NOT NULL
+          AND d.is_local = FALSE
           -- Solo drafts skip bidding entirely and auto-win every pick at a
           -- flat starting price (see rerollNomination's comment in
           -- draftStore.js) -- there's no one to bid against, so

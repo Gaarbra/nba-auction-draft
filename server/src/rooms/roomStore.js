@@ -378,12 +378,14 @@ export function beginDisconnectGrace(room, playerId, socketId, onExpire) {
   room.pendingForfeits.set(playerId, timer);
 }
 
-export function reconnectPlayer(code, playerId, socketId) {
+export function reconnectPlayer(code, playerId, socketId, reconnectToken) {
   const room = getRoom(code);
   if (!room) return { error: "ROOM_NOT_FOUND" };
 
   const player = room.players.find((p) => p.id === playerId);
   if (!player) return { error: "PLAYER_NOT_FOUND" };
+
+  if (!player.reconnectToken || player.reconnectToken !== reconnectToken || player.forfeited) return { error: "RECONNECT_FAILED" };
 
   // If this identity was already live on a different socket (e.g. the same
   // person opened a second tab that shares localStorage), that previous

@@ -123,6 +123,8 @@ export function nominatePlayer(room, playerId, player) {
     nominatedBy: playerId,
     currentBid: bid,
     currentBidder: playerId,
+    bidderIds: [playerId],
+    bidCount: 1,
     passed: [],
     phase,
     // Only meaningful in "orderly" bidding mode. See placeBid/passOnNomination.
@@ -188,6 +190,8 @@ export function placeBid(room, playerId, amount) {
   if (!Number.isInteger(bid) || bid <= nomination.currentBid) return { error: "BID_TOO_LOW" };
   if (bid > bidder.budget) return { error: "BID_EXCEEDS_BUDGET" };
 
+  if (!nomination.bidderIds.includes(playerId)) nomination.bidderIds.push(playerId);
+  nomination.bidCount += 1;
   nomination.currentBid = bid;
   nomination.currentBidder = playerId;
 
@@ -260,7 +264,7 @@ export function assignPosition(room, playerId, position) {
   // player just sold for N coins" event. The Market tab's live bid feed
   // (see roomHandlers.js's draft:assign handler) is the only consumer, and
   // it has no room to be `io.to(roomCode)`-scoped into.
-  return { room, sale: { nbaPlayerId: soldPlayer.nbaPlayerId, fullName: soldPlayer.fullName, price: finalPrice } };
+  return { room, sale: { nbaPlayerId: soldPlayer.nbaPlayerId, fullName: soldPlayer.fullName, price: finalPrice, bidderCount: nomination.bidderIds.length, bidCount: nomination.bidCount } };
 }
 
 export function swapRosterPositions(room, playerId, slotA, slotB) {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { nominatePlayer, placeBid, passOnNomination, removePlayerFromDraft, swapRosterPositions } from "./draftStore.js";
+import { assignPosition, nominatePlayer, placeBid, passOnNomination, removePlayerFromDraft, swapRosterPositions } from "./draftStore.js";
 
 function emptyRoster() {
   return { PG: null, SG: null, SF: null, PF: null, C: null };
@@ -135,4 +135,18 @@ test("roster drag moves into empty slots, exchanges occupied slots, and respects
   room.status = "complete";
   assert.equal(swapRosterPositions(room, "A", "C", "PG").error, "NOT_DRAFTING");
   assert.deepEqual(room.draft.rosters, before);
+});
+
+test("sale counts distinct accepted bidders, including the opening bid", () => {
+  const room = makeRoom({ biddingMode: "open" });
+  nominatePlayer(room, "A", player);
+  placeBid(room, "B", 3);
+  placeBid(room, "A", 5);
+  assert.ok(placeBid(room, "C", 100).error);
+  passOnNomination(room, "B");
+  passOnNomination(room, "C");
+  const { sale } = assignPosition(room, "A", "PG");
+  assert.equal(sale.bidderCount, 2);
+  assert.equal(sale.bidCount, 3);
+  assert.equal(sale.price, 5);
 });

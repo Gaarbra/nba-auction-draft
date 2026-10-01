@@ -1,0 +1,18 @@
+{$DOMAIN} {
+  encode zstd gzip
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy strict-origin-when-cross-origin
+    Strict-Transport-Security "max-age=31536000"
+  }
+  @backend path /api/* /socket.io/* /health
+  handle @backend {
+    reverse_proxy server:4000
+  }
+  handle {
+    root * /srv
+    try_files {path} /index.html
+    file_server
+  }
+}

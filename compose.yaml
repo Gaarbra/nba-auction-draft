@@ -1,0 +1,74 @@
+name: hoop-bids
+x-defaults: &defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+services:
+  web:
+    <<: *defaults
+    build:
+      context: .
+      target: web
+      args:
+        VITE_SERVER_URL: https://${DOMAIN:?Set DOMAIN in .env}
+        VITE_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?Set TURNSTILE_SITE_KEY}
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes: ["caddy-data:/data", "caddy-config:/config"]
+    depends_on: [server]
+  server:
+    <<: *defaults
+    build: { context: ., target: server }
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      CLIENT_ORIGIN: https://${DOMAIN}
+      TRUST_PROXY: "1"
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?Set TURNSTILE_SECRET_KEY}
+      STATS_SERVICE_URL: http://stats:5001
+      DATABASE_URL: postgresql://hoop:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD to a random hex value}@db:5432/hoop_bids
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    volumes: ["server-data:/app/server/data"]
+    depends_on:
+      db: { condition: service_healthy }
+      stats: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  stats:
+    <<: *defaults
+    build: { context: ., target: stats }
+    environment:
+      DATABASE_URL: postgresql://hoop:${POSTGRES_PASSWORD}@db:5432/hoop_bids
+    volumes: ["stats-data:/app/stats-service/data"]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/health', timeout=5)"]
+      interval: 15s
+      timeout: 6s
+      start_period: 30s
+      retries: 5
+  db:
+    <<: *defaults
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hoop
+      POSTGRES_DB: hoop_bids
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hoop -d hoop_bids"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  postgres-data:
+  stats-data:
+  server-data:
+  caddy-data:
+  caddy-config:

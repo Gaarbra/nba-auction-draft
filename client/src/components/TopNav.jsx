@@ -77,7 +77,7 @@ export default function TopNav({
       <div className="topnav-inner">
         <div className="topnav-left">
           {onGoHome ? (
-            <button type="button" className="topnav-brand topnav-brand-link" onClick={onGoHome}>
+            <button type="button" className="topnav-brand topnav-brand-link" aria-label="Hoop Bids home" onClick={onGoHome}>
               <LogoMark className="topnav-logo" />
               <span className="topnav-wordmark">Hoop Bids</span>
             </button>

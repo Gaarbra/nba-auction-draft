@@ -1,0 +1,15 @@
+**/node_modules
+**/.env
+**/.env.*
+**/__pycache__
+**/.venv
+**/dist
+.git
+.agents
+.claude
+.codex
+.impeccable
+graphify-out
+backups
+*.dump
+*.log

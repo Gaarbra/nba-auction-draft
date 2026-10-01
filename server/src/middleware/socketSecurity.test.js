@@ -1,0 +1,55 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { verifyHuman, socketSecurity } from "./socketSecurity.js";
+import { createKeyedRateLimiter } from "./rateLimit.js";
+import { createRoom, addPlayerToRoom, reconnectPlayer } from "../rooms/roomStore.js";
+
+test("verification fails closed, checks action/hostname, and limits token size", async () => {
+  const options = { secret: "test", hostname: "example.com" };
+  const verify = (result) => verifyHuman("token", { ...options, fetcher: async () => ({ ok: true, json: async () => result }) });
+  assert.equal(await verify({ success: true, hostname: "example.com", action: "connect" }), true);
+  assert.equal(await verify({ success: true, hostname: "attacker.com", action: "connect" }), false);
+  assert.equal(await verify({ success: true, hostname: "example.com", action: "other" }), false);
+  assert.equal(await verify({ success: false }), false);
+  assert.equal(await verifyHuman("", options), false);
+  assert.equal(await verifyHuman("x".repeat(2049), options), false);
+  assert.equal(await verifyHuman("token", { ...options, fetcher: async () => { throw new Error("offline"); } }), false);
+});
+
+test("reconnection requires the private token, without mutating on rejection", () => {
+  const room = createRoom("private");
+  const { player } = addPlayerToRoom(room.code, { name: "Tester", socketId: "original" });
+  player.reconnectToken = "private-token";
+  assert.ok(reconnectPlayer(room.code, player.id, "attacker").error);
+  assert.ok(reconnectPlayer(room.code, player.id, "attacker", "wrong").error);
+  assert.equal(player.socketId, "original");
+  assert.equal(reconnectPlayer(room.code, player.id, "new", "private-token").error, undefined);
+  player.forfeited = true;
+  assert.ok(reconnectPlayer(room.code, player.id, "again", "private-token").error);
+});
+
+test("socket gate rejects production without verification and validates packets", async () => {
+  let middleware;
+  const io = { use: (fn) => { middleware = fn; } };
+  const config = { origin: "https://example.com", production: true, trustProxy: false };
+  socketSecurity(io, config);
+  let packetCheck;
+  const socket = { data: {}, handshake: { address: "127.0.0.1", headers: { origin: config.origin, "x-forwarded-for": "fake" } }, use: (fn) => { packetCheck = fn; } };
+  let error;
+  await middleware(socket, (err) => { error = err; });
+  assert.equal(error.message, "HUMAN_VERIFICATION_NOT_CONFIGURED");
+  assert.equal(socket.data.clientIp, "127.0.0.1");
+  socketSecurity(io, { ...config, production: false });
+  await middleware(socket, (err) => { error = err; });
+  assert.equal(error, undefined);
+  let reply;
+  packetCheck(["room:join", null, (value) => { reply = value; }], () => assert.fail("invalid payload accepted"));
+  assert.equal(reply.error, "INVALID_PAYLOAD");
+  socket.data.roomCode = "ROOM";
+  packetCheck(["room:create", {}, (value) => { reply = value; }], () => assert.fail("second room accepted"));
+  assert.equal(reply.error, "ALREADY_IN_ROOM");
+  const limiter = createKeyedRateLimiter({ windowMs: 60000, max: 1 });
+  assert.equal(limiter("ip"), true);
+  assert.equal(limiter("ip"), false);
+  assert.equal(limiter("other"), true);
+});

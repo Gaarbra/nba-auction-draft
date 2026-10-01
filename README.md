@@ -128,6 +128,7 @@ The results screen also ranks all the teams by Final Team Score and shows a simp
 4. Once all three have deployed at least once, each one has a real URL under its own **Settings** tab (something like `https://hoop-bids-client.onrender.com`). Go to each service's **Environment** tab and fill in the placeholder vars that `render.yaml` left blank:
    - `hoop-bids-server`: `STATS_SERVICE_URL` set to the stats service's URL, `CLIENT_ORIGIN` set to the client's URL
    - `hoop-bids-client`: `VITE_SERVER_URL` set to the server's URL (this one gets baked in at build time, so saving it triggers a full rebuild, not just a restart)
+   - Required: set `TURNSTILE_SECRET_KEY` on the server and `VITE_TURNSTILE_SITE_KEY` on the client for a widget allowing your client hostname. Rebuild the client.
    - Optional: `VITE_POSTHOG_KEY`/`VITE_POSTHOG_HOST` on `hoop-bids-client` for PostHog analytics (draft nominations, bids, assignments, results viewed). Get the key from your PostHog project's **Project settings > API keys** (the public one, not a personal API key). Left unset, PostHog just doesn't load.
 5. Give friends the client's URL. That's the one people actually open.
 
@@ -141,3 +142,9 @@ server/src/scoring/   Op/DIR/Ms scoring module (pure, unit-tested) plus the stat
 client/                React (Vite) frontend
 stats-service/         Flask + nba_api microservice. Player pool, per-game stats, headshots, everything NBA-data-related
 ```
+
+## Budget deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Docker Compose, domain setup, bot protection,
+current low-cost hosting options, and a backup-first migration from AWS.
+Production now requires Turnstile keys; rebuild the client with its public site key.

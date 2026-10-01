@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import { socketSecurity } from "./middleware/socketSecurity.js";
 import cors from "cors";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
@@ -24,17 +25,14 @@ initSchema(); // no-op if DATABASE_URL isn't set, see db.js
 const PORT = process.env.PORT || 4000;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-// Set this in production to keep /api/players/sync (an expensive, real
-// nba_api-hitting call) from being publicly triggerable by anyone who finds
-// the URL. Left unset, it stays open for local dev convenience.
+// The expensive NBA sync endpoint stays disabled unless an admin token is set.
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
 
 const app = express();
 
-// Running behind a hosting platform's reverse proxy (Render, Railway, etc.).
-// Without this, req.ip is the proxy's address, which would make the
-// per-IP rate limits below useless (everyone shares one bucket).
-if (IS_PRODUCTION) app.set("trust proxy", 1);
+// Enable only behind one trusted proxy, with direct access to Node blocked.
+const TRUST_PROXY = process.env.TRUST_PROXY === "1";
+if (TRUST_PROXY) app.set("trust proxy", 1);
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -44,7 +42,8 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({ origin: CLIENT_ORIGIN }));
-app.use(express.json());
+app.disable("x-powered-by");
+app.use(express.json({ limit: "8kb" }));
 
 /** Logs the real error server-side always; only echoes it to the client outside production, where a generic message is safer than leaking internals. */
 function handleApiError(err, req, res) {
@@ -154,7 +153,7 @@ app.get("/api/warm-stats-service", (req, res) => {
 });
 
 app.post("/api/players/sync", async (req, res) => {
-  if (ADMIN_TOKEN && req.get("x-admin-token") !== ADMIN_TOKEN) {
+  if (!ADMIN_TOKEN || req.get("x-admin-token") !== ADMIN_TOKEN) {
     return res.status(404).end();
   }
   try {
@@ -168,7 +167,11 @@ app.post("/api/players/sync", async (req, res) => {
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: CLIENT_ORIGIN },
+  maxHttpBufferSize: 8192,
+  allowRequest: (req, callback) => callback(null, req.headers.origin === CLIENT_ORIGIN),
 });
+
+socketSecurity(io, { origin: CLIENT_ORIGIN, secret: process.env.TURNSTILE_SECRET_KEY, production: IS_PRODUCTION, trustProxy: TRUST_PROXY });
 
 io.on("connection", (socket) => {
   registerRoomHandlers(io, socket);

@@ -52,6 +52,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
       # Was fromDatabase: hoop-bids-db -- see the matching comment on
       # hoop-bids-stats-service above.
       - key: DATABASE_URL
@@ -68,9 +72,9 @@ services:
         sync: false
       - key: CLIENT_ORIGIN
         sync: false
-      # Optional. Set this to any random string if you want to lock down
+      # Optional. Set this to a random string to enable
       # POST /api/players/sync (see README's Security section). Leave unset
-      # and it stays open, same as local dev.
+      # and it stays disabled.
       - key: ADMIN_TOKEN
         sync: false
 
@@ -85,6 +89,8 @@ services:
       # Baked into the build at build time (Vite env vars aren't readable at
       # runtime). Set this to the server service's URL, same caveat as
       # above.
+      - key: VITE_TURNSTILE_SITE_KEY
+        sync: false
       - key: VITE_SERVER_URL
         sync: false
       # Optional. PostHog project API key (client/src/analytics.js). Leave

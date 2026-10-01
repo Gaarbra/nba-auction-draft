@@ -1,5 +1,5 @@
 {
-  "fetchedAt": 1789116899280,
+  "fetchedAt": 1790071512800,
   "players": [
     {
       "id": 76001,
@@ -216,7 +216,14 @@
       "fullName": "Ochai Agbaji",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2025
+      "toYear": 2026
+    },
+    {
+      "id": 1643855,
+      "fullName": "Obi Agbim",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 200772,
@@ -427,6 +434,13 @@
       "isActive": false,
       "fromYear": 1968,
       "toYear": 1968
+    },
+    {
+      "id": 1643789,
+      "fullName": "Drake Allen",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 1628960,
@@ -987,6 +1001,13 @@
       "isActive": false,
       "fromYear": 2001,
       "toYear": 2003
+    },
+    {
+      "id": 1643616,
+      "fullName": "DJ Armstrong",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 353,
@@ -1959,7 +1980,7 @@
       "fullName": "Nicolas Batum",
       "isActive": true,
       "fromYear": 2008,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1641878,
@@ -2099,7 +2120,7 @@
       "fullName": "MarJon Beauchamp",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 76134,
@@ -2894,7 +2915,7 @@
     },
     {
       "id": 203992,
-      "fullName": "Bogdan Bogdanovi\u0107",
+      "fullName": "Bogdan Bogdanović",
       "isActive": true,
       "fromYear": 2017,
       "toYear": 2026
@@ -3320,6 +3341,13 @@
       "toYear": 1974
     },
     {
+      "id": 1643592,
+      "fullName": "Nick Boyd",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 1863,
       "fullName": "Earl Boykins",
       "isActive": false,
@@ -3443,7 +3471,7 @@
       "fullName": "Tony Bradley",
       "isActive": true,
       "fromYear": 2017,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1361,
@@ -4669,13 +4697,6 @@
       "isActive": false,
       "fromYear": 2021,
       "toYear": 2024
-    },
-    {
-      "id": 1642966,
-      "fullName": "Lamont Butler",
-      "isActive": false,
-      "fromYear": 2026,
-      "toYear": 2026
     },
     {
       "id": 348,
@@ -6005,7 +6026,7 @@
       "fullName": "Amir Coffey",
       "isActive": true,
       "fromYear": 2019,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 76410,
@@ -6467,7 +6488,7 @@
       "fullName": "Sharife Cooper",
       "isActive": true,
       "fromYear": 2021,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 76441,
@@ -7055,7 +7076,7 @@
       "fullName": "Seth Curry",
       "isActive": true,
       "fromYear": 2013,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 201939,
@@ -7080,7 +7101,7 @@
     },
     {
       "id": 1642359,
-      "fullName": "Pac\u00f4me Dadiet",
+      "fullName": "Pacôme Dadiet",
       "isActive": true,
       "fromYear": 2024,
       "toYear": 2026
@@ -7941,7 +7962,7 @@
     },
     {
       "id": 1631217,
-      "fullName": "Moussa Diabat\u00e9",
+      "fullName": "Moussa Diabaté",
       "isActive": true,
       "fromYear": 2022,
       "toYear": 2026
@@ -8213,6 +8234,13 @@
       "toYear": 2008
     },
     {
+      "id": 1643849,
+      "fullName": "Reese Dixon-Waters",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 1059,
       "fullName": "Aleksandar Djordjevic",
       "isActive": false,
@@ -8284,7 +8312,7 @@
     },
     {
       "id": 1629029,
-      "fullName": "Luka Don\u010di\u0107",
+      "fullName": "Luka Dončić",
       "isActive": true,
       "fromYear": 2018,
       "toYear": 2026
@@ -8837,7 +8865,7 @@
     },
     {
       "id": 1642856,
-      "fullName": "Egor D\u00ebmin",
+      "fullName": "Egor Dëmin",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -9519,7 +9547,7 @@
       "fullName": "Drew Eubanks",
       "isActive": true,
       "fromYear": 2018,
-      "toYear": 2025
+      "toYear": 2026
     },
     {
       "id": 76687,
@@ -11644,7 +11672,7 @@
     },
     {
       "id": 1642864,
-      "fullName": "Hugo Gonz\u00e1lez",
+      "fullName": "Hugo González",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -12025,7 +12053,7 @@
       "fullName": "Hayden Gray",
       "isActive": true,
       "fromYear": 2025,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1627982,
@@ -12158,7 +12186,7 @@
       "fullName": "Jeff Green",
       "isActive": true,
       "fromYear": 2007,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 76867,
@@ -14412,7 +14440,7 @@
       "fullName": "Aaron Holiday",
       "isActive": true,
       "fromYear": 2018,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 201950,
@@ -15206,6 +15234,13 @@
       "toYear": 2022
     },
     {
+      "id": 1643633,
+      "fullName": "Graham Ike",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 980,
       "fullName": "Zydrunas Ilgauskas",
       "isActive": false,
@@ -15301,13 +15336,6 @@
       "fullName": "Jonathan Isaac",
       "isActive": true,
       "fromYear": 2017,
-      "toYear": 2026
-    },
-    {
-      "id": 1643585,
-      "fullName": "Vsevolod Ishchenko",
-      "isActive": false,
-      "fromYear": 2026,
       "toYear": 2026
     },
     {
@@ -15627,7 +15655,7 @@
     },
     {
       "id": 1642857,
-      "fullName": "Kasparas Jaku\u010dionis",
+      "fullName": "Kasparas Jakučionis",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -16410,6 +16438,13 @@
       "toYear": 1989
     },
     {
+      "id": 1641800,
+      "fullName": "Meechie Johnson",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 77168,
       "fullName": "Mickey Johnson",
       "isActive": false,
@@ -16565,7 +16600,7 @@
     },
     {
       "id": 203999,
-      "fullName": "Nikola Joki\u0107",
+      "fullName": "Nikola Jokić",
       "isActive": true,
       "fromYear": 2015,
       "toYear": 2026
@@ -16666,7 +16701,7 @@
       "fullName": "Curtis Jones",
       "isActive": true,
       "fromYear": 2025,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 2563,
@@ -16844,18 +16879,18 @@
       "toYear": 2026
     },
     {
+      "id": 1643850,
+      "fullName": "Keonte Jones",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 203158,
       "fullName": "Kevin Jones",
       "isActive": false,
       "fromYear": 2012,
       "toYear": 2012
-    },
-    {
-      "id": 1643650,
-      "fullName": "Lajae Jones",
-      "isActive": false,
-      "fromYear": 2026,
-      "toYear": 2026
     },
     {
       "id": 77200,
@@ -17153,7 +17188,7 @@
     },
     {
       "id": 1631107,
-      "fullName": "Nikola Jovi\u0107",
+      "fullName": "Nikola Jović",
       "isActive": true,
       "fromYear": 2022,
       "toYear": 2026
@@ -17313,13 +17348,6 @@
       "toYear": 1974
     },
     {
-      "id": 1643626,
-      "fullName": "Trey Kaufman-Renn",
-      "isActive": false,
-      "fromYear": 2026,
-      "toYear": 2026
-    },
-    {
       "id": 201619,
       "fullName": "Sasha Kaun",
       "isActive": false,
@@ -17338,13 +17366,6 @@
       "fullName": "Yuki Kawamura",
       "isActive": true,
       "fromYear": 2024,
-      "toYear": 2026
-    },
-    {
-      "id": 1643583,
-      "fullName": "Jack Kayil",
-      "isActive": false,
-      "fromYear": 2026,
       "toYear": 2026
     },
     {
@@ -17387,6 +17408,13 @@
       "fullName": "Trevor Keels",
       "isActive": true,
       "fromYear": 2022,
+      "toYear": 2025
+    },
+    {
+      "id": 1643627,
+      "fullName": "Keba Keita",
+      "isActive": false,
+      "fromYear": 2026,
       "toYear": 2026
     },
     {
@@ -18101,7 +18129,7 @@
       "fullName": "John Konchar",
       "isActive": true,
       "fromYear": 2019,
-      "toYear": 2025
+      "toYear": 2026
     },
     {
       "id": 77299,
@@ -18238,7 +18266,7 @@
     },
     {
       "id": 1630249,
-      "fullName": "V\u00edt Krej\u010d\u00ed",
+      "fullName": "Vít Krejčí",
       "isActive": true,
       "fromYear": 2021,
       "toYear": 2026
@@ -18794,7 +18822,7 @@
       "fullName": "A.J. Lawson",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1535,
@@ -19182,13 +19210,6 @@
       "toYear": 2022
     },
     {
-      "id": 1641831,
-      "fullName": "Malique Lewis",
-      "isActive": false,
-      "fromYear": 2026,
-      "toYear": 2026
-    },
-    {
       "id": 729,
       "fullName": "Martin Lewis",
       "isActive": false,
@@ -19326,7 +19347,7 @@
       "fullName": "Isaiah Livers",
       "isActive": true,
       "fromYear": 2021,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1641753,
@@ -19592,7 +19613,7 @@
       "fullName": "Kevin Love",
       "isActive": true,
       "fromYear": 2008,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 77413,
@@ -19634,7 +19655,7 @@
       "fullName": "Kyle Lowry",
       "isActive": true,
       "fromYear": 2006,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1628070,
@@ -20282,7 +20303,7 @@
     },
     {
       "id": 1642881,
-      "fullName": "Bogoljub Markovi\u0107",
+      "fullName": "Bogoljub Marković",
       "isActive": false,
       "fromYear": 2026,
       "toYear": 2026
@@ -20544,7 +20565,7 @@
       "fullName": "Tyrese Martin",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1643568,
@@ -20617,6 +20638,13 @@
       "toYear": 1972
     },
     {
+      "id": 1643792,
+      "fullName": "Rienk Mast",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 1628999,
       "fullName": "Yante Maten",
       "isActive": false,
@@ -20653,7 +20681,7 @@
     },
     {
       "id": 1631255,
-      "fullName": "Karlo Matkovi\u0107",
+      "fullName": "Karlo Matković",
       "isActive": true,
       "fromYear": 2024,
       "toYear": 2026
@@ -20807,7 +20835,7 @@
     },
     {
       "id": 1643024,
-      "fullName": "Chris Ma\u00f1on",
+      "fullName": "Chris Mañon",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -20824,7 +20852,7 @@
       "fullName": "Bez Mbeng",
       "isActive": true,
       "fromYear": 2025,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 2788,
@@ -21104,7 +21132,7 @@
       "fullName": "Kevin McCullar Jr.",
       "isActive": true,
       "fromYear": 2024,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1626191,
@@ -21434,6 +21462,13 @@
       "isActive": false,
       "fromYear": 2017,
       "toYear": 2021
+    },
+    {
+      "id": 1643724,
+      "fullName": "Isaac McKneely",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 1630605,
@@ -22658,7 +22693,7 @@
       "fullName": "Wendell Moore Jr.",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1631457,
@@ -23065,6 +23100,13 @@
       "isActive": false,
       "fromYear": 1946,
       "toYear": 1946
+    },
+    {
+      "id": 1643564,
+      "fullName": "KeShawn Murphy",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 203122,
@@ -23676,13 +23718,6 @@
       "toYear": 2025
     },
     {
-      "id": 1643712,
-      "fullName": "Narcisse Ngoy",
-      "isActive": false,
-      "fromYear": 2026,
-      "toYear": 2026
-    },
-    {
       "id": 1627777,
       "fullName": "Georges Niang",
       "isActive": false,
@@ -23711,13 +23746,6 @@
       "toYear": 2016
     },
     {
-      "id": 1643589,
-      "fullName": "Tyler Nickel",
-      "isActive": false,
-      "fromYear": 2026,
-      "toYear": 2026
-    },
-    {
       "id": 1093,
       "fullName": "Gaylon Nickerson",
       "isActive": false,
@@ -23733,7 +23761,7 @@
     },
     {
       "id": 1642949,
-      "fullName": "Yanic Konan Niederh\u00e4user",
+      "fullName": "Yanic Konan Niederhäuser",
       "isActive": true,
       "fromYear": 2025,
       "toYear": 2026
@@ -23998,6 +24026,13 @@
       "toYear": 2023
     },
     {
+      "id": 1643070,
+      "fullName": "Jayden Nunn",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 1629134,
       "fullName": "Kendrick Nunn",
       "isActive": false,
@@ -24013,7 +24048,7 @@
     },
     {
       "id": 203994,
-      "fullName": "Jusuf Nurki\u0107",
+      "fullName": "Jusuf Nurkić",
       "isActive": true,
       "fromYear": 2014,
       "toYear": 2026
@@ -24513,7 +24548,7 @@
       "fullName": "Norchad Omier",
       "isActive": true,
       "fromYear": 2025,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1630647,
@@ -25014,7 +25049,7 @@
     },
     {
       "id": 1628394,
-      "fullName": "An\u017eejs Pase\u010d\u0146iks",
+      "fullName": "Anžejs Pasečņiks",
       "isActive": false,
       "fromYear": 2019,
       "toYear": 2020
@@ -25220,7 +25255,7 @@
       "fullName": "Elfrid Payton",
       "isActive": false,
       "fromYear": 2014,
-      "toYear": 2024
+      "toYear": 2026
     },
     {
       "id": 56,
@@ -26043,7 +26078,7 @@
     },
     {
       "id": 204001,
-      "fullName": "Kristaps Porzi\u0146\u0123is",
+      "fullName": "Kristaps Porziņģis",
       "isActive": true,
       "fromYear": 2015,
       "toYear": 2026
@@ -26109,7 +26144,7 @@
       "fullName": "Dwight Powell",
       "isActive": true,
       "fromYear": 2014,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 2694,
@@ -26271,6 +26306,13 @@
       "isActive": false,
       "fromYear": 2002,
       "toYear": 2015
+    },
+    {
+      "id": 1643761,
+      "fullName": "Nick Pringle",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 77887,
@@ -26449,7 +26491,7 @@
     },
     {
       "id": 1631311,
-      "fullName": "Lester Qui\u00f1ones",
+      "fullName": "Lester Quiñones",
       "isActive": false,
       "fromYear": 2022,
       "toYear": 2024
@@ -26935,7 +26977,7 @@
       "fullName": "Antonio Reeves",
       "isActive": true,
       "fromYear": 2024,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 735,
@@ -27775,7 +27817,7 @@
       "fullName": "David Roddy",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 78003,
@@ -27965,6 +28007,13 @@
       "isActive": false,
       "fromYear": 1954,
       "toYear": 1956
+    },
+    {
+      "id": 1643732,
+      "fullName": "Chase Ross",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 2624,
@@ -28325,7 +28374,7 @@
     },
     {
       "id": 1642275,
-      "fullName": "Tidjane Sala\u00fcn",
+      "fullName": "Tidjane Salaün",
       "isActive": true,
       "fromYear": 2024,
       "toYear": 2026
@@ -28604,13 +28653,6 @@
       "toYear": 1977
     },
     {
-      "id": 1643563,
-      "fullName": "Richie Saunders",
-      "isActive": false,
-      "fromYear": 2026,
-      "toYear": 2026
-    },
-    {
       "id": 78066,
       "fullName": "Don Savage",
       "isActive": false,
@@ -28836,7 +28878,7 @@
     },
     {
       "id": 203471,
-      "fullName": "Dennis Schr\u00f6der",
+      "fullName": "Dennis Schröder",
       "isActive": true,
       "fromYear": 2013,
       "toYear": 2026
@@ -29448,7 +29490,7 @@
       "fullName": "Max Shulga",
       "isActive": true,
       "fromYear": 2025,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 78143,
@@ -30856,6 +30898,13 @@
       "isActive": false,
       "fromYear": 1955,
       "toYear": 1955
+    },
+    {
+      "id": 1641868,
+      "fullName": "Jake Stephens",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
     },
     {
       "id": 1086,
@@ -32283,6 +32332,13 @@
       "fullName": "Xavier Tillman",
       "isActive": true,
       "fromYear": 2020,
+      "toYear": 2025
+    },
+    {
+      "id": 1643754,
+      "fullName": "Cristoph Tilly",
+      "isActive": false,
+      "fromYear": 2026,
       "toYear": 2026
     },
     {
@@ -32434,7 +32490,7 @@
     },
     {
       "id": 1642260,
-      "fullName": "Nikola Topi\u0107",
+      "fullName": "Nikola Topić",
       "isActive": true,
       "fromYear": 2024,
       "toYear": 2026
@@ -33277,7 +33333,7 @@
       "fullName": "Gabe Vincent",
       "isActive": true,
       "fromYear": 2019,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 78418,
@@ -33400,7 +33456,7 @@
     },
     {
       "id": 202696,
-      "fullName": "Nikola Vu\u010devi\u0107",
+      "fullName": "Nikola Vučević",
       "isActive": true,
       "fromYear": 2011,
       "toYear": 2026
@@ -33683,7 +33739,7 @@
       "fullName": "Keaton Wallace",
       "isActive": true,
       "fromYear": 2024,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 78443,
@@ -34001,6 +34057,13 @@
       "toYear": 1981
     },
     {
+      "id": 1643741,
+      "fullName": "Solomon Washington",
+      "isActive": false,
+      "fromYear": 2026,
+      "toYear": 2026
+    },
+    {
       "id": 78470,
       "fullName": "Stan Washington",
       "isActive": false,
@@ -34026,7 +34089,7 @@
       "fullName": "TyTy Washington Jr.",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1629139,
@@ -34383,7 +34446,7 @@
       "fullName": "Blake Wesley",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 133,
@@ -34705,7 +34768,7 @@
       "fullName": "Cam Whitmore",
       "isActive": true,
       "fromYear": 2023,
-      "toYear": 2025
+      "toYear": 2026
     },
     {
       "id": 78519,
@@ -35342,7 +35405,7 @@
       "fullName": "Nate Williams",
       "isActive": true,
       "fromYear": 2022,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 1630172,
@@ -35811,7 +35874,7 @@
       "fullName": "James Wiseman",
       "isActive": false,
       "fromYear": 2020,
-      "toYear": 2025
+      "toYear": 2026
     },
     {
       "id": 203481,
@@ -36245,7 +36308,7 @@
       "fullName": "Jahmir Young",
       "isActive": true,
       "fromYear": 2024,
-      "toYear": 2026
+      "toYear": 2025
     },
     {
       "id": 203923,
