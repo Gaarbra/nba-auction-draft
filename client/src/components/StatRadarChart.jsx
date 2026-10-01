@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 // Career-high-ish ceilings per stat, used purely to normalize the radar's
 // 0-1 axes. Not a claim about the literal all-time record, just enough
@@ -27,6 +27,7 @@ function pointAt(angleDeg, r) {
  * for something this simple, and it means the fill color can follow the player's
  * team like everything else in the app already does. */
 export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
+  const reduceMotion = useReducedMotion();
   if (!stats || stats.unavailable) return null;
 
   const points = AXES.map((axis, i) => {
@@ -42,7 +43,7 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
   const polygonPoints = points.map((p) => p.point.join(",")).join(" ");
 
   return (
-    <svg viewBox={`-10 -10 ${SIZE + 20} ${SIZE + 20}`} className="stat-radar" role="img" aria-label="Career per-game stat radar">
+    <svg width={SIZE} height={SIZE} viewBox={`-16 -16 ${SIZE + 32} ${SIZE + 32}`} className="stat-radar" role="img" aria-label="Career per-game stat radar">
       {[0.33, 0.66, 1].map((f) => (
         <polygon
           key={f}
@@ -62,9 +63,9 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
         stroke={color}
         strokeWidth={2}
         strokeLinejoin="round"
-        initial={{ scale: 0, opacity: 0 }}
+        initial={reduceMotion ? false : { scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 190, damping: 16 }}
+        transition={{ duration: reduceMotion ? 0 : 0.25 }}
         style={{ transformOrigin: `${CENTER}px ${CENTER}px` }}
       />
 
@@ -75,9 +76,9 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
           cy={p.point[1]}
           r={2.75}
           fill={color}
-          initial={{ opacity: 0, scale: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.18 + i * 0.05, type: "spring", stiffness: 300, damping: 14 }}
+          transition={{ duration: reduceMotion ? 0 : 0.2 }}
         />
       ))}
 

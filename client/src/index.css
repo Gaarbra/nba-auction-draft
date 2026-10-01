@@ -1501,9 +1501,8 @@ form input {
 
 .draft-layout {
   display: flex;
-  /* stretch, not flex-start. The chat sidebar matches .draft-board's full
-     height this way, rather than being a short box floating at the top. */
-  align-items: stretch;
+  /* Chat and the draft size independently, including between rolls. */
+  align-items: flex-start;
   gap: 14px;
   width: 100%;
   /* Was on .draft-board itself, moved up here so the chat sidebar sits
@@ -2220,6 +2219,8 @@ form input {
   display: none;
   width: 168px;
   height: 168px;
+  max-width: 100%;
+  overflow: visible;
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -3718,6 +3719,7 @@ form input {
 
 .chat-panel.collapsed {
   width: 44px;
+  align-self: flex-start;
 }
 
 .chat-panel-header {
@@ -5460,8 +5462,8 @@ button.topnav-brand-link:focus-visible {
    the Stitch mock's own 8/4-column split. */
 .market-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
+  gap: 24px;
   align-items: start;
 }
 
@@ -5476,12 +5478,11 @@ button.topnav-brand-link:focus-visible {
 /* The player dossier card -- the mock's central "lot" panel. */
 .market-dossier {
   display: flex;
-  gap: 20px;
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(165deg, var(--bg-panel-raised) 0%, var(--bg-panel) 100%);
+  gap: 24px;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--bg-panel);
   border: 1px solid var(--line);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
   position: relative;
   overflow: hidden;
 }
@@ -5489,8 +5490,8 @@ button.topnav-brand-link:focus-visible {
 .market-dossier-photo {
   position: relative;
   flex-shrink: 0;
-  width: clamp(140px, 16vw, 220px);
-  height: 280px;
+  width: clamp(112px, 11vw, 160px);
+  height: 200px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   border: 2px solid color-mix(in srgb, var(--team-primary, var(--line-bright)) 55%, var(--line-bright));
@@ -5606,10 +5607,8 @@ button.topnav-brand-link:focus-visible {
   gap: 16px;
   flex-wrap: wrap;
   margin: 8px 0;
-  padding: 12px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-panel);
-  border: 1px solid var(--line);
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
 }
 
 .market-dossier-difficulty {
@@ -5703,11 +5702,10 @@ button.topnav-brand-link:focus-visible {
 
 /* Shared panel chrome (value chart, similar players, live bids). */
 .market-panel {
-  padding: 16px;
-  border-radius: var(--radius-lg);
+  padding: 24px;
+  border-radius: 16px;
   border: 1px solid var(--line);
   background: var(--bg-panel-raised);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .market-panel-header {
@@ -7412,17 +7410,42 @@ button.topnav-brand-link:focus-visible {
 
   .room-drafting .active-nomination-cinematic .nominated-player-card {
     min-width: 0;
-    min-height: 272px;
+    min-height: 0;
     padding: 24px;
+    container-type: inline-size;
   }
 
   .room-drafting .active-nomination-cinematic .nominated-player-header {
-    min-height: 224px;
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: start;
+    min-height: 0;
+    padding-left: 0;
+    gap: 20px;
+  }
+
+  .room-drafting .active-nomination-cinematic .nomination-photo-wrap {
+    position: relative;
+    width: 112px;
+    height: 150px;
+  }
+
+  .room-drafting .active-nomination-cinematic .player-headshot-cinematic {
+    width: 112px;
+    height: 150px;
+  }
+
+  .room-drafting .active-nomination-cinematic .nomination-content-fade {
+    display: block;
+    margin: 0;
+    padding: 0;
+    background: none;
   }
 
   .room-drafting .active-nomination-cinematic .stat-radar {
     width: 140px;
     height: 140px;
+    margin: 16px 0 0;
   }
 
   .room-drafting .active-nomination-cinematic .bidding-panel,
@@ -7437,6 +7460,15 @@ button.topnav-brand-link:focus-visible {
     border-left: 1px solid var(--line);
     border-radius: 0;
     background: rgba(8, 9, 12, 0.72);
+  }
+}
+
+@container (max-width: 480px) {
+  .room-drafting .active-nomination-cinematic .nominated-player-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .room-drafting .active-nomination-cinematic .stat-highlight-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -7554,3 +7586,54 @@ button.topnav-brand-link:focus-visible {
 .market-reading-select { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--text-dim); font-size: 14px; }
 .market-reading-select select { min-height: 44px; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--bg-panel); }
 .market-reading-detail { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* Shared tab rhythm: player data leads; controls and secondary details support it. */
+.market-page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 12px;
+}
+.market-page-heading h1 { margin: 0; font: 700 clamp(28px, 4vw, 40px)/1.15 var(--font-display); letter-spacing: -.03em; }
+.market-page-heading p { margin: 10px 0 0; max-width: 60ch; color: var(--text-dim); line-height: 1.5; }
+.market-page-heading button { flex-shrink: 0; }
+.market-catalogue-status { padding: 32px 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg-panel); }
+.market-catalogue-status h2 { margin: 0; font-size: 20px; }
+.market-catalogue-status p { color: var(--text-dim); }
+.market-exchange .market-ticker { border-radius: 0; background: transparent; border-inline: 0; padding-inline: 0; flex-wrap: wrap; row-gap: 12px; }
+.market-exchange .market-results { max-height: 320px; overflow-y: auto; scrollbar-gutter: stable; }
+.market-exchange .market-result-row[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--bg-panel)); box-shadow: inset 0 0 0 1px var(--accent); }
+.market-exchange .market-dossier .stat-highlight-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
+.market-exchange .market-dossier .stat-highlight { min-width: 0; padding: 0; }
+.market-exchange .market-dossier .stat-highlight-value { font-size: clamp(20px, 2vw, 28px); font-variant-numeric: tabular-nums; }
+.market-exchange .market-dossier .stat-radar { width: 128px; height: 128px; margin: 0; }
+.market-exchange .market-dossier .player-accolades { margin: 4px 0 12px; flex-wrap: wrap; }
+.market-exchange .market-dossier .accolade-chip { white-space: normal; }
+.market-exchange .market-panel-title { font-size: 18px; text-transform: none; letter-spacing: -.01em; }
+.market-exchange .market-panel-subtitle { flex-basis: 100%; line-height: 1.5; }
+.market-exchange .market-sale-row { flex-wrap: wrap; row-gap: 8px; }
+.market-exchange .market-chart { background: var(--bg-inset); border-radius: 12px; margin-bottom: 16px; }
+.market-exchange .market-reading-detail { padding: 12px 0 0; border-top: 1px solid var(--line); }
+.landing-lobby-title { text-wrap: balance; }
+.landing-lobby-subtitle { text-wrap: pretty; }
+.landing-lobby .lobby-console { border-radius: 16px; box-shadow: none; }
+.how-to-play-step { background: transparent; border: 0; border-top: 1px solid var(--line-bright); border-radius: 0; padding-inline: 0; }
+.how-to-play-step-copy p { max-width: 60ch; text-wrap: pretty; }
+.how-to-play-hero { border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.topnav-tab { min-height: 44px; }
+:where(.market-exchange, .landing-lobby, .how-to-play) button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (min-width: 861px) {
+  .room-drafting .draft-board { align-self: flex-start; padding: 24px; }
+  .room-drafting .chat-panel:not(.collapsed) { height: min(520px, calc(100dvh - 160px)); }
+}
+@media (max-width: 700px) {
+  .market-page-heading { align-items: flex-start; flex-direction: column; }
+  .market-exchange .market-dossier { gap: 20px; }
+  .market-exchange .market-dossier-photo { width: 112px; height: 140px; }
+  .market-exchange .market-dossier-featured { display: none; }
+  .market-exchange .market-dossier .stat-highlight-row { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 16px; }
+  .market-exchange .market-panel { padding: 18px; }
+  .market-exchange .market-ticker-sep { display: none; }
+  .market-exchange .market-ticker-item { flex: 1 1 140px; flex-wrap: wrap; }
+}

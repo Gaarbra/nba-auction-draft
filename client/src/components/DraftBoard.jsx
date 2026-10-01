@@ -611,7 +611,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                           ·{" "}
                           {nomination.player.draftYear ? `Drafted ${nomination.player.draftYear}` : "Undrafted"}
                         </p>
-                        <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} />
+                        <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} compact />
                         {nomination.player.teamHistory?.length > 1 && (
                           <p className="player-meta player-team-history">
                             Career teams: {nomination.player.teamHistory.map((t) => t.abbreviation).join(", ")}

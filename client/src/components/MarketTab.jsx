@@ -7,6 +7,8 @@ import StatHighlightRow from "./StatHighlightRow.jsx";
 import StatRadarChart from "./StatRadarChart.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
 import TeamBadge from "./TeamBadge.jsx";
+import PlayerAccolades from "./PlayerAccolades.jsx";
+import { loadMarketCatalogue } from "../marketCatalogue.js";
 import { getTeamColors } from "../teamColors.js";
 import { getHistoricalTeamName } from "../teamNames.js";
 
@@ -135,6 +137,8 @@ function ValueHistoryChart({ points, color = "var(--accent)" }) {
 export default function MarketTab({ socket, onNavigateToLobby }) {
   const [index, setIndex] = useState([]);
   const [indexLoading, setIndexLoading] = useState(true);
+  const [indexError, setIndexError] = useState(false);
+  const [reloadIndex, setReloadIndex] = useState(0);
   const [era, setEra] = useState("all");
   const [team, setTeam] = useState("");
   const [search, setSearch] = useState("");
@@ -171,12 +175,17 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
   }, [socket]);
 
   useEffect(() => {
-    fetch(`${SERVER_URL}/api/players/market-index`)
-      .then((res) => res.json())
-      .then((data) => setIndex(Array.isArray(data.players) ? data.players : []))
-      .catch(() => setIndex([]))
-      .finally(() => setIndexLoading(false));
-  }, []);
+    let cancelled = false;
+    setIndexLoading(true);
+    setIndexError(false);
+    loadMarketCatalogue(`${SERVER_URL}/api/players/market-index`)
+      .then((players) => {
+        if (!cancelled) setIndex(players);
+      })
+      .catch(() => { if (!cancelled) setIndexError(true); })
+      .finally(() => { if (!cancelled) setIndexLoading(false); });
+    return () => { cancelled = true; };
+  }, [reloadIndex]);
 
   const eraFiltered = useMemo(() => {
     if (era === "all") return index;
@@ -313,6 +322,13 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
 
   return (
     <div className="market-tab market-exchange">
+      <header className="market-page-heading">
+        <div>
+          <h1>Player market</h1>
+          <p>Scout career stats, compare value, and follow completed auctions.</p>
+        </div>
+        {onNavigateToLobby && <button type="button" className="secondary-button" onClick={onNavigateToLobby}>Go to lobby</button>}
+      </header>
       {/* Real numbers only -- the Stitch mock's own "24H volume"/"Market
           Index"/"Liquidity %" ticker was invented trend data this app has
           no basis for, so this version only ever shows things that are
@@ -358,6 +374,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search any player by name…"
+          aria-label="Search players by name"
         />
         <button
           type="button"
@@ -390,6 +407,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                 key={opt.value}
                 type="button"
                 className={`market-pill ${era === opt.value ? "active" : ""}`}
+                aria-pressed={era === opt.value}
                 onClick={() => setEra(opt.value)}
               >
                 {opt.label}
@@ -414,12 +432,25 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
             key={tag.value}
             type="button"
             className={`market-tag ${positionTag === tag.value ? "active" : ""}`}
+            aria-pressed={positionTag === tag.value}
             onClick={() => setPositionTag((cur) => (cur === tag.value ? null : tag.value))}
           >
             {tag.label}
           </button>
         ))}
       </div>
+
+      {indexError ? (
+        <div className="market-catalogue-status" role="alert">
+          <h2>Player catalogue couldn’t load</h2>
+          <p>Try again in a moment. Your filters will stay selected.</p>
+          <button type="button" className="secondary-button" onClick={() => setReloadIndex((attempt) => attempt + 1)}>Retry catalogue</button>
+        </div>
+      ) : indexLoading ? (
+        <div className="market-catalogue-status" role="status"><p>Loading the player catalogue…</p></div>
+      ) : index.length === 0 ? (
+        <div className="market-catalogue-status"><h2>No players available yet</h2><p>The stats service hasn’t supplied a player catalogue.</p></div>
+      ) : null}
 
       {isBrowsing && (
         <div className="market-results">
@@ -437,7 +468,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
             <ul className="market-results-list">
               {shownResults.map((p) => (
                 <li key={p.id}>
-                  <button type="button" className="market-result-row" onClick={() => jumpToPlayer(p.id)}>
+                  <button type="button" className="market-result-row" aria-pressed={String(p.id) === String(playerId)} onClick={() => jumpToPlayer(p.id)}>
                     <TeamBadge abbreviation={p.team} size={24} />
                     <span className="market-result-name">{p.fullName}</span>
                     <span className="market-result-meta">
@@ -493,10 +524,10 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                   )}
                 </div>
 
-                <h1 className="market-dossier-name">
+                <h2 className="market-dossier-name">
                   <TeamBadge abbreviation={selectedMeta.team} size={28} />
                   <PlayerNameLink nbaPlayerId={selectedMeta.id} name={selectedMeta.fullName} />
-                </h1>
+                </h2>
                 <p className="market-dossier-meta">
                   {selectedMeta.position || "N/A"} ·{" "}
                   {getHistoricalTeamName(selectedMeta.team) || selectedMeta.team} ·{" "}
@@ -516,6 +547,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                   <p className="player-stats loading">Stats unavailable for this player.</p>
                 )}
                 {stats && !stats.unavailable && !statsLoading && <StatHighlightRow stats={stats} />}
+                <PlayerAccolades nbaPlayerId={selectedMeta.id} compact />
 
                 <div className="market-dossier-archetype-row">
                   {stats && !stats.unavailable && !statsLoading && <StatRadarChart stats={stats} color={teamColors?.primary} />}
@@ -527,6 +559,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                           key={opt.value}
                           type="button"
                           className={`difficulty-option ${difficulty === opt.value ? "active" : ""}`}
+                          aria-pressed={difficulty === opt.value}
                           onClick={() => setDifficulty(opt.value)}
                         >
                           {opt.label}
@@ -568,6 +601,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
               difficulty={difficulty}
               onPredictedPrice={handlePredictedPrice}
               onSimilarPlayerClick={jumpToPlayer}
+              showSimilar={false}
             />
 
             <div className="market-panel">
@@ -582,8 +616,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
 
             <div className="market-panel">
               <div className="market-panel-header">
-                <h4 className="market-panel-title">Similar player assets</h4>
-                <span className="market-panel-kicker">Market comparables</span>
+                <h3 className="market-panel-title">Compare similar players</h3>
               </div>
               <SimilarPlayersGrid playerId={playerId} index={index} onJump={jumpToPlayer} />
             </div>
