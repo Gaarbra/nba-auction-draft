@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import RosterGrid from "./RosterGrid.jsx";
 import AssignBoard from "./AssignBoard.jsx";
-import PlayerHeadshot from "./PlayerHeadshot.jsx";
+import PlayerReveal from "./PlayerReveal.jsx";
 import PlayerNameLink from "./PlayerNameLink.jsx";
 import ResultsScreen from "./ResultsScreen.jsx";
 import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
@@ -14,11 +14,9 @@ import ChatPanel from "./ChatPanel.jsx";
 import LocalBiddingRows from "./LocalBiddingRows.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
 import PlayerAccolades from "./PlayerAccolades.jsx";
-import TeamRevealBackdrop from "./TeamRevealBackdrop.jsx";
 import TeamBadge from "./TeamBadge.jsx";
 import { playRollTick, playRollSelectChime } from "../rollSound.js";
 import { getTeamColors } from "../teamColors.js";
-import { getTeamLogoUrl } from "../teamLogos.js";
 import { getHistoricalTeamName } from "../teamNames.js";
 import { countryFlag } from "../countryFlags.js";
 import { trackEvent } from "../analytics.js";
@@ -146,6 +144,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   // rotation would leave the wrong bid UI wired up rather than just
   // looking briefly outdated.
   const isMobileViewport = useMediaQuery("(max-width: 640px)");
+  const hasRosterSidebar = useMediaQuery("(min-width: 1100px)");
 
   const isComplete = room.status === "complete";
   const nomination = draft?.nomination || null;
@@ -362,12 +361,10 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         // any width) filtered to just this player, with assigningSlot's
         // two-tap arm/confirm doing the "pick a spot" job in place.
         <div className="mobile-assign-strip">
-          <TeamRevealBackdrop team={nomination.player.team?.abbreviation} playerId={nomination.player.nbaPlayerId} />
           <div className="mobile-assign-summary">
-            <PlayerHeadshot
-              nbaPlayerId={nomination.player.nbaPlayerId}
-              photoUrl={nomination.player.stats?.photoUrl}
-              alt={nomination.player.fullName}
+            <PlayerReveal
+              key={nomination.player.nbaPlayerId ?? nomination.player.fullName}
+              player={nomination.player}
               className="mobile-assign-headshot"
             />
             <p>
@@ -410,6 +407,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           </div>
 
           <RosterGrid
+            isRolling={isRolling}
             room={room}
             currentPlayerId={currentPlayerId}
             socket={socket}
@@ -464,6 +462,20 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         </div>
       ) : (
         <AssignBoard
+          rosterOnRight={hasRosterSidebar}
+          rosterControls={!hasRosterSidebar && (
+            <RosterGrid
+              room={room}
+              currentPlayerId={currentPlayerId}
+              socket={socket}
+              onlyPlayerId={currentPlayerId}
+              floatingByPlayer={floatingByPlayer}
+              assigningSlot
+              isRolling={isRolling}
+              onAssignSlot={handlePickPosition}
+              hideCost={isSolo}
+            />
+          )}
           ownerName={currentPlayer?.name || "Your"}
           roster={myRoster}
           budget={currentPlayer?.budget ?? 0}
@@ -506,24 +518,6 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           transition={{ duration: 0.4, ease: "easeOut" }}
         >
           {(() => {
-            const logoUrl = getTeamLogoUrl(nomination.player.team?.abbreviation);
-            // The official NBA CDN headshot is a transparent cutout -- the
-            // team logo can sit directly behind the player and show
-            // through around them, big and confident, like a real
-            // broadcast graphic. stats.photoUrl only gets set when that
-            // CDN image doesn't exist for this player (see PlayerHeadshot's
-            // own doc comment) and a Wikipedia/fallback photo is standing
-            // in instead -- a flat rectangular photo, not a cutout, so a
-            // giant logo behind it would just be hidden. Badge it small in
-            // the corner there instead.
-            const isOfficialPhoto = Boolean(nomination.player.nbaPlayerId) && !nomination.player.stats?.photoUrl;
-            const slideFrom = prefersReducedMotion ? "translateX(0px)" : "translateX(-36px)";
-            // A premium, slightly overshooting ease-out -- deliberately
-            // distinct from the rest of the app's standard entrance curve
-            // (see the animate skill's --ease-out token) for this one
-            // specific "big logo slides into place" moment.
-            const logoEase = [0.25, 1, 0.5, 1];
-
             return (
               <>
                 <div className="nominated-player-card">
@@ -538,47 +532,9 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                     animate={{ scaleX: 1 }}
                     transition={{ type: "spring", stiffness: 220, damping: 30, delay: 0.08 }}
                   />
-                  {/* Back inside .nominated-player-card (not a sibling of it)
-                      so its position is anchored to THIS box's own edges --
-                      specifically bottom:0, matching the photo's own anchor --
-                      rather than the outer card's, which also includes the
-                      separate bidding/assign panel below and let the logo
-                      drift down behind that too. .nominated-player-card
-                      itself now allows overflow (see that rule) so the logo
-                      can still bleed out past ITS edges; only the true outer
-                      card (.active-nomination-cinematic) clips it for real. */}
-                  <TeamRevealBackdrop team={nomination.player.team?.abbreviation} playerId={nomination.player.nbaPlayerId} />
                   <div className="nominated-player-header">
                     <div className="nomination-photo-wrap">
-                      <motion.div
-                        // Masked only when there's the big logo actually
-                        // sitting behind it (see .nomination-photo-slide.masked)
-                        // -- softening a photo's edges toward transparent
-                        // with nothing behind it would just look like an
-                        // unexplained vignette against the card.
-                        className={`nomination-photo-slide ${logoUrl && isOfficialPhoto ? "masked" : ""}`}
-                        initial={{ opacity: 0, transform: slideFrom }}
-                        animate={{ opacity: 1, transform: "translateX(0px)" }}
-                        transition={{ duration: 0.6, ease: logoEase, delay: 0.05 }}
-                      >
-                        <PlayerHeadshot
-                          nbaPlayerId={nomination.player.nbaPlayerId}
-                          photoUrl={nomination.player.stats?.photoUrl}
-                          alt={nomination.player.fullName}
-                          className="player-headshot player-headshot-cinematic"
-                        />
-                      </motion.div>
-                      {logoUrl && !isOfficialPhoto && (
-                        <motion.img
-                          src={logoUrl}
-                          alt=""
-                          aria-hidden="true"
-                          className="nomination-photo-logo badge"
-                          initial={{ opacity: 0, transform: slideFrom }}
-                          animate={{ opacity: 1, transform: "translateX(0px)" }}
-                          transition={{ duration: 0.5, ease: logoEase, delay: 0.2 }}
-                        />
-                      )}
+                      <PlayerReveal player={nomination.player} />
                     </div>
                     {/* Everything that isn't the photo/logo rises into place
                         together instead of sliding with the card -- a
@@ -793,8 +749,9 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
         </motion.div>
       )}
 
-      {!isAssigningAsWinner && (
+      {!isAssigningAsWinner && (!hasRosterSidebar || room.players.length > 1) && (
         <RosterGrid
+            isRolling={isRolling}
           room={room}
           currentPlayerId={currentPlayerId}
           socket={socket}
@@ -803,10 +760,29 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           assigningSlot={false}
           onAssignSlot={handlePickPosition}
           hideCost={isSolo}
+          excludePlayerId={hasRosterSidebar ? currentPlayerId : null}
         />
       )}
       </div>
 
+      {hasRosterSidebar && (
+        <aside className="draft-roster" aria-label="Your roster">
+          <h2>Your roster</h2>
+          <RosterGrid
+            isRolling={isRolling}
+            room={room}
+            currentPlayerId={currentPlayerId}
+            socket={socket}
+            nominatingId={draft?.currentNominatorId}
+            floatingByPlayer={floatingByPlayer}
+            onlyPlayerId={currentPlayerId}
+            compact
+            assigningSlot={isAssigningAsWinner && !isRolling}
+            onAssignSlot={handlePickPosition}
+            hideCost={isSolo}
+          />
+        </aside>
+      )}
       <ChatPanel socket={socket} room={room} currentPlayerId={currentPlayerId} messages={chatMessages} />
     </div>
   );

@@ -24,8 +24,12 @@ export default function RosterGrid({
   onAssignSlot,
   hideCost = false,
   onlyPlayerId = null,
+  excludePlayerId = null,
+  compact = false,
+  isRolling = false,
 }) {
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [swapFrom, setSwapFrom] = useState(null);
   const [inspected, setInspected] = useState(null);
   const [drag, setDrag] = useState(null);
   const [moveMessage, setMoveMessage] = useState("");
@@ -36,20 +40,30 @@ export default function RosterGrid({
 
   useEffect(() => {
     setSelectedSlot(null);
+    setSwapFrom(null);
     setInspected(null);
     setDrag(null);
     pointer.current = null;
   }, [currentPlayerId, assigningSlot, room.status, room.allowPositionSwaps]);
 
-  const canSwap = Boolean(room.allowPositionSwaps) && room.status === "drafting";
-  const players = onlyPlayerId ? room.players.filter((p) => p.id === onlyPlayerId) : room.players;
+  const canSwap = Boolean(room.allowPositionSwaps && room.draft?.nomination) &&
+    room.status === "drafting" && !isRolling && !room.draft?.isRolling;
+  useEffect(() => {
+    if (!canSwap) {
+      setSwapFrom(null);
+      setDrag(null);
+      pointer.current = null;
+    }
+  }, [canSwap]);
+  const players = room.players.filter((p) => (!onlyPlayerId || p.id === onlyPlayerId) && p.id !== excludePlayerId);
 
   function movePlayer(from, to) {
-    if (!canSwap || assigningSlot || movePending.current || from === to) return;
+    if (!canSwap || movePending.current || from === to) return;
     if (!room.draft?.rosters?.[currentPlayerId]?.[from]) return;
     movePending.current = true;
     setMoving(true);
     setSelectedSlot(null);
+    setSwapFrom(null);
     setMoveMessage("Moving player...");
     socket.timeout(5000).emit("draft:swap-positions", {
       slotA: from, slotB: to, playerId: currentPlayerId,
@@ -71,6 +85,11 @@ export default function RosterGrid({
       return;
     }
     const isMine = playerId === currentPlayerId;
+    if (isMine && canSwap && swapFrom) {
+      if (swapFrom === pos) setSwapFrom(null);
+      else movePlayer(swapFrom, pos);
+      return;
+    }
     if (isMine && assigningSlot && !occupant) {
       if (selectedSlot === pos) {
         setSelectedSlot(null);
@@ -78,16 +97,11 @@ export default function RosterGrid({
       } else setSelectedSlot(pos);
       return;
     }
-    if (isMine && canSwap && !assigningSlot && selectedSlot) {
-      if (selectedSlot === pos) setSelectedSlot(null);
-      else movePlayer(selectedSlot, pos);
-      return;
-    }
     if (occupant) setInspected({ playerId, pos });
   }
 
   function startDrag(event, pos, occupant, isMine) {
-    if (!isMine || !canSwap || assigningSlot || moving || !occupant || !event.isPrimary || event.button !== 0) return;
+    if (!isMine || !canSwap || moving || !occupant || !event.isPrimary || event.button !== 0) return;
     if (event.target.closest("a, button")) return;
     suppressClick.current = false;
     pointer.current = { id: event.pointerId, pos, occupant, x: event.clientX, y: event.clientY, active: false };
@@ -124,6 +138,7 @@ export default function RosterGrid({
         pointer.current = null;
         setDrag(null);
         setSelectedSlot(null);
+        setSwapFrom(null);
       }
     }}>
       <p className="roster-move-status" role="status">{moveMessage}</p>
@@ -133,7 +148,7 @@ export default function RosterGrid({
           <span>{drag.target && drag.target !== drag.pos ? `Drop at ${drag.target}` : "Drag to a position"}</span>
         </div>
       )}
-      {canSwap && !assigningSlot && (
+      {canSwap && players.some((player) => player.id === currentPlayerId) && (
         <p className="roster-grid-swap-hint">Drag a player to a position. Drop on another player to swap. Tap a player to see stats.</p>
       )}
       {players.map((player) => {
@@ -179,8 +194,8 @@ export default function RosterGrid({
                 const occupant = roster[pos];
                 const assignable = isMine && assigningSlot && !occupant;
                 const armed = assignable && selectedSlot === pos;
-                const interactive = assignable || Boolean(occupant) || (isMine && canSwap && !assigningSlot);
-                const draggable = isMine && canSwap && !assigningSlot && Boolean(occupant) && !moving;
+                const interactive = assignable || Boolean(occupant) || (isMine && canSwap);
+                const draggable = isMine && canSwap && Boolean(occupant) && !moving;
                 const colors = occupant ? getTeamColors(occupant.team?.abbreviation) : null;
                 // A plain div, not a <button>. The hover tooltip nests a
                 // real <a> (the NBA.com stats link) inside it, and a link
@@ -218,7 +233,7 @@ export default function RosterGrid({
                       interactive ? "interactive" : "",
                       assignable ? "assignable" : "",
                       armed ? "armed" : "",
-                      isMine && !assignable && selectedSlot === pos ? "selected" : "",
+                      isMine && swapFrom === pos ? "selected" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -251,6 +266,7 @@ export default function RosterGrid({
                       </AnimatePresence>
                     </div>
                     <span className="slot-label">{pos}</span>
+                    {compact && <span className="roster-slot-name">{occupant?.fullName || "Open"}</span>}
                     {armed && <span className="slot-armed-hint">Tap again</span>}
                     {/* Solo prices every pick the same flat amount -- a cost
                         tag that never varies isn't telling you anything, so
@@ -290,21 +306,21 @@ export default function RosterGrid({
               <section className="roster-player-details" aria-label={`${inspectedPlayer.fullName} stats`}>
                 <div className="roster-details-heading">
                   <strong>{inspectedPlayer.fullName}</strong>
-                  <button type="button" className="secondary-btn" onClick={() => { setInspected(null); setSelectedSlot(null); }}>Close</button>
+                  <button type="button" className="secondary-btn" onClick={() => { setInspected(null); setSelectedSlot(null); setSwapFrom(null); }}>Close</button>
                 </div>
                 <div className="roster-detail-position">
                   <span>Draft slot <strong>{inspected.pos}</strong></span>
                   <span>Listed {inspectedPlayer.position || "Unknown"}</span>
                 </div>
-                {isMine && canSwap && !assigningSlot && (
+                {isMine && canSwap && (
                   <div className="roster-position-actions">
-                    <button type="button" className="secondary-btn" disabled={moving} onClick={() => setSelectedSlot(selectedSlot ? null : inspected.pos)}>
-                      {selectedSlot ? "Cancel change" : "Change position"}
+                    <button type="button" className="secondary-btn" disabled={moving} onClick={() => { setSelectedSlot(null); setSwapFrom(swapFrom ? null : inspected.pos); }}>
+                      {swapFrom ? "Cancel change" : "Change position"}
                     </button>
-                    {selectedSlot && <p role="status">Choose a slot above. An occupied slot swaps both players.</p>}
+                    {swapFrom && <p role="status">Choose a slot above. An occupied slot swaps both players.</p>}
                   </div>
                 )}
-                {isMine && !canSwap && !assigningSlot && <p className="roster-position-note">Position changes are disabled for this draft.</p>}
+                {isMine && !canSwap && <p className="roster-position-note">{room.allowPositionSwaps ? "Position changes are available after the player is nominated." : "Position changes are disabled for this draft."}</p>}
                 <p className="roster-stats-label">Career averages</p>
                 {inspectedPlayer.stats && !inspectedPlayer.stats.unavailable
                   ? <StatHighlightRow stats={inspectedPlayer.stats} />

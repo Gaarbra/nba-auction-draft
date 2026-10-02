@@ -113,6 +113,7 @@ test("orderly mode: a player leaving who wasn't on turn doesn't disturb whose tu
 test("roster drag moves into empty slots, exchanges occupied slots, and respects swap settings", () => {
   const room = makeRoom();
   room.allowPositionSwaps = true;
+  nominatePlayer(room, "A", player);
   const guard = { nbaPlayerId: 30, fullName: "Guard", acquiredFor: 5 };
   const center = { nbaPlayerId: 34, fullName: "Center", acquiredFor: 7 };
   room.draft.rosters.A.PG = guard;
@@ -149,4 +150,21 @@ test("sale counts distinct accepted bidders, including the opening bid", () => {
   assert.equal(sale.bidderCount, 2);
   assert.equal(sale.bidCount, 3);
   assert.equal(sale.price, 5);
+});
+
+test("swaps require a settled nomination, including rerolls, and work while assigning", () => {
+  const room = makeRoom();
+  room.allowPositionSwaps = true;
+  room.draft.rosters.A.PG = { nbaPlayerId: 30 };
+  const original = structuredClone(room.draft.rosters);
+  assert.equal(swapRosterPositions(room, "A", "PG", "SG").error, "NOMINATION_NOT_READY");
+  nominatePlayer(room, "A", player);
+  room.draft.isRolling = true;
+  assert.equal(swapRosterPositions(room, "A", "PG", "SG").error, "NOMINATION_NOT_READY");
+  assert.deepEqual(room.draft.rosters, original);
+  room.draft.isRolling = false;
+  room.draft.nomination.phase = "assigning";
+  assert.equal(swapRosterPositions(room, "A", "PG", "SG").error, undefined);
+  assert.equal(room.draft.rosters.A.SG.nbaPlayerId, 30);
+  assert.equal(room.draft.nomination.player, player);
 });

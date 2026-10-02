@@ -1505,49 +1505,8 @@ form input {
   align-items: flex-start;
   gap: 14px;
   width: 100%;
-  /* Was on .draft-board itself, moved up here so the chat sidebar sits
-     inside this same width budget instead of floating past it. */
+  /* The board and personal roster share one width budget. */
   max-width: 1560px;
-}
-
-@media (max-width: 860px) {
-  /* Not enough room for a side-by-side sidebar, so stack chat below the
-     board instead. Still never covers anything, just takes its own row. */
-  .draft-layout {
-    flex-direction: column;
-  }
-
-  /* Scoped under .draft-layout (which .chat-panel is always inside), not
-     just .chat-panel/.chat-panel.collapsed on their own -- those match the
-     base (desktop) .chat-panel rules declared further down the file at
-     identical specificity, and same-specificity ties go to whichever rule
-     is LATER in source order, which was the base 280px/44px desktop rules,
-     not this media query. Verified live: without this scoping, the
-     collapsed chat rail rendered as a full-height 44px vertical strip on a
-     375px screen instead of a compact bar, on every mobile load. */
-  .draft-layout .chat-panel,
-  .draft-layout .chat-panel.collapsed {
-    width: 100%;
-    align-self: stretch;
-  }
-
-  .draft-layout .chat-panel:not(.collapsed) {
-    max-height: 320px;
-  }
-
-  /* Scoped under .draft-layout for the same reason as above -- this is the
-     exact same selector, at the exact same specificity, as the desktop
-     ".chat-panel.collapsed .chat-panel-header" rule declared later in this
-     file, so an unscoped version here would keep losing that tie and the
-     collapsed header would keep rendering as a full-height vertical column
-     (a big empty box) instead of a short horizontal bar. Verified live. */
-  .draft-layout .chat-panel.collapsed .chat-panel-header {
-    writing-mode: horizontal-tb;
-    flex-direction: row;
-    height: auto;
-    min-height: 44px;
-    padding: 10px 14px;
-  }
 }
 
 @media (max-width: 600px) {
@@ -1588,10 +1547,7 @@ form input {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
   padding: 32px;
-  /* Was width:100% plus its own max-width, now a flex child of
-     .draft-layout, alongside the chat sidebar, so opening the sidebar makes
-     room instead of covering the roster grid. min-width:0 is required for a
-     flex child to actually shrink below its content's natural width. */
+  /* Let the board shrink alongside the personal roster. */
   flex: 1 1 auto;
   min-width: 0;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -3689,38 +3645,24 @@ form input {
   color: var(--text);
 }
 
-/* A real flex sidebar now, not a floating overlay. See .draft-layout,
-   which is what actually reserves this width so the roster grid never sits
-   underneath it. Expanded, it stretches to match .draft-board's full
-   height (align-items: stretch on the shared parent); collapsed, it's a
-   slim vertical tab that still takes a little space but covers nothing. */
-.chat-panel {
+/* Chat stays out of the draft layout until opened. */
+.draft-layout .chat-panel {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 50;
   display: flex;
   flex-direction: column;
-  /* Flat, not glass. See .footer-modal's comment. */
+  width: min(320px, calc(100vw - 32px));
+  max-height: calc(100dvh - 100px);
   background: var(--bg-panel-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
   overflow: hidden;
-  flex-shrink: 0;
-  width: 280px;
-  /* Without this, the panel had no bounded height to distribute among its
-     flex children, so .chat-panel-messages's flex:1 + overflow-y:auto
-     never actually had anything to clip against -- the whole panel just
-     grew taller with every message instead of staying put and scrolling
-     internally. align-items:stretch on .draft-layout doesn't help here
-     either: it makes this match .draft-board's height, but .draft-board
-     itself has no cap, so "stretch to match" was stretching to an
-     unbounded height too. */
-  max-height: calc(100vh - 32px);
-  transition: width 0.18s ease; /* impeccable-disable-line layout-transition -- real flex sibling, width must actually change so .draft-board reclaims the space on collapse; transform can't do that */
 }
-
-.chat-panel.collapsed {
-  width: 44px;
-  align-self: flex-start;
-}
+.draft-layout .chat-panel:not(.collapsed) { height: min(420px, calc(100dvh - 100px)); }
+.draft-layout .chat-panel.collapsed { width: auto; border-radius: 999px; }
 
 .chat-panel-header {
   display: flex;
@@ -3742,15 +3684,14 @@ form input {
 }
 
 .chat-panel.collapsed .chat-panel-header {
-  flex-direction: column;
-  justify-content: center;
+  flex-direction: row;
   gap: 10px;
-  flex: 1;
-  min-height: 140px;
-  padding: 16px 0;
+  min-height: 44px;
+  padding: 12px 18px;
   border-bottom: none;
-  writing-mode: vertical-rl;
 }
+.chat-panel.collapsed .chat-panel-toggle { display: none; }
+.chat-panel-header:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 
 .chat-panel-toggle {
   color: var(--text-faint);
@@ -5988,7 +5929,7 @@ button.topnav-brand-link:focus-visible {
 
 .room-drafting .app-main { justify-content: flex-start; }
 .draft-layout.is-rolling { align-items: flex-start; }
-.draft-layout.is-rolling .chat-panel.collapsed .chat-panel-header { height: auto; min-height: 140px; }
+
 .mobile-player-details { margin-top: 12px; min-width: 0; }
 .mobile-player-details summary { cursor: pointer; min-height: 44px; padding-block: 12px; }
 .mobile-player-details .stat-radar { display: block; max-width: 100%; margin: 12px auto; }
@@ -6000,7 +5941,7 @@ button.topnav-brand-link:focus-visible {
   .mobile-assign-strip { padding: 0; border: 0; background: transparent; }
   .mobile-assign-strip .roster-card { padding: 10px; min-width: 0; }
   .mobile-assign-strip .roster-slots { gap: 3px; }
-  .draft-layout.is-rolling .chat-panel.collapsed .chat-panel-header { min-height: 44px; }
+
 }
 
 /* ============ Draft Board console (room-drafting scope) ============
@@ -7399,7 +7340,7 @@ button.topnav-brand-link:focus-visible {
 /* Keep the live auction compact enough to scan while bids are moving. */
 @media (min-width: 861px) {
   .room-drafting .draft-layout {
-    max-width: 1240px;
+    max-width: 1560px;
   }
 
   .room-drafting .active-nomination-cinematic {
@@ -7625,7 +7566,7 @@ button.topnav-brand-link:focus-visible {
 :where(.market-exchange, .landing-lobby, .how-to-play) button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (min-width: 861px) {
   .room-drafting .draft-board { align-self: flex-start; padding: 24px; }
-  .room-drafting .chat-panel:not(.collapsed) { height: min(520px, calc(100dvh - 160px)); }
+
 }
 @media (max-width: 700px) {
   .market-page-heading { align-items: flex-start; flex-direction: column; }
@@ -7636,4 +7577,50 @@ button.topnav-brand-link:focus-visible {
   .market-exchange .market-panel { padding: 18px; }
   .market-exchange .market-ticker-sep { display: none; }
   .market-exchange .market-ticker-item { flex: 1 1 140px; flex-wrap: wrap; }
+}
+
+/* Paper draft board: personal roster beside the existing auction. */
+.draft-layout { padding-bottom: 76px; }
+.draft-roster { flex: 0 0 280px; min-width: 0; }
+.draft-roster h2 { margin: 0 0 16px; font: 600 13px var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.draft-roster .roster-grid { grid-template-columns: minmax(0, 1fr); margin: 0; }
+.draft-roster .roster-card-header .player-name { display: flex; flex-wrap: wrap; gap: 4px; overflow-wrap: anywhere; }
+.draft-roster .roster-slots { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.draft-roster .roster-slot { min-height: 60px; aspect-ratio: auto; display: grid; grid-template-columns: 32px 28px minmax(0, 1fr) auto; gap: 8px; padding: 10px; }
+.draft-roster .roster-slot-media { position: relative; inset: auto; width: 32px; height: 32px; border-radius: 50%; }
+.draft-roster .roster-slot .slot-label { position: static; padding: 0; background: none; font-size: 11px; }
+.draft-roster .roster-slot-name { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.draft-roster .slot-cost { position: static; padding: 0; background: none; }
+.draft-roster .slot-tooltip { left: auto; right: 0; transform: none; max-width: 250px; }
+.draft-roster .roster-grid-swap-hint { font-size: 12px; }
+@media (max-width: 1099px) {
+  .draft-layout { display: block; }
+}
+@media (min-width: 1100px) and (max-width: 1399px) {
+  .room-drafting .active-nomination-cinematic { grid-template-columns: minmax(0, 1fr); }
+  .room-drafting .active-nomination-cinematic .bidding-panel,
+  .room-drafting .active-nomination-cinematic .assign-panel { border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* The reveal is clipped to the headshot, keeping controls steady. */
+.player-reveal { position: relative; isolation: isolate; width: 100%; height: 100%; overflow: hidden; border-radius: var(--radius-sm); background: linear-gradient(180deg, color-mix(in srgb, var(--reveal-color) 55%, var(--bg-inset)), var(--bg-inset) 85%); }
+.player-reveal-suspense { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: var(--bg-inset); color: var(--accent); font: 600 10px var(--font-display); text-transform: uppercase; letter-spacing: .04em; animation: portrait-suspense 150ms ease 250ms forwards; }
+.player-reveal-suspense > span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.player-reveal-logo { position: absolute; top: 10%; left: 5%; width: 90%; height: 80%; object-fit: contain; opacity: .22; animation: portrait-logo 300ms var(--ease-out) 250ms both; }
+.player-reveal-portrait { position: relative; width: 100%; height: 100%; animation: portrait-settle 250ms var(--ease-out) 550ms both; }
+.player-reveal-portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.player-reveal.mobile-assign-headshot { width: 48px; height: 48px; }
+.mobile-assign-headshot .player-reveal-suspense { font-size: 0; gap: 0; }
+@keyframes portrait-suspense { to { opacity: 0; visibility: hidden; } }
+@keyframes portrait-logo { from { opacity: 0; transform: translateX(-60%); } to { opacity: .22; transform: translateX(0); } }
+@keyframes portrait-settle { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .player-reveal-suspense { display: none; }
+  .player-reveal-logo { animation: none; }
+  .player-reveal-portrait { animation: portrait-fade 150ms ease both; }
+}
+@keyframes portrait-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (min-width: 1100px) {
+  .draft-board > .roster-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
 }

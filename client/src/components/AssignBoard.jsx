@@ -4,7 +4,7 @@ import PlayerNameLink from "./PlayerNameLink.jsx";
 import StatHighlightRow from "./StatHighlightRow.jsx";
 import StatRadarChart from "./StatRadarChart.jsx";
 import PlayerAccolades from "./PlayerAccolades.jsx";
-import TeamRevealBackdrop from "./TeamRevealBackdrop.jsx";
+import PlayerReveal from "./PlayerReveal.jsx";
 import { getTeamColors } from "../teamColors.js";
 import { getHistoricalTeamName } from "../teamNames.js";
 
@@ -26,6 +26,8 @@ function positionMatchesSlot(playerPosition, slot) {
 
 export default function AssignBoard({
   ownerName,
+  rosterOnRight = false,
+  rosterControls = null,
   roster,
   budget,
   nomination,
@@ -57,15 +59,9 @@ export default function AssignBoard({
     <div className="assign-screen">
       {/* ---- Won-player hero banner ---- */}
       <section className="won-banner">
-        <TeamRevealBackdrop team={player.team?.abbreviation} playerId={player.nbaPlayerId} />
         <div className="won-banner-main">
           <div className="won-banner-avatar">
-            <PlayerHeadshot
-              nbaPlayerId={player.nbaPlayerId}
-              photoUrl={player.stats?.photoUrl}
-              alt={player.fullName}
-              className="won-banner-headshot"
-            />
+            <PlayerReveal key={player.nbaPlayerId ?? player.fullName} player={player} className="won-banner-headshot" />
             <span className="won-banner-chip">Won</span>
           </div>
 
@@ -125,11 +121,11 @@ export default function AssignBoard({
 
         <div className="won-banner-prompt">
           <span className="won-banner-prompt-icon" aria-hidden="true">
-            ↓
+            {rosterOnRight ? "→" : "↓"}
           </span>
           {isSolo ? (
             <p>
-              You picked <strong>{player.fullName}</strong>. Pick an open slot below to add them.
+              You picked <strong>{player.fullName}</strong>. {rosterOnRight ? "Choose a slot in your roster on the right, then select it again to confirm." : rosterControls ? "Choose an open slot below, then select it again to confirm." : "Pick an open slot below to add them."}
             </p>
           ) : (
             <p>
@@ -137,7 +133,7 @@ export default function AssignBoard({
               <span className="won-banner-prompt-cost">
                 {cost} {cost === 1 ? "coin" : "coins"}
               </span>
-              . Pick an open slot below to add them.
+              . {rosterOnRight ? "Choose a slot in your roster on the right, then select it again to confirm." : rosterControls ? "Choose an open slot below, then select it again to confirm." : "Pick an open slot below to add them."}
             </p>
           )}
         </div>
@@ -165,7 +161,8 @@ export default function AssignBoard({
       </section>
 
       {/* ---- Roster slot board ---- */}
-      <section className="assign-board">
+      {(!rosterOnRight || pendingAssignment || assignError) && <section className="assign-board">
+        {!rosterOnRight && (rosterControls || <>
         <div className="assign-board-head">
           <div>
             <div className="assign-board-title">
@@ -257,6 +254,7 @@ export default function AssignBoard({
           })}
         </div>
 
+        </>)}
         {pendingAssignment && (
           <div className="budget-warning">
             {pendingAssignment.positionMismatch && (
@@ -281,7 +279,7 @@ export default function AssignBoard({
         )}
 
         {assignError && <p className="error-text">{assignError}</p>}
-      </section>
+      </section>}
     </div>
   );
 }

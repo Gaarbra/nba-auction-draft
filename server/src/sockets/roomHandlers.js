@@ -237,6 +237,7 @@ function toPublicRoom(room) {
       rosters: room.draft.rosters,
       draftedPlayerIds: room.draft.draftedPlayerIds,
       nomination: room.draft.nomination,
+      isRolling: Boolean(room.draft.isRolling),
       soloRerollUsed: room.draft.soloRerollUsed,
     },
   };
@@ -472,9 +473,19 @@ export function registerRoomHandlers(io, socket) {
     // Broadcast to the whole room, including the requester, before doing
     // any of the slow work, so every client's rolling animation starts at
     // the same moment instead of only the nominator seeing it locally.
+    if (room.draft.isRolling) return callback?.({ error: "NOMINATION_IN_PROGRESS" });
+    const rollingDraft = room.draft;
+    rollingDraft.isRolling = true;
     io.to(roomCode).emit("draft:rolling");
 
-    const roll = await rollPlayerForRoom(room);
+    let roll;
+    try {
+      roll = await rollPlayerForRoom(room);
+    } catch {
+      roll = { error: "PLAYER_NOT_FOUND" };
+    } finally {
+      rollingDraft.isRolling = false;
+    }
     if (roll.error) {
       io.to(roomCode).emit("draft:rolling-cancelled");
       return callback?.({ error: roll.error });
@@ -512,9 +523,19 @@ export function registerRoomHandlers(io, socket) {
     if (room.draft.turnOrder.length !== 1) return callback?.({ error: "REROLL_SOLO_ONLY" });
     if (room.draft.soloRerollUsed) return callback?.({ error: "REROLL_ALREADY_USED" });
 
+    if (room.draft.isRolling) return callback?.({ error: "NOMINATION_IN_PROGRESS" });
+    const rollingDraft = room.draft;
+    rollingDraft.isRolling = true;
     io.to(roomCode).emit("draft:rolling");
 
-    const roll = await rollPlayerForRoom(room, [room.draft.nomination.player.id]);
+    let roll;
+    try {
+      roll = await rollPlayerForRoom(room, [room.draft.nomination.player.id]);
+    } catch {
+      roll = { error: "PLAYER_NOT_FOUND" };
+    } finally {
+      rollingDraft.isRolling = false;
+    }
     if (roll.error) {
       io.to(roomCode).emit("draft:rolling-cancelled");
       return callback?.({ error: roll.error });

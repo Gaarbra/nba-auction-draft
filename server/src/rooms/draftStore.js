@@ -270,6 +270,7 @@ export function assignPosition(room, playerId, position) {
 export function swapRosterPositions(room, playerId, slotA, slotB) {
   if (room.status !== "drafting") return { error: "NOT_DRAFTING" };
   if (!room.allowPositionSwaps) return { error: "SWAPS_NOT_ALLOWED" };
+  if (room.draft?.isRolling || !room.draft?.nomination) return { error: "NOMINATION_NOT_READY" };
   if (!POSITIONS.includes(slotA) || !POSITIONS.includes(slotB) || slotA === slotB) {
     return { error: "INVALID_SLOTS" };
   }

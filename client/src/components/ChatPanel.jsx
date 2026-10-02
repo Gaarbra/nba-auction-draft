@@ -13,6 +13,7 @@ export default function ChatPanel({ socket, room, currentPlayerId, messages }) {
   const [collapsed, setCollapsed] = useState(true);
   const [text, setText] = useState("");
   const listRef = useRef(null);
+  const toggleRef = useRef(null);
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -34,15 +35,21 @@ export default function ChatPanel({ socket, room, currentPlayerId, messages }) {
   }
 
   return (
-    <div className={`chat-panel ${collapsed ? "collapsed" : ""}`}>
-      <button type="button" className="chat-panel-header" onClick={() => setCollapsed((c) => !c)}>
-        <span>Chat</span>
+    <div className={`chat-panel ${collapsed ? "collapsed" : ""}`} onKeyDown={(event) => {
+      if (event.key === "Escape" && !collapsed) {
+        setCollapsed(true);
+        toggleRef.current?.focus();
+      }
+    }}>
+      <button ref={toggleRef} type="button" className="chat-panel-header" aria-expanded={!collapsed} aria-controls="draft-chat-messages" onClick={() => setCollapsed((c) => !c)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5Z" /></svg>
+        <span>Chat{collapsed && messages.length > 0 ? ` · ${messages.length}` : ""}</span>
         <span className="chat-panel-toggle">{collapsed ? "▲" : "▼"}</span>
       </button>
 
       {!collapsed && (
         <>
-          <div className="chat-panel-messages" ref={listRef}>
+          <div id="draft-chat-messages" className="chat-panel-messages" ref={listRef} role="log" aria-label="Draft chat">
             {messages.length === 0 && <p className="chat-panel-empty">No messages yet. Say hi.</p>}
             {messages.map((m) => (
               <p key={m.id} className="chat-panel-message">
@@ -79,6 +86,7 @@ export default function ChatPanel({ socket, room, currentPlayerId, messages }) {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Say something…"
+              aria-label="Chat message"
               maxLength={MAX_MESSAGE_LENGTH}
             />
             <button type="submit" className="chat-send-btn" aria-label="Send message">
