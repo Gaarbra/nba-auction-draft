@@ -168,3 +168,15 @@ test("swaps require a settled nomination, including rerolls, and work while assi
   assert.equal(room.draft.rosters.A.SG.nbaPlayerId, 30);
   assert.equal(room.draft.nomination.player, player);
 });
+
+test("solo drafts fill all five positions without spending coins", () => {
+  const room = makeRoom({ turnOrder: ["A"], budgets: { A: 0 } });
+  for (const [i, position] of ["PG", "SG", "SF", "PF", "C"].entries()) {
+    assert.equal(nominatePlayer(room, "A", { id: i + 1, fullName: `Player ${i}` }).error, undefined);
+    assert.equal(room.draft.nomination.phase, "assigning");
+    assert.equal(room.draft.nomination.currentBid, 0);
+    assert.equal(assignPosition(room, "A", position).error, undefined);
+    assert.equal(room.players[0].budget, 0);
+  }
+  assert.equal(room.status, "complete");
+});

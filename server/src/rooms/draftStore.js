@@ -103,11 +103,12 @@ export function nominatePlayer(room, playerId, player) {
 
   if (draft.draftedPlayerIds.includes(player.id)) return { error: "PLAYER_ALREADY_DRAFTED" };
 
-  // A nominator with less than the usual starting bid (down to 0) can still
+  // Solo picks are free. A multiplayer nominator with less than the usual
+  // starting bid (down to 0) can still
   // nominate. They open the bidding at whatever they can afford, and win
   // for that amount via the normal pass-out flow if nobody outbids them.
   // Keeps a broke player's turn from stalling the draft.
-  const bid = Math.min(STARTING_BID, nominator.budget);
+  const bid = draft.turnOrder.length === 1 ? 0 : Math.min(STARTING_BID, nominator.budget);
 
   // Skip straight to "assigning" whenever no one else can even bid (every
   // other roster is full), not just for a literal one-player room.
@@ -160,7 +161,7 @@ export function rerollNomination(room, playerId, newPlayer) {
   if (draft.draftedPlayerIds.includes(newPlayer.id)) return { error: "PLAYER_ALREADY_DRAFTED" };
 
   // Price stays at the nomination's existing currentBid (still the flat
-  // STARTING_BID solo always opens at) -- rerolling changes who you get,
+  // zero-price solo pick) -- rerolling changes who you get,
   // never what they cost.
   draft.nomination.player = newPlayer;
   draft.soloRerollUsed = true;

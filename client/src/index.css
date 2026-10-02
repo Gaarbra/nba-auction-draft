@@ -7762,3 +7762,137 @@ button.topnav-brand-link:focus-visible {
 @media (max-width: 640px) {
   .won-banner { padding: 16px; }
 }
+/* Full-height solo reveal, compact phone play, and a featured market player. */
+.room-drafting .draft-layout.draft-solo { max-width: none; padding-bottom: 0; }
+.draft-solo .won-banner-sub { display: none; }
+.draft-solo .won-banner-prompt p { margin: 0; }
+.draft-solo .roster-card-header .host-badge,
+.draft-solo .roster-card-header .you-badge,
+.draft-solo .roster-card-header .nominating-badge { display: none; }
+@media (min-width: 1100px) {
+  .room-drafting .app-main:has(.draft-solo) { padding: 24px; }
+  .draft-solo { min-height: calc(100dvh - 112px - var(--room-footer-height, 64px)); align-items: stretch; }
+  .draft-solo .draft-board, .draft-solo .assign-screen { display: flex; flex-direction: column; }
+  .draft-solo .assign-screen, .draft-solo .won-banner { flex: 1; }
+  .draft-solo .won-banner { display: flex; flex-direction: column; flex-wrap: nowrap; justify-content: center; align-items: stretch; padding: clamp(24px, 3vw, 48px); gap: 24px; }
+  .draft-solo .won-banner-main { flex: 1; align-items: center; gap: 32px; }
+  .draft-solo .won-banner-avatar { width: clamp(180px, 18vw, 280px); height: clamp(260px, 40dvh, 400px); flex-shrink: 0; }
+  .draft-solo .won-banner-name { font-size: clamp(28px, 3vw, 48px); }
+  .draft-solo .won-banner-prompt { flex-basis: auto; }
+  .draft-solo .won-banner-reroll { margin-top: 0; }
+  .draft-solo .draft-roster { flex-basis: 304px; display: flex; flex-direction: column; }
+  .draft-solo .draft-roster .roster-grid { flex: 1; display: flex; flex-direction: column; }
+  .draft-solo .draft-roster .roster-card { flex: 1; display: flex; flex-direction: column; }
+  .draft-solo .draft-roster .roster-slots { flex: 1; grid-template-rows: repeat(5, minmax(68px, 1fr)); }
+  .draft-solo .draft-roster .roster-slot { min-height: 68px; grid-template-columns: 48px 28px minmax(0, 1fr); }
+  .draft-solo .draft-roster .roster-slot-media { width: 48px; height: 48px; }
+}
+.accolade-dialog-row { color: var(--text); gap: 16px; }
+.accolade-dialog-row > span { min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.accolade-dialog-row > strong { flex: 0 0 36px; text-align: right; }
+.accolade-dialog { max-height: calc(100dvh - 32px); }
+.score-penalty, .results-player-scores .score-penalty, .score-penalty .lbl { color: #ff8585; }
+.score-positive, .score-positive .lbl { color: #66dfa0; }
+.roster-slot.selected, .roster-slot.assignable.selected { border-color: #66dfa0; }
+.info-dialog { border: 0; padding: 0; background: transparent; color: var(--text); width: min(560px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 32px); overflow: auto; }
+.info-dialog::backdrop { background: rgba(0, 0, 0, .72); }
+.info-dialog .footer-modal { width: 100%; max-height: none; margin: 0; }
+.info-dialog .footer-modal-header { position: sticky; top: 0; z-index: 1; background: var(--bg-panel-raised); }
+.info-dialog .footer-modal-body { max-height: none; overflow: visible; }
+.info-dialog h3 { font-size: 16px; margin-top: 24px; }
+.analytics-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.analytics-actions .secondary-btn { flex: 1 1 160px; margin: 0; min-height: 44px; }
+.footer-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 16px; }
+.footer-links .site-footer-link { min-height: 44px; padding: 8px 0; font-size: 12px; }
+.footer-attribution { font: 12px/1.5 var(--font-body); color: var(--text-dim); }
+.footer-attribution a { color: inherit; }
+.room-footer { padding: 8px 24px max(8px, env(safe-area-inset-bottom)); }
+.site-footer { flex-wrap: wrap; }
+.room-drafting .market-workspace { min-width: 0; }
+.market-exchange .market-workspace { display: flex; flex-direction: column; gap: 24px; }
+.market-exchange .market-workspace .market-grid { position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; max-height: none; overflow: visible; gap: 16px; scroll-margin-top: 80px; }
+.market-exchange .market-workspace .market-grid-main,
+.market-exchange .market-workspace .market-grid-side { display: contents; }
+.market-exchange .market-workspace .market-dossier { grid-column: 1 / -1; display: flex; flex-direction: row; align-items: center; padding: 32px; gap: 32px; }
+.market-exchange .market-workspace .market-dossier-photo { width: 220px; height: 280px; flex: 0 0 220px; }
+.market-exchange .market-workspace .market-dossier-info { flex: 1; }
+.market-exchange .market-workspace .market-dossier-name { font: 700 clamp(24px, 3vw, 36px)/1.2 var(--font-body); letter-spacing: -.02em; }
+.market-exchange .market-workspace .stat-highlight-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.market-exchange .market-workspace .market-dossier-archetype-row .stat-radar { width: 100px; height: 100px; }
+.market-exchange .market-workspace .market-dossier-archetype-row { margin: 12px 0; }
+.market-exchange .market-workspace .market-results { width: 100%; }
+.market-exchange .market-workspace .market-results-list { max-height: none; overflow: visible; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.market-exchange .market-workspace .market-result-name,
+.market-exchange .market-workspace .market-card-stat strong { font-family: var(--font-body); font-variant-numeric: tabular-nums; }
+.market-exchange .market-workspace .market-similar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.market-exchange .market-workspace details.market-panel { align-self: start; padding: 12px 16px; }
+.market-exchange .market-workspace details.market-panel > summary { min-height: 44px; align-content: center; cursor: pointer; font: 600 14px/1.4 var(--font-body); }
+@media (max-width: 1000px) {
+  .market-exchange .market-workspace .market-results-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .market-exchange .market-workspace .market-dossier { padding: 20px; gap: 20px; }
+  .market-exchange .market-workspace .market-dossier-photo { width: 140px; height: 180px; flex-basis: 140px; }
+}
+@media (max-width: 640px) {
+  .room-drafting .app-main { padding: 12px 12px 24px; }
+  .draft-layout { padding-bottom: 64px; }
+  .draft-solo .mobile-assign-strip { gap: 12px; }
+  .mobile-assign-strip { gap: 12px; }
+  .mobile-assign-strip p { font-size: 13px; line-height: 1.45; }
+  .mobile-pick-stats .hint-text { margin: 6px 0; font-size: 12px; }
+  .room-drafting .mobile-pick-stats .stat-highlight-row,
+  .room-drafting .active-nomination-cinematic .stat-highlight-row,
+  .room-drafting .won-banner .stat-highlight-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 12px 0; }
+  .room-drafting .stat-highlight-value { font: 650 clamp(18px, 5.5vw, 24px)/1.2 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .room-drafting .stat-highlight-label { font-size: 10px; letter-spacing: .025em; }
+  .room-drafting .stat-highlight { padding: 0 4px; min-width: 0; }
+  .mobile-player-details { margin-top: 4px; }
+  .mobile-player-details > summary { min-height: 44px; align-content: center; font-size: 13px; }
+  .mobile-assign-strip .roster-grid { margin-top: 4px; }
+  .mobile-assign-strip .roster-grid-swap-hint { font-size: 11px; line-height: 1.4; margin: 0 0 8px; }
+  .mobile-assign-strip .roster-card { padding: 10px; }
+  .mobile-assign-strip .roster-card-header { margin-bottom: 8px; }
+  .mobile-assign-strip .won-banner-reroll { margin-top: 4px; padding-top: 12px; gap: 8px; }
+  .mobile-assign-strip .won-banner-reroll .hint-text { font-size: 12px; margin: 0; }
+  .mobile-assign-strip .won-banner-reroll .secondary-btn { margin: 0; padding: 10px 12px; min-height: 44px; }
+  .room-footer { padding: 4px 12px max(4px, env(safe-area-inset-bottom)); justify-content: center; gap: 0; }
+  .room-footer .footer-attribution { display: none; }
+  .footer-links { column-gap: 12px; }
+  .footer-links .site-footer-link { min-height: 36px; font-size: 11px; }
+  .market-exchange .market-workspace .market-grid { grid-template-columns: 1fr; gap: 8px; }
+  .market-exchange .market-workspace .market-dossier { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 16px; padding: 16px; align-items: start; }
+  .market-exchange .market-workspace .market-dossier-photo { width: 88px; height: 112px; }
+  .market-exchange .market-workspace .market-dossier-info { display: contents; }
+  .market-exchange .market-workspace .market-dossier-name { grid-column: 2; grid-row: 1; font-size: 24px; margin: 0; align-self: center; }
+  .market-exchange .market-workspace .market-dossier-info > :not(.market-dossier-name) { grid-column: 1 / -1; }
+  .market-exchange .market-workspace .market-dossier-badges { display: none; }
+  .market-exchange .market-workspace .market-dossier .stat-highlight-row { grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; gap: 4px; }
+  .market-exchange .market-workspace .stat-highlight-value { font: 650 20px/1.2 var(--font-body); }
+  .market-exchange .market-workspace .stat-highlight-label { font-size: 10px; }
+  .market-exchange .market-workspace .market-results-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Final density adjustments after the desktop and phone review. */
+@media (min-width: 1100px) {
+  .room-drafting .draft-solo .draft-board { align-self: stretch; }
+}
+.market-exchange { --font-display: var(--font-body); font-family: var(--font-body); }
+.market-exchange .market-workspace .market-dossier-info > * { margin-top: 0; margin-bottom: 12px; }
+.market-exchange .market-workspace .market-dossier-value-row { padding-top: 12px; margin: 0; }
+.market-exchange .market-workspace .market-dossier-archetype-row { padding-top: 12px; margin: 0 0 12px; align-items: center; gap: 16px; }
+.market-stat-profile > summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 13px; }
+.market-extra { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; width: 100%; }
+.accolade-dialog-row { box-shadow: none; }
+@media (max-width: 640px) {
+  .mobile-pick-stats .stat-highlight-row { width: 100%; max-width: none; }
+  .mobile-assign-strip .roster-grid { margin-top: 12px; }
+  .mobile-pick-stats .accolade-mobile-trigger { margin: 4px 0; }
+  .market-extra { grid-template-columns: 1fr; }
+  .market-exchange .market-workspace .market-dossier-info > * { margin-bottom: 0; }
+  .market-exchange .market-workspace .market-dossier { row-gap: 12px; }
+  .market-exchange .market-workspace .market-dossier-archetype-row { margin: 0; padding-top: 0; border: 0; }
+  .market-exchange .market-workspace .market-dossier-value-row { padding-top: 8px; }
+  .market-exchange .market-workspace .market-dossier-photo-footer { display: none; }
+}
+
+.room-drafting .roster-slot.armed { border-color: #66dfa0; background: #183e2c; }
+.bid-leading { color: #66dfa0; }
+.bid-controls .secondary-btn { color: #ff8585; }

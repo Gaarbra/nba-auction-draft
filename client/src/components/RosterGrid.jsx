@@ -149,7 +149,7 @@ export default function RosterGrid({
         </div>
       )}
       {canSwap && players.some((player) => player.id === currentPlayerId) && (
-        <p className="roster-grid-swap-hint">Drag a player to a position. Drop on another player to swap. Tap a player to see stats.</p>
+        <p className="roster-grid-swap-hint">Tap a player for stats or to change position. Drag to swap.</p>
       )}
       {players.map((player) => {
         const roster = room.draft?.rosters?.[player.id] || {};
@@ -188,7 +188,7 @@ export default function RosterGrid({
                 <KickButton room={room} currentPlayerId={currentPlayerId} socket={socket} targetPlayerId={player.id} />
               )}
             </div>
-            <CoinRow budget={player.budget} />
+            {!hideCost && <CoinRow budget={player.budget} />}
             <div className="roster-slots">
               {POSITIONS.map((pos) => {
                 const occupant = roster[pos];

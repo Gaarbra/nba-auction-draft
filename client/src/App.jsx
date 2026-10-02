@@ -37,7 +37,7 @@ const ERROR_MESSAGES = {
   NAME_TOO_LONG: "That name is too long.",
   NAME_INAPPROPRIATE: "Please choose a different name.",
   ROOM_NOT_FOUND: "No room found with that code.",
-  ROOM_FULL: "That room already has 4 players.",
+  ROOM_FULL: "That room has reached its player limit.",
   NAME_TAKEN: "Someone in that room already has that name.",
   DRAFT_ALREADY_STARTED: "That draft has already started.",
   NOT_HOST: "Only the host can start the draft.",
@@ -374,7 +374,7 @@ export default function App() {
           difficulty={room.difficulty}
           biddingMode={room.biddingMode}
           onClockName={inDraft && onClockPlayer ? (isMyNominationTurn ? "You" : onClockPlayer.name) : null}
-          coins={inDraft ? myBudget : null}
+          coins={inDraft && room.draft?.turnOrder?.length !== 1 ? myBudget : null}
           maxCoins={inDraft ? teamBudget : null}
           onLeaveRoom={handleLeaveRoom}
           onGoHome={handleGoHome}
@@ -398,7 +398,7 @@ export default function App() {
           <p>Verify you’re human to enter Hoop Bids. You’ll continue automatically once the check is complete.</p>
           {needsVerification && <div className="verification-widget" ref={verificationRef} />}
           {connectionError && <><p role="alert">{connectionError}</p><button type="button" className="primary-btn" onClick={retryConnection}>Try again</button></>}
-          <p className="verification-footnote">Protected by Cloudflare Turnstile</p>
+          <p className="verification-footnote">Protected by Cloudflare Turnstile · <a href="https://www.cloudflare.com/turnstile-privacy-policy/" target="_blank" rel="noreferrer">Privacy</a></p>
         </div>
       </section>
       <main className="app-main" inert={!connected && (needsVerification || Boolean(connectionError)) ? "" : undefined}>
@@ -452,7 +452,7 @@ export default function App() {
       </main>
 
       {room ? (
-        inDraft && <RoomFooter totalBudget={teamBudget} />
+        inDraft && <RoomFooter />
       ) : (
         <>
           <Footer />

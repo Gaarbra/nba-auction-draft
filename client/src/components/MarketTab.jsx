@@ -135,7 +135,7 @@ function ValueHistoryChart({ points, color = "var(--accent)" }) {
  * closest honest equivalent this app can back. Backed entirely by
  * GET /api/players/market-index, itself stats-service's own already-cached
  * data -- nothing here does a fresh stats.nba.com lookup. */
-export default function MarketTab({ socket, onNavigateToLobby }) {
+export default function MarketTab({ socket }) {
   const [index, setIndex] = useState([]);
   const [indexLoading, setIndexLoading] = useState(true);
   const [indexError, setIndexError] = useState(false);
@@ -144,7 +144,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
   const [team, setTeam] = useState("");
   const [search, setSearch] = useState("");
   const [positionTag, setPositionTag] = useState(null);
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const [playerId, setPlayerId] = useState(null);
   const [difficulty, setDifficulty] = useState("normal");
 
@@ -285,8 +285,8 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
 
   // Keep the browse filters in place while inspecting a player.
   function jumpToPlayer(id, focusDetails = true) {
-    if (focusDetails && window.matchMedia("(max-width: 1000px)").matches) {
-      requestAnimationFrame(() => document.getElementById("market-player-details")?.scrollIntoView({ behavior: "instant", block: "start" }));
+    if (focusDetails) {
+      requestAnimationFrame(() => document.getElementById("market-player-details")?.focus());
     }
     setPlayerId(String(id));
   }
@@ -299,7 +299,6 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
   const teamColors = selectedMeta ? getTeamColors(selectedMeta.team) : null;
   const salesForPlayer = playerId ? liveSales.filter((s) => String(s.nbaPlayerId) === String(playerId)) : [];
   const highestLiveBid = salesForPlayer.length ? Math.max(...salesForPlayer.map((s) => s.price)) : null;
-  const topSaleOverall = liveSales.length ? Math.max(...liveSales.map((s) => s.price)) : null;
 
   return (
     <div className="market-tab market-exchange">
@@ -308,31 +307,12 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
           <h1>Player market</h1>
           <p>Scout career stats, compare value, and follow completed auctions.</p>
         </div>
-        {onNavigateToLobby && <button type="button" className="secondary-button" onClick={onNavigateToLobby}>Go to lobby</button>}
       </header>
       {/* Real numbers only -- the Stitch mock's own "24H volume"/"Market
           Index"/"Liquidity %" ticker was invented trend data this app has
           no basis for, so this version only ever shows things that are
           either static real facts (catalogue size) or genuinely
           session-derived (the live sales feed this tab has actually seen). */}
-      <div className="market-ticker">
-        <div className="market-ticker-item">
-          <span className="market-ticker-dot" aria-hidden="true" />
-          <span className="market-ticker-label">Catalogue</span>
-          <span className="market-ticker-value">{eraFiltered.length.toLocaleString()} players</span>
-        </div>
-        <div className="market-ticker-sep" aria-hidden="true" />
-        <div className="market-ticker-item">
-          <span className="market-ticker-label">Live sales this session</span>
-          <span className="market-ticker-value">{liveSales.length}</span>
-        </div>
-        <div className="market-ticker-sep" aria-hidden="true" />
-        <div className="market-ticker-item">
-          <span className="market-ticker-label">Top sale this session</span>
-          <span className="market-ticker-value accent">{topSaleOverall != null ? `${topSaleOverall}c` : "N/A"}</span>
-        </div>
-      </div>
-
       {/* Its own row, ahead of the era/franchise filters below -- typing a
           name is a complete way to find a player on its own (isBrowsing
           triggers on search text alone), not one more filter to combine
@@ -397,7 +377,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
         </motion.div>
       )}
 
-      <div className="market-quicktags">
+      {showFilters && <div className="market-quicktags">
         <span className="market-quicktags-label">Quick filters</span>
         {QUICK_TAGS.map((tag) => (
           <button
@@ -410,7 +390,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
             {tag.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {indexError ? (
         <div className="market-catalogue-status" role="alert">
@@ -425,43 +405,9 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
       ) : null}
 
       <div className="market-workspace">
-        <div className="market-results">
-          <span className="market-filter-label">
-            {indexLoading
-              ? "Loading the player pool…"
-              : `${searchResults.length} player${searchResults.length === 1 ? "" : "s"}${
-                  team && !search.trim() ? ` on ${team}` : " match"
-                }`}
-          </span>
-          {!indexLoading && searchResults.length === 0 && (
-            <p className="hint-text">No players match this filter.</p>
-          )}
-          {!indexLoading && shownResults.length > 0 && (
-            <ul className="market-results-list">
-              {shownResults.map((p) => (
-                <li key={p.id}>
-                  <button type="button" className="market-result-row" aria-pressed={String(p.id) === String(playerId)} onClick={() => jumpToPlayer(p.id)}>
-                    <PlayerHeadshot nbaPlayerId={p.id} alt="" className="market-card-headshot" allowRetry={false} />
-                    <span className="market-result-name">{p.fullName}</span>
-                    <span className="market-result-meta">
-                      {p.position || "N/A"}
-                      · {getHistoricalTeamName(p.team) || p.team}
-                    </span>
-                    <span className="market-card-stat"><span>Career PPG</span><strong>{p.pointsPerGame != null ? p.pointsPerGame.toFixed(1) : "—"}</strong></span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {searchResults.length > SEARCH_RESULTS_LIMIT && (
-            <p className="hint-text">
-              Showing {SEARCH_RESULTS_LIMIT} of {searchResults.length}. Narrow your search to see more.
-            </p>
-          )}
-        </div>
 
       {playerId && selectedMeta && (
-        <motion.div key={playerId} id="market-player-details" className="market-grid" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
+        <motion.div key={playerId} id="market-player-details" tabIndex={-1} aria-label="Selected player" className="market-grid" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
           <div className="market-grid-main">
             <div
               className="market-dossier"
@@ -521,7 +467,7 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                 <PlayerAccolades nbaPlayerId={selectedMeta.id} compact />
 
                 <div className="market-dossier-archetype-row">
-                  {stats && !stats.unavailable && !statsLoading && <StatRadarChart stats={stats} color={teamColors?.primary} />}
+                  {stats && !stats.unavailable && !statsLoading && <details className="market-stat-profile"><summary>Stats profile</summary><StatRadarChart stats={stats} color={teamColors?.primary} /></details>}
                   <div className="market-dossier-difficulty">
                     <span className="market-filter-label">Suggested value under</span>
                     <div className="difficulty-picker market-difficulty-picker">
@@ -558,15 +504,50 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                       </span>
                     )}
                   </div>
-                  {onNavigateToLobby && (
-                    <button type="button" className="market-cta" onClick={onNavigateToLobby}>
-                      Start a draft to bid
-                    </button>
-                  )}
+
                 </div>
               </div>
             </div>
 
+          </div>
+        </motion.div>
+      )}
+        <div className="market-results">
+          <span className="market-filter-label">
+            {indexLoading
+              ? "Loading the player pool…"
+              : `${searchResults.length} player${searchResults.length === 1 ? "" : "s"}${
+                  team && !search.trim() ? ` on ${team}` : " match"
+                }`}
+          </span>
+          {!indexLoading && searchResults.length === 0 && (
+            <p className="hint-text">No players match this filter.</p>
+          )}
+          {!indexLoading && shownResults.length > 0 && (
+            <ul className="market-results-list">
+              {shownResults.map((p) => (
+                <li key={p.id}>
+                  <button type="button" className="market-result-row" aria-pressed={String(p.id) === String(playerId)} onClick={() => jumpToPlayer(p.id)}>
+                    <PlayerHeadshot nbaPlayerId={p.id} alt="" className="market-card-headshot" allowRetry={false} />
+                    <span className="market-result-name">{p.fullName}</span>
+                    <span className="market-result-meta">
+                      {p.position || "N/A"}
+                      · {getHistoricalTeamName(p.team) || p.team}
+                    </span>
+                    <span className="market-card-stat"><span>Career PPG</span><strong>{p.pointsPerGame != null ? p.pointsPerGame.toFixed(1) : "—"}</strong></span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {searchResults.length > SEARCH_RESULTS_LIMIT && (
+            <p className="hint-text">
+              Showing {SEARCH_RESULTS_LIMIT} of {searchResults.length}. Narrow your search to see more.
+            </p>
+          )}
+        </div>
+
+        {playerId && selectedMeta && <div className="market-extra">
             <details className="market-panel market-history-panel">
               <summary>Suggested value history</summary>
               <div className="market-panel-header">
@@ -577,16 +558,11 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
               <ValueHistoryChart key={playerId} points={valueHistory} color={teamColors?.primary} />
             </details>
 
-            <div className="market-panel">
-              <div className="market-panel-header">
-                <h3 className="market-panel-title">Compare similar players</h3>
-              </div>
+            <details className="market-panel"><summary>Compare similar players</summary>
               <SimilarPlayersGrid playerId={playerId} index={index} onJump={jumpToPlayer} />
-            </div>
-          </div>
+            </details>
 
-          <div className="market-grid-side">
-            <div className="market-panel market-livebids-panel">
+            <details className="market-panel market-livebids-panel"><summary>Completed auctions</summary>
               <div className="market-panel-header">
                 <h4 className="market-panel-title">Completed auctions</h4>
                 <span className="market-live-chip">
@@ -617,10 +593,8 @@ export default function MarketTab({ socket, onNavigateToLobby }) {
                   Highest real sale this session: <strong>{highestLiveBid}c</strong>
                 </p>
               )}
-            </div>
-          </div>
-        </motion.div>
-      )}
+            </details>
+        </div>}
       </div>
     </div>
   );

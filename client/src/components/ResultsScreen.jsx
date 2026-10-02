@@ -78,7 +78,7 @@ function TeamCard({ team, index, isYou }) {
         <span className="results-score-block">
           <span className="results-final-score">{formatScore(team.finalScore)}</span>
           {open && (
-            <span className="results-score-meta">
+            <span className={`results-score-meta ${team.synergyMultiplier < 1 ? "score-penalty" : team.synergyMultiplier > 1 ? "score-positive" : ""}`}>
               Sum USG%: {formatPct(team.sumUsagePct)} · Synergy ×{team.synergyMultiplier.toFixed(2)}
             </span>
           )}
@@ -125,8 +125,8 @@ function TeamCard({ team, index, isYou }) {
                       here, same reasoning as the usagePctEstimated flag
                       above. */}
                   {p.penalty > 0 && (
-                    <span title={`Played out of position (${p.realPosition || "unlisted"} at ${p.slot})`}>
-                      <span className="lbl">Pen</span>-{formatScore(p.penalty)}
+                    <span className="score-penalty" title={`Played out of position (${p.realPosition || "unlisted"} at ${p.slot})`}>
+                      <span className="lbl">Penalty</span>-{formatScore(p.penalty)}
                     </span>
                   )}
                 </div>

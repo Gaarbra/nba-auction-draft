@@ -321,7 +321,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   const rerollAvailable = isSolo && !draft?.soloRerollUsed;
 
   return (
-    <div className={`draft-layout${isRolling ? " is-rolling" : ""}`}>
+    <div className={`draft-layout${isSolo ? " draft-solo" : ""}${isRolling ? " is-rolling" : ""}`}>
       <div className="draft-board">
       {(room.draftEra && room.draftEra !== "all") || room.biddingMode === "orderly" ? (
         <div className="draft-meta">
@@ -392,12 +392,12 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               ? <>
                   <p className="hint-text">
                     {nomination.player.stats.season ? `${nomination.player.stats.season} regular season` : `Career averages · ${nomination.player.stats.firstSeason}–${nomination.player.stats.lastSeason}`}
-                    {` · ${nomination.player.stats.gamesPlayed} games`}
+
                   </p>
                   <StatHighlightRow stats={nomination.player.stats} />
-                  {room.gameMode !== "active-now" && <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} showHeading />}
+                  {room.gameMode !== "active-now" && <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} />}
                   <details className="mobile-player-details">
-                    <summary>Player profile &amp; stats chart</summary>
+                    <summary>Stats profile</summary>
                     {nomination.player.teamHistory?.length > 0 && <p className="hint-text">Career teams: {nomination.player.teamHistory.map((team) => getHistoricalTeamName(team.abbreviation) || team.abbreviation).join(", ")}</p>}
                     {nomination.player.stats.country && <p className="hint-text">Country: {nomination.player.stats.country}</p>}
                     <StatRadarChart stats={nomination.player.stats} color={getTeamColors(nomination.player.team?.abbreviation).primary} />
@@ -448,7 +448,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
             <div className="won-banner-reroll">
               {rerollAvailable ? (
                 <>
-                  <p className="hint-text">Not feeling this one? You've got one reroll for the whole draft.</p>
+                  <p className="hint-text">One reroll per draft.</p>
                   <button type="button" onClick={handleReroll} className="secondary-btn">
                     Reroll {nomination.player.fullName}
                   </button>
@@ -640,7 +640,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
               ) : (
                 <>
                   {currentPlayerId === nomination.currentBidder && (
-                    <p className="hint-text">You're the high bidder!</p>
+                    <p className="hint-text bid-leading">You're the high bidder!</p>
                   )}
 
                   {currentPlayerId !== nomination.currentBidder && nomination.passed.includes(currentPlayerId) && (
@@ -783,7 +783,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
           />
         </aside>
       )}
-      <ChatPanel socket={socket} room={room} currentPlayerId={currentPlayerId} messages={chatMessages} />
+      {!isSolo && <ChatPanel socket={socket} room={room} currentPlayerId={currentPlayerId} messages={chatMessages} />}
     </div>
   );
 }

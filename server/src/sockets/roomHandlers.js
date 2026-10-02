@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   createRoom,
+  setRoomPlayerLimit,
   addPlayerToRoom,
   addLocalPlayersToRoom,
   startDraft,
@@ -208,6 +209,7 @@ function toPublicRoom(room) {
     visibility: room.visibility || "private",
     isLocal: room.isLocal || false,
     isSolo: room.isSolo || false,
+    maxPlayers: room.maxPlayers ?? 4,
     allowPositionSwaps: room.allowPositionSwaps || false,
     resultsStatus: room.resultsStatus || null,
     results: room.results || null,
@@ -314,6 +316,14 @@ export function registerRoomHandlers(io, socket) {
   // browse open rooms it can join without needing a code. A snapshot on
   // request, not a live subscription: simpler, and good enough for a list
   // that's just there to help someone find a room to join.
+  socket.on("room:set-player-limit", ({ maxPlayers } = {}, callback) => {
+    if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
+    const result = setRoomPlayerLimit(socket.data.roomCode, socket.data.playerId, maxPlayers);
+    if (result.error) return callback?.({ error: result.error });
+    callback?.({ room: toPublicRoom(result.room) });
+    io.to(result.room.code).emit("room:update", toPublicRoom(result.room));
+  });
+
   socket.on("rooms:list-public", (payload, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
     callback?.({ rooms: listPublicRooms() });
@@ -616,7 +626,7 @@ export function registerRoomHandlers(io, socket) {
     callback?.({ room: toPublicRoom(result.room) });
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
     // Public competitive sales only; never expose private invite codes or local/solo prices.
-    if (result.sale && room.visibility === "public" && !room.isLocal && !room.isSolo) {
+    if (result.sale && room.visibility === "public" && !room.isLocal && room.draft.turnOrder.length > 1) {
       io.emit("market:sale", { ...result.sale, gameMode: result.room.gameMode || "classic", statsSeason: result.room.activeNowSnapshot?.season || null, at: Date.now() });
     }
     maybeComputeResults(io, result.room, roomCode);

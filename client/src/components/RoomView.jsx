@@ -5,7 +5,6 @@ import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
 import VoteKickBanner, { KickButton } from "./VoteKick.jsx";
 import Dropdown from "./Dropdown.jsx";
 
-const MAX_PLAYERS = 4;
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
 
 const DIFFICULTIES = [
@@ -20,7 +19,7 @@ const BIDDING_MODES = [
   { id: "orderly", label: "Orderly", hint: "One at a time, in turn order, wait your turn to raise or pass" },
 ];
 
-function getHintText(playerCount, isHost, isLocal) {
+function getHintText(playerCount, isHost, isLocal, maxPlayers) {
   if (isLocal) {
     return isHost ? "Everyone's added. Start whenever you're ready." : "Waiting for the host to start.";
   }
@@ -29,17 +28,19 @@ function getHintText(playerCount, isHost, isLocal) {
       ? "Playing solo. Start whenever you're ready. You'll draft a full roster and get a score at the end."
       : "Waiting for the host to start.";
   }
-  if (playerCount === MAX_PLAYERS) {
+  if (playerCount === maxPlayers) {
     return isHost ? "Room is full. Ready to start!" : "Room is full. Waiting for the host to start.";
   }
   return isHost
-    ? `You can start now with ${playerCount} players, or wait for up to ${MAX_PLAYERS}.`
+    ? `You can start now with ${playerCount} players, or wait for up to ${maxPlayers}.`
     : "Waiting for the host to start (or for more players to join).";
 }
 
 export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, onStartDraft }) {
   const [gameMode, setGameMode] = useState("classic");
-  const emptySlots = MAX_PLAYERS - room.players.length;
+  const maxPlayers = room.maxPlayers ?? 4;
+  const [limitError, setLimitError] = useState("");
+  const emptySlots = maxPlayers - room.players.length;
   const currentPlayer = room.players.find((p) => p.id === currentPlayerId);
   const isHost = Boolean(currentPlayer?.isHost);
 
@@ -101,7 +102,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
       {!room.isLocal && !room.isSolo && <VoteKickBanner room={room} currentPlayerId={currentPlayerId} socket={socket} />}
 
       <h3>
-        Players ({room.players.length}/{MAX_PLAYERS})
+        Players ({room.players.length}/{maxPlayers})
       </h3>
       <ul className="player-list">
         {room.players.map((p) => (
@@ -113,7 +114,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
               <PlayerStatusBadge player={p} reconnectGraceMs={room.reconnectGraceMs} />
             </span>
             <span className="player-list-right">
-              <CoinRow budget={p.budget} />
+              {!room.isSolo && <CoinRow budget={p.budget} />}
               <KickButton room={room} currentPlayerId={currentPlayerId} socket={socket} targetPlayerId={p.id} />
             </span>
           </li>
@@ -127,10 +128,22 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
           ))}
       </ul>
 
-      <p className="hint-text">{getHintText(room.players.length, isHost, room.isLocal)}</p>
+      <p className="hint-text">{getHintText(room.players.length, isHost, room.isLocal, maxPlayers)}</p>
 
       {isHost && (
         <>
+          {!room.isSolo && !room.isLocal && <label className="era-picker-label">
+            Player limit
+            <select aria-label="Player limit" value={maxPlayers} onChange={(event) => {
+              setLimitError("");
+              socket.emit("room:set-player-limit", { maxPlayers: Number(event.target.value) }, (response) => {
+                if (response?.error) setLimitError(response.error === "PLAYER_LIMIT_TOO_SMALL" ? "The limit cannot be smaller than the number of players already here." : "Could not change the player limit. Try again.");
+              });
+            }}>
+              {[2, 3, 4].map((count) => <option key={count} value={count} disabled={count < room.players.length}>{count} players</option>)}
+            </select>
+          </label>}
+          {limitError && <p className="error-text" role="alert">{limitError}</p>}
           <div className="era-picker-label">
             Game mode
             <Dropdown value={gameMode} onChange={setGameMode} options={[{ value: "classic", label: "Classic · career stats" }, { value: "active-now", label: "Active Now · season stats" }]} />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
@@ -10,6 +10,7 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
  * has to turn a tier string into a color). Best-effort like PlayerInsights:
  * an empty or failed lookup just renders nothing, not an error state. */
 export default function PlayerAccolades({ nbaPlayerId, showHeading = false, compact = false }) {
+  const titleId = useId();
   const reduceMotion = useReducedMotion();
   const [awards, setAwards] = useState([]);
   const dialogRef = useRef(null);
@@ -67,14 +68,14 @@ export default function PlayerAccolades({ nbaPlayerId, showHeading = false, comp
       <dialog
         ref={dialogRef}
         className="accolade-dialog"
-        aria-labelledby="accolade-dialog-title"
+        aria-labelledby={titleId}
         onClick={(event) => {
           if (event.target === event.currentTarget) event.currentTarget.close();
         }}
       >
         <div className="accolade-dialog-panel">
           <div className="accolade-dialog-header">
-            <h2 id="accolade-dialog-title">Career awards</h2>
+            <h2 id={titleId}>Career awards</h2>
             <button type="button" className="accolade-dialog-close" onClick={() => dialogRef.current?.close()} aria-label="Close awards">
               Close
             </button>

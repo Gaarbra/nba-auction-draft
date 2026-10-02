@@ -53,8 +53,8 @@ export async function initSchema() {
  * that already finished successfully for the players in it.
  */
 export async function saveDraftResults(room, results) {
-  // Career-trained price analytics must never ingest season-only auctions.
-  if (room.gameMode === "active-now") return;
+  // Career-trained auction pricing excludes season-only games and free solo picks.
+  if (room.gameMode === "active-now" || room.draft?.turnOrder?.length === 1) return;
   if (!pool) return;
 
   const client = await pool.connect().catch((err) => {

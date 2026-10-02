@@ -169,10 +169,9 @@ export function createRoom(visibility = "private", isSolo = false) {
     // "private": needs the room code to join (today's long-standing default).
     // "public": also listable via listPublicRooms(), joinable without a code.
     visibility: visibility === "public" ? "public" : "private",
-    // Purely a display flag for RoomView (hides invite/waiting-for-others
-    // chrome and the bidding-mode/swap settings that don't apply to solo),
-    // same role as isLocal below -- doesn't change what the server allows.
+    // Solo rooms have one seat and omit multiplayer controls.
     isSolo: Boolean(isSolo),
+    maxPlayers: isSolo ? 1 : MAX_PLAYERS,
     // playerId -> setTimeout handle, for pending disconnect-grace forfeits.
     pendingForfeits: new Map(),
   };
@@ -192,14 +191,14 @@ export function listPublicRooms() {
     if (room.visibility !== "public") continue;
     if (room.status !== "waiting") continue;
     if (room.isLocal) continue;
-    if (room.players.length >= MAX_PLAYERS) continue;
+    if (room.players.length >= (room.maxPlayers ?? MAX_PLAYERS)) continue;
 
     const host = room.players.find((p) => p.isHost);
     list.push({
       code: room.code,
       hostName: host?.name || "Someone",
       playerCount: room.players.length,
-      maxPlayers: MAX_PLAYERS,
+      maxPlayers: room.maxPlayers ?? MAX_PLAYERS,
       createdAt: room.createdAt,
     });
   }
@@ -213,6 +212,17 @@ function normalizeName(name) {
   return (name || "").trim().slice(0, 30);
 }
 
+export function setRoomPlayerLimit(code, playerId, maxPlayers) {
+  const room = getRoom(code);
+  if (!room) return { error: "ROOM_NOT_FOUND" };
+  if (!room.players.some((p) => p.id === playerId && p.isHost)) return { error: "NOT_HOST" };
+  if (room.status !== "waiting" || room.isSolo || room.isLocal) return { error: "ROOM_SETTINGS_LOCKED" };
+  if (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > MAX_PLAYERS) return { error: "INVALID_PLAYER_LIMIT" };
+  if (maxPlayers < room.players.length) return { error: "PLAYER_LIMIT_TOO_SMALL" };
+  room.maxPlayers = maxPlayers;
+  return { room };
+}
+
 export function addPlayerToRoom(code, { name, socketId }) {
   const room = getRoom(code);
   if (!room) {
@@ -221,7 +231,7 @@ export function addPlayerToRoom(code, { name, socketId }) {
   if (room.status !== "waiting") {
     return { error: "DRAFT_ALREADY_STARTED" };
   }
-  if (room.players.length >= MAX_PLAYERS) {
+  if (room.players.length >= (room.maxPlayers ?? MAX_PLAYERS)) {
     return { error: "ROOM_FULL" };
   }
 
