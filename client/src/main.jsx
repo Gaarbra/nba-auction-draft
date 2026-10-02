@@ -4,8 +4,10 @@ import App from "./App.jsx";
 import AnalyticsConsent from "./components/AnalyticsConsent.jsx";
 import { initAnalytics } from "./analytics.js";
 import "./index.css";
+import { setupWebApp } from "./webApp.js";
 
 initAnalytics();
+setupWebApp();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

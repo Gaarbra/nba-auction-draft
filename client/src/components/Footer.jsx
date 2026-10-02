@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import InstallApp from "./InstallApp.jsx";
 import InfoModal from "./InfoModal.jsx";
 import { PAGES } from "../siteContent.jsx";
 
@@ -18,6 +19,7 @@ export default function Footer({ inRoom = false }) {
     <footer ref={footerRef} className={inRoom ? "room-footer" : "site-footer"}>
       <span className="footer-attribution">Fan-made · Data: <a href="https://www.nba.com/" target="_blank" rel="noreferrer">NBA.com</a></span>
       <nav aria-label="Help and legal" className="footer-links">
+        <InstallApp />
         {Object.entries(PAGES).map(([key, page]) => <button key={key} type="button" className="site-footer-link" onClick={() => setOpenPage(key)}>{page.title}</button>)}
         <button type="button" className="site-footer-link" onClick={() => window.dispatchEvent(new Event("analytics:preferences"))}>Analytics choices</button>
       </nav>

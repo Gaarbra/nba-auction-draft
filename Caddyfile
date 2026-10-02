@@ -10,6 +10,8 @@ www.{$DOMAIN} {
     Referrer-Policy strict-origin-when-cross-origin
     Strict-Transport-Security "max-age=31536000"
   }
+  @appMetadata path /hoopbids/sw.js /hoopbids/manifest.webmanifest
+  header @appMetadata Cache-Control "no-cache"
   @backend path /api/* /socket.io/* /health
   handle @backend {
     reverse_proxy server:4000

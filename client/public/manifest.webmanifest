@@ -1,0 +1,17 @@
+{
+  "id": "/hoopbids/",
+  "name": "Hoop Bids",
+  "short_name": "Hoop Bids",
+  "description": "Draft your starting five. Play solo or bid with friends.",
+  "start_url": "/hoopbids/",
+  "scope": "/hoopbids/",
+  "display": "standalone",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "lang": "en",
+  "icons": [
+    { "src": "icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
