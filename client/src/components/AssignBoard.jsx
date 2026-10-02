@@ -62,7 +62,7 @@ export default function AssignBoard({
         <div className="won-banner-main">
           <div className="won-banner-avatar">
             <PlayerReveal key={player.nbaPlayerId ?? player.fullName} player={player} className="won-banner-headshot" />
-            <span className="won-banner-chip">Won</span>
+            <span className="won-banner-chip">{isSolo ? "Picked" : "Won"}</span>
           </div>
 
           <div className="won-banner-bio">
@@ -92,30 +92,13 @@ export default function AssignBoard({
                   {stats.season ? `${stats.season} regular season` : `Career avg · ${seasonRange}`}
                 </p>
                 <StatHighlightRow stats={stats} />
+                {!stats.season && <PlayerAccolades nbaPlayerId={player.nbaPlayerId} compact />}
+                <details className="player-chart-details">
+                  <summary>Stats profile</summary>
+                  <StatRadarChart stats={stats} color={teamColor} />
+                </details>
               </>
             )}
-          </div>
-        </div>
-
-        <div className="won-banner-aside">
-          {/* Solo prices every pick the same flat 1 coin -- a "winning bid"
-              readout that never changes isn't telling you anything, so it's
-              dropped here rather than repeated on every single nomination. */}
-          {!isSolo && (
-            <div className="won-banner-bid">
-              <span className="won-banner-bid-label">Winning bid</span>
-              <div className="won-banner-bid-value">
-                <span className="won-banner-bid-num">{cost}</span>
-                <span className="won-banner-bid-unit">
-                  <span className="won-banner-bid-coin">{cost === 1 ? "Coin" : "Coins"}</span>
-                  <span className="won-banner-bid-tier">Standard pick</span>
-                </span>
-              </div>
-            </div>
-          )}
-          {hasStats && <StatRadarChart stats={stats} color={teamColor} />}
-          <div className="won-banner-honors">
-            {!stats?.season && <PlayerAccolades nbaPlayerId={player.nbaPlayerId} showHeading compact />}
           </div>
         </div>
 
@@ -147,7 +130,7 @@ export default function AssignBoard({
           <div className="won-banner-reroll">
             {rerollAvailable ? (
               <>
-                <p className="hint-text">Not feeling this one? You've got one reroll for the whole draft.</p>
+                <p className="hint-text">One reroll available for this draft.</p>
                 <button type="button" onClick={onReroll} className="secondary-btn">
                   Reroll {player.fullName}
                 </button>

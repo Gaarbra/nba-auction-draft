@@ -611,10 +611,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                         </p>
                       </div>
                       {nomination.player.stats && !nomination.player.stats.unavailable && (
+                        <details className="player-chart-details">
+                          <summary>Stats profile</summary>
                         <StatRadarChart
                           stats={nomination.player.stats}
                           color={getTeamColors(nomination.player.team?.abbreviation).primary}
                         />
+                        </details>
                       )}
                     </motion.div>
                   </div>
