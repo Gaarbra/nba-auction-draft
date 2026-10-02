@@ -71,7 +71,7 @@ export default function StatHighlightRow({ stats }) {
         </div>
       ))}
     </div>
-    {stats.savedAt && <p className="stats-snapshot-note">Saved career stats · {new Date(stats.savedAt * 1000).toLocaleDateString()}</p>}
+    {stats.savedAt && <p className="stats-snapshot-note">{stats.season ? `${stats.season} regular season` : "Saved career stats"} · {new Date(stats.savedAt * 1000).toLocaleDateString()}</p>}
     </>
   );
 }

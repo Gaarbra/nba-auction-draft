@@ -19,6 +19,7 @@ export default function PlayerInsights({
   onPredictedPrice,
   onSimilarPlayerClick,
   showSimilar = true,
+  seasonPlayer = null,
 }) {
   const [predictedPrice, setPredictedPrice] = useState(null);
   const [explanation, setExplanation] = useState([]);
@@ -28,6 +29,7 @@ export default function PlayerInsights({
     setPredictedPrice(null);
     setExplanation([]);
     setSimilar([]);
+    if (seasonPlayer) return undefined;
     if (!nbaPlayerId) return undefined;
 
     let cancelled = false;
@@ -65,8 +67,12 @@ export default function PlayerInsights({
     return () => {
       cancelled = true;
     };
-  }, [nbaPlayerId, era, difficulty, showSimilar]);
+  }, [nbaPlayerId, era, difficulty, showSimilar, seasonPlayer]);
 
+  if (seasonPlayer) return <div className="player-insights">
+    <p className="predicted-price"><span className="predicted-price-label">{seasonPlayer.stats.season} suggested value</span><span className="predicted-price-value">~{seasonPlayer.suggestedPrice.toFixed(1)} coins</span></p>
+    <p className="hint-text">Based only on this season’s stats and scoring. You set the bid.</p>
+  </div>;
   if (predictedPrice === null && similar.length === 0) return null;
 
   return (

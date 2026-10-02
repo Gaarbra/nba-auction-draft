@@ -269,7 +269,7 @@ export function addLocalPlayersToRoom(names, socketId) {
   return { room, players };
 }
 
-export function startDraft(code, playerId, era, allowPositionSwaps, difficulty, biddingMode) {
+export function startDraft(code, playerId, era, allowPositionSwaps, difficulty, biddingMode, gameMode = "classic", activeNowSnapshot = null) {
   const room = getRoom(code);
   if (!room) {
     return { error: "ROOM_NOT_FOUND" };
@@ -301,6 +301,12 @@ export function startDraft(code, playerId, era, allowPositionSwaps, difficulty, 
     return { error: "INVALID_BIDDING_MODE" };
   }
 
+  if (!["classic", "active-now"].includes(gameMode)) return { error: "INVALID_GAME_MODE" };
+  if (gameMode === "active-now" && (!activeNowSnapshot || activeNowSnapshot.players.length < room.players.length * 5 + 1)) {
+    return { error: "ACTIVE_NOW_UNAVAILABLE" };
+  }
+  room.gameMode = gameMode;
+  room.activeNowSnapshot = gameMode === "active-now" ? structuredClone(activeNowSnapshot) : null;
   room.status = "drafting";
   room.draftEra = draftEra;
   room.difficulty = draftDifficulty;

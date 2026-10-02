@@ -38,6 +38,7 @@ function getHintText(playerCount, isHost, isLocal) {
 }
 
 export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, onStartDraft }) {
+  const [gameMode, setGameMode] = useState("classic");
   const emptySlots = MAX_PLAYERS - room.players.length;
   const currentPlayer = room.players.find((p) => p.id === currentPlayerId);
   const isHost = Boolean(currentPlayer?.isHost);
@@ -131,6 +132,11 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
       {isHost && (
         <>
           <div className="era-picker-label">
+            Game mode
+            <Dropdown value={gameMode} onChange={setGameMode} options={[{ value: "classic", label: "Classic · career stats" }, { value: "active-now", label: "Active Now · season stats" }]} />
+          </div>
+          {gameMode === "active-now" && <p className="hint-text">Active players. One regular season only. Ratings, suggested bids and final scores use the current season; before it starts, they use last season. Updated every Saturday.</p>}
+          <div className="era-picker-label" hidden={gameMode === "active-now"}>
             Player pool for this draft
             <Dropdown
               className="era-picker"
@@ -152,7 +158,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
                   type="button"
                   className={`difficulty-option ${difficulty === d.id ? "active" : ""}`}
                   onClick={() => setDifficulty(d.id)}
-                  title={d.hint}
+                  title={gameMode === "active-now" ? "Strength is based only on the selected season" : d.hint}
                 >
                   {d.label}
                 </button>
@@ -192,7 +198,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
           )}
           <motion.button
             type="button"
-            onClick={() => onStartDraft(era, allowPositionSwaps, difficulty, biddingMode)}
+            onClick={() => onStartDraft(gameMode === "active-now" ? "all" : era, allowPositionSwaps, difficulty, biddingMode, gameMode)}
             className="primary-btn start-btn"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}

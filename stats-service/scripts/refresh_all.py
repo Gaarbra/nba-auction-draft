@@ -13,10 +13,10 @@ DAY = 86400
 
 
 def due_players(pool, cache, now, active_days=7):
-    # Retired careers are stable: refresh only missing data, not 5,000 careers weekly.
-    due = [p for p in pool if p["id"] not in cache or
-           (p["isActive"] and now - cache[p["id"]].get("fetchedAt", 0) >= active_days * DAY)]
-    return sorted(due, key=lambda p: (not p["isActive"], cache.get(p["id"], {}).get("fetchedAt", 0), p["id"]))
+    # Weekly refreshes never fetch retired players, even when their cache is missing.
+    due = [p for p in pool if p["isActive"] and (p["id"] not in cache or
+           now - cache[p["id"]].get("fetchedAt", 0) >= active_days * DAY)]
+    return sorted(due, key=lambda p: (cache.get(p["id"], {}).get("fetchedAt", 0), p["id"]))
 
 
 def refresh_batch(candidates, fetch, publish, budget, clock=time.monotonic, sleep=time.sleep):
@@ -77,8 +77,9 @@ def main():
             if os.environ.get("REFRESH_SERVER_CATALOGUES", "1") == "1":
                 service._atomic_write_json(str(ROOT / "server" / "data" / name), value)
 
+        active_days = max(0, int(os.environ.get("REFRESH_ACTIVE_DAYS", "7")))
         started = time.time()
-        status = {"startedAt": started, "state": "running"}
+        status = {"startedAt": started, "state": "running", "activePlayersOnly": True}
         def interrupted(signum, frame):
             raise RuntimeError("Refresh interrupted; checkpointing")
         signal.signal(signal.SIGTERM, interrupted)
@@ -88,6 +89,8 @@ def main():
             if not pool:
                 raise ValueError("Empty player catalogue; preserving saved data")
             catalogue("players.json", {"players": pool, "fetchedAt": time.time() * 1000})
+            from active_now import refresh as refresh_active_now
+            refresh_active_now(service, pool)
             time.sleep(2)
             notable = service.fetch_notable_player_ids()
             if not notable:
@@ -97,21 +100,25 @@ def main():
             team, ids = service.fetch_top_team_player_ids()
             if team and ids:
                 catalogue("topTeamPlayers.json", {"ids": sorted(ids), "teamAbbreviation": team, "fetchedAt": time.time() * 1000})
+            stats_candidates = due_players(pool, service._cache, time.time(), active_days)
             failed = refresh_batch(
-                due_players(pool, service._cache, time.time()),
+                stats_candidates,
                 service._fetch_and_cache_stats, publish,
                 max(1, int(os.environ.get("REFRESH_MAX_RUNTIME_SECONDS", "1200"))),
             )
             award_pool = [p for p in pool if service._cache.get(p["id"], {}).get("stats")]
+            award_candidates = due_players(award_pool, service._awards_cache, time.time(), active_days)
             failed += refresh_batch(
-                due_players(award_pool, service._awards_cache, time.time(), active_days=30),
+                award_candidates,
                 service._fetch_and_cache_awards, publish,
                 max(1, int(os.environ.get("REFRESH_AWARDS_MAX_RUNTIME_SECONDS", "600"))),
             )
-            # Existing endpoint fetches the entire league per season. Warm each
-            # season once; historical seasons with saved data need no weekly work.
+            # Usage is a league-wide endpoint. Refresh only the latest active
+            # season; never request historical seasons as part of this job.
             seasons = {}
             for player in pool:
+                if not player["isActive"]:
+                    continue
                 stats = service._cache.get(player["id"], {}).get("stats") or {}
                 season = stats.get("lastSeason")
                 if season and season >= service.EARLIEST_USG_SEASON:
@@ -119,6 +126,8 @@ def main():
             current = max(seasons, default="")
             pending_usage = []
             for season, pid in sorted(seasons.items(), reverse=True):
+                if season != current:
+                    continue
                 entries = [v for (_, s), v in service._usage_cache.items() if s == season]
                 if entries and (season != current or time.time() - max(v["fetchedAt"] for v in entries) < 7 * DAY):
                     continue
@@ -133,8 +142,8 @@ def main():
                 status["pendingUsageSeasons"] -= 1
                 time.sleep(2)
             status["state"] = "partial" if failed else "complete"
-            status["pendingStats"] = len(due_players(pool, service._cache, time.time()))
-            status["pendingAwards"] = len(due_players(award_pool, service._awards_cache, time.time(), 30))
+            status["pendingStats"] = sum(service._cache.get(p["id"], {}).get("fetchedAt", 0) < started for p in stats_candidates)
+            status["pendingAwards"] = sum(service._awards_cache.get(p["id"], {}).get("fetchedAt", 0) < started for p in award_candidates)
             if status["pendingStats"] or status["pendingAwards"] or status["pendingUsageSeasons"]:
                 status["state"] = "partial"
             return 1 if failed else 0

@@ -284,11 +284,11 @@ export default function App() {
     setLocalPlayerIds(null);
   }
 
-  function handleStartDraft(era, allowPositionSwaps, difficulty, biddingMode) {
-    const payload = { era, allowPositionSwaps, difficulty, biddingMode, playerId: currentPlayerId };
+  function handleStartDraft(era, allowPositionSwaps, difficulty, biddingMode, gameMode) {
+    const payload = { era, allowPositionSwaps, difficulty, biddingMode, gameMode, playerId: currentPlayerId };
     socketRef.current.emit("room:start", payload, (response) => {
       if (response.error) {
-        setError(ERROR_MESSAGES[response.error] || "Could not start draft.");
+        setError(response.error === "ACTIVE_NOW_UNAVAILABLE" ? "Active Now season data is not ready. Refresh the season snapshot on the server, then try again." : ERROR_MESSAGES[response.error] || "Could not start draft.");
       }
     });
   }
@@ -389,17 +389,27 @@ export default function App() {
         />
       )}
 
-      <main className="app-main">
-        <div className="connection-verification" hidden={connected || (!needsVerification && !connectionError)}>
-          {needsVerification && <><p>Verify you're human to join a draft.</p><div ref={verificationRef} /></>}
-          {connectionError && <><p role="alert">{connectionError}</p><button type="button" className="secondary-button" onClick={retryConnection}>Retry connection</button></>}
+      <section className="verification-page" hidden={connected || (!needsVerification && !connectionError)} aria-labelledby="verification-title">
+        <div className="verification-card">
+          <span className="verification-wordmark">HOOP BIDS</span>
+          <div className="verification-symbol" aria-hidden="true">✓</div>
+          <p className="eyebrow">One quick check</p>
+          <h1 id="verification-title">Ready to join the game?</h1>
+          <p>Verify you’re human to enter Hoop Bids. You’ll continue automatically once the check is complete.</p>
+          {needsVerification && <div className="verification-widget" ref={verificationRef} />}
+          {connectionError && <><p role="alert">{connectionError}</p><button type="button" className="primary-btn" onClick={retryConnection}>Try again</button></>}
+          <p className="verification-footnote">Protected by Cloudflare Turnstile</p>
         </div>
+      </section>
+      <main className="app-main" inert={!connected && (needsVerification || Boolean(connectionError)) ? "" : undefined}>
         {isReconnecting && !room ? (
           <div className="lobby-card">
             <p className="hint-text">Reconnecting to your room…</p>
           </div>
         ) : room ? (
           <div className="room-with-switcher">
+            {room.gameMode === "active-now" && <p className="season-mode-banner"><strong>Active Now</strong> · {room.statsSeason} regular season only{room.seasonFallback ? " · Previous-season snapshot" : ""}</p>}
+            {error && <p className="error-message" role="alert">{error}</p>}
             {room.status === "waiting" ? (
               <RoomView
                 room={room}

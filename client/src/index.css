@@ -7604,16 +7604,16 @@ button.topnav-brand-link:focus-visible {
 
 /* The reveal is clipped to the headshot, keeping controls steady. */
 .player-reveal { position: relative; isolation: isolate; width: 100%; height: 100%; overflow: hidden; border-radius: var(--radius-sm); background: linear-gradient(180deg, color-mix(in srgb, var(--reveal-color) 55%, var(--bg-inset)), var(--bg-inset) 85%); }
-.player-reveal-suspense { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: var(--bg-inset); color: var(--accent); font: 600 10px var(--font-display); text-transform: uppercase; letter-spacing: .04em; animation: portrait-suspense 150ms ease 250ms forwards; }
+.player-reveal-suspense { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: var(--bg-inset); color: var(--accent); font: 600 10px var(--font-display); text-transform: uppercase; letter-spacing: .04em; animation: portrait-suspense 150ms ease 250ms forwards; animation-play-state: paused; }
 .player-reveal-suspense > span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.player-reveal-logo { position: absolute; top: 10%; left: 5%; width: 90%; height: 80%; object-fit: contain; opacity: .22; animation: portrait-logo 300ms var(--ease-out) 250ms both; }
-.player-reveal-portrait { position: relative; width: 100%; height: 100%; animation: portrait-settle 250ms var(--ease-out) 550ms both; }
+.player-reveal-logo { position: absolute; top: 10%; left: 5%; width: 90%; height: 80%; object-fit: contain; opacity: .22; animation: portrait-logo 400ms var(--ease-out) 250ms both; animation-play-state: paused; }
+.player-reveal-portrait { position: relative; width: 100%; height: 100%; animation: portrait-settle 450ms var(--ease-out) 500ms both; animation-play-state: paused; }
 .player-reveal-portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .player-reveal.mobile-assign-headshot { width: 48px; height: 48px; }
 .mobile-assign-headshot .player-reveal-suspense { font-size: 0; gap: 0; }
 @keyframes portrait-suspense { to { opacity: 0; visibility: hidden; } }
 @keyframes portrait-logo { from { opacity: 0; transform: translateX(-60%); } to { opacity: .22; transform: translateX(0); } }
-@keyframes portrait-settle { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes portrait-settle { from { opacity: 0; transform: translateX(-38%); } to { opacity: 1; transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) {
   .player-reveal-suspense { display: none; }
   .player-reveal-logo { animation: none; }
@@ -7624,3 +7624,112 @@ button.topnav-brand-link:focus-visible {
 @media (min-width: 1100px) {
   .draft-board > .roster-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
 }
+
+/* Paper reveal card: legible figures and a larger, image-ready slide sequence. */
+.player-reveal.is-ready > * { animation-play-state: running; }
+.room-drafting .roster-player-details .stat-highlight-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
+.room-drafting .roster-player-details .stat-highlight { padding: 0; border: 0; min-width: 0; }
+.room-drafting .roster-player-details .stat-highlight-value { font: 700 24px/1.2 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-shadow: none; transform: none; }
+.room-drafting .roster-player-details .stat-highlight-label { font-size: 10px; line-height: 1.5; letter-spacing: .06em; }
+.won-banner-avatar { width: 150px; height: 180px; }
+.player-reveal.mobile-assign-headshot { width: 88px; height: 112px; flex-shrink: 0; }
+.mobile-assign-headshot .player-reveal-suspense { font-size: 10px; gap: 8px; }
+.season-mode-banner { margin: 0 0 16px; color: var(--text-dim); font-size: 13px; line-height: 1.6; }
+.season-mode-banner strong { color: var(--accent); }
+.era-picker-label[hidden] { display: none; }
+@media (min-width: 861px) {
+  .room-drafting .active-nomination-cinematic .nominated-player-header { grid-template-columns: 160px minmax(0, 1fr); }
+  .room-drafting .active-nomination-cinematic .nomination-photo-wrap,
+  .room-drafting .active-nomination-cinematic .player-headshot-cinematic { width: 160px; height: 210px; }
+}
+@media (max-width: 640px) {
+  .won-banner-avatar { width: 100px; height: 130px; }
+  .mobile-assign-strip { align-items: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .player-reveal-portrait, .player-reveal-logo { animation: none; }
+}
+
+/* A dedicated verification page; keep Turnstile mounted for reconnections. */
+.verification-page { position: fixed; inset: 0; z-index: 10000; overflow-y: auto; display: grid; place-items: center; padding: 32px 16px; background: var(--bg-void); }
+.verification-page[hidden] { display: none; }
+.app-shell:has(.verification-page:not([hidden])) > :not(.verification-page) { visibility: hidden; }
+.verification-card { width: min(100%, 460px); padding: 40px 32px; border: 1px solid var(--line); border-radius: 20px; background: var(--bg-panel); text-align: center; }
+.verification-wordmark { font: 700 14px var(--font-display); letter-spacing: .1em; }
+.verification-symbol { margin: 36px auto 24px; width: 60px; height: 60px; display: grid; place-items: center; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); font-size: 28px; }
+.verification-card h1 { font: 700 clamp(26px, 6vw, 36px)/1.15 var(--font-display); margin: 12px 0 16px; letter-spacing: -.03em; }
+.verification-card p { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+.verification-widget { margin: 24px auto; width: 100%; min-width: 0; }
+.verification-footnote { margin-top: 28px; font-size: 11px !important; }
+@media (max-width: 480px) {
+  .verification-page { padding: 24px 12px; }
+  .verification-card { border: 0; background: transparent; padding: 24px 0; }
+}
+
+/* Paper Market: browse cards alongside a focused player detail column. */
+.market-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); gap: 24px; align-items: start; }
+.market-workspace > * { min-width: 0; }
+.market-workspace .market-results-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-height: 780px; overflow-y: auto; padding: 2px; }
+.market-workspace .market-result-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 4px 12px; height: 100%; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg-panel); color: var(--text); transform: none; }
+.market-workspace .market-result-row[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--bg-panel)); }
+.market-workspace .market-result-row:hover { background: var(--bg-panel-raised); }
+.market-card-headshot { grid-row: 1 / 3; width: 48px; height: 52px; object-fit: cover; border-radius: 10px; background: var(--bg-inset); }
+.market-workspace .market-result-name { align-self: end; white-space: normal; overflow-wrap: anywhere; font-weight: 600; line-height: 1.35; }
+.market-workspace .market-result-meta { line-height: 1.5; font-size: 11px; }
+.market-card-stat { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+.market-card-stat > span { color: var(--text-dim); font-size: 11px; }
+.market-card-stat strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.market-workspace .market-grid { display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 90px; }
+.market-workspace .market-grid-main, .market-workspace .market-grid-side { width: 100%; }
+.market-workspace .market-dossier { flex-direction: column; gap: 20px; padding: 24px; box-shadow: none; }
+.market-workspace .market-dossier-photo { width: 140px; height: 160px; margin: 0 auto; border: 0; }
+.market-workspace .market-dossier-featured { display: none; }
+.market-workspace .market-dossier-name { font: 700 26px/1.2 var(--font-display); letter-spacing: -.025em; }
+.market-workspace .market-dossier-info { min-width: 0; }
+.market-workspace .stat-highlight-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 8px; }
+.market-workspace .stat-highlight-value { font: 700 26px/1.2 var(--font-body); font-variant-numeric: tabular-nums; }
+.market-workspace .stat-highlight { min-width: 0; padding: 0; }
+.market-workspace .market-dossier-archetype-row { flex-wrap: wrap; }
+.market-workspace .market-panel { padding: 20px; }
+.market-workspace .market-similar-grid { grid-template-columns: 1fr; }
+.market-workspace button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (min-width: 1450px) { .market-workspace .market-results-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1000px) {
+  .market-workspace { grid-template-columns: 1fr; }
+  .market-workspace .market-results-list { max-height: 400px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .market-workspace .market-grid-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
+@media (max-width: 640px) {
+  .market-workspace { gap: 24px; }
+  .market-workspace .market-results-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 380px; gap: 8px; }
+  .market-workspace .market-result-row { grid-template-columns: 1fr; padding: 12px; gap: 8px; align-content: start; }
+  .market-card-headshot { grid-row: auto; width: 56px; height: 56px; }
+  .market-workspace .market-result-name { font-size: 13px; }
+  .market-workspace .market-result-meta { min-height: 2.8em; }
+  .market-workspace .market-grid-main { display: flex; }
+  .market-workspace .market-dossier, .market-workspace .market-panel { padding: 18px; }
+  .market-exchange .market-filterbar { align-items: stretch; }
+  .market-exchange .market-franchise-chip { min-width: 0; width: 100%; }
+  .market-exchange .market-ticker { gap: 12px; flex-wrap: wrap; }
+  .market-exchange .market-ticker-sep { display: none; }
+  .market-exchange .market-quicktags { flex-wrap: wrap; }
+  .market-exchange .market-quicktags button, .market-exchange .market-pill { min-height: 44px; }
+  .market-workspace .market-grid { scroll-margin-top: 76px; }
+}
+
+.market-workspace .market-history-panel summary { cursor: pointer; min-height: 24px; font-weight: 600; font-size: 15px; }
+.market-workspace .market-history-panel[open] summary { margin-bottom: 20px; }
+.market-workspace .market-dossier .player-insights { margin: 0; }
+.market-workspace .market-dossier .predicted-price { flex-wrap: wrap; gap: 8px; }
+.market-workspace .market-dossier .predicted-price-value { font-size: 24px; }
+
+.market-exchange .market-workspace .market-results { max-height: none; overflow: visible; scrollbar-gutter: auto; }
+.market-exchange .market-workspace .stat-highlight-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.market-era-select { display: flex; align-items: center; gap: 12px; min-width: 180px; }
+.market-era-select .dropdown { flex: 1; }
+@media (min-width: 1200px) {
+  .market-workspace { grid-template-columns: minmax(0, 1fr) 340px; }
+  .market-workspace .market-results-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) { .market-era-select { width: 100%; } }

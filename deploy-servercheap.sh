@@ -137,7 +137,7 @@ cat > /etc/systemd/system/hoop-bids-refresh.timer <<'UNIT'
 Description=Weekly Hoop Bids refresh
 
 [Timer]
-OnCalendar=Sun *-*-* 10:00:00 UTC
+OnCalendar=Sat *-*-* 10:00:00 UTC
 RandomizedDelaySec=15min
 Persistent=true
 

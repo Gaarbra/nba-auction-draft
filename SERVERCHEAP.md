@@ -40,11 +40,11 @@ This deployment creates a **new database**. Import the old database separately t
 
 ## Low-load weekly refresh
 
-The installer enables `hoop-bids-refresh.timer` only after the NBA proxy probe passes. It runs Sundays at 10:00 UTC (2 a.m. Pacific standard time / 3 a.m. daylight time), with up to 15 minutes of jitter. A missed run is caught up after the VPS boots. The timer runs on the VPS, so your laptop can be off.
+The installer enables `hoop-bids-refresh.timer` only after the NBA proxy probe passes. It runs Saturdays at 10:00 UTC (2 a.m. Pacific standard time / 3 a.m. daylight time), with up to 15 minutes of jitter. A missed run is caught up after the VPS boots. The timer runs on the VPS, so your laptop can be off.
 
 Gameplay reads saved stats, awards, usage, and catalogues without live NBA requests. The stats container mounts its cache volume read-only and checks for new snapshots at most once every 30 seconds. Node picks up new catalogues within one hour on the next request. Existing saved data remains available if the proxy fails. An uncached player returns unavailable rather than invented statistics. ML training is not part of this job; the serving similarity index still loads at startup.
 
-The separate refresh container uses the same stats image, a writable shared volume, at most **0.5 CPU and 1 GB RAM**, and one sequential fetch loop. These are initial limits, not measured memory requirements. It refreshes active careers older than seven days, active awards older than 30 days, and missing historical records. Saved retired careers and awards are left alone. Usage data is fetched league-wide once per needed season, with historical seasons retained. Biography fields are reused when available. There is a two-second pause between player fetches; a missing biography can require a second API request.
+The separate refresh container uses the same stats image, a writable shared volume, at most **0.5 CPU and 1 GB RAM**, and one sequential fetch loop. These are initial limits, not measured memory requirements. It refreshes active careers and active awards older than seven days, including missing active-player records. Retired players are never fetched by this job, even if their records are missing. Saved retired careers and awards are retained. Usage data is fetched league-wide for the latest active season only; historical seasons are retained. Biography fields are reused when available. There is a two-second pause between player fetches; a missing biography can require a second API request.
 
 Successful progress is atomically saved every 25 players and at normal shutdown. Runs resume from cache timestamps; no full restart of the dataset is needed. Failed players are retried on the next run, with a 10/20-second backoff between failures and an abort after three consecutive failures. Stats and awards have 20/10-minute budgets, plus up to five minutes for usage data; an in-flight request can extend a budget by its timeout. A file lock prevents concurrent runs. An abrupt kill or out-of-memory exit can lose the current batch, but leaves the previous checkpoint intact.
 
@@ -59,7 +59,7 @@ sudo docker compose exec -T stats cat data/refreshStatus.json
 sudo docker stats --no-stream
 ```
 
-`complete` means all selected work finished; `partial` includes remaining stats/awards counts; `failed` preserves the prior snapshots and records the error type. A partial backlog can be continued with another manual service start. Check DataImpulse bandwidth usage after the first run before allowing a large historical backfill. To pause weekly refreshes: `sudo systemctl disable --now hoop-bids-refresh.timer` (this does not interrupt an already-running job).
+`complete` means all selected work finished; `partial` includes remaining stats/awards counts; `failed` preserves the prior snapshots and records the error type. A partial backlog can be continued with another manual service start. Check DataImpulse bandwidth usage after the first run. This weekly job does not backfill retired players. To pause weekly refreshes: `sudo systemctl disable --now hoop-bids-refresh.timer` (this does not interrupt an already-running job).
 
 Tune `REFRESH_CPUS`, `REFRESH_MEMORY_LIMIT`, and the two runtime budgets in `/opt/hoop-bids/.env` if measurements justify it. Timer runs read them on each execution. Docker enforces the [CPU and memory limits](https://docs.docker.com/reference/compose-file/services/); the [systemd timer](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html) handles scheduling. No Redis or additional paid scheduler is needed.
 
@@ -74,3 +74,14 @@ docker compose config --quiet
 ```
 
 The unit tests verify actual Requests proxy selection and internal-host bypass without contacting the internet. `docker compose config --quiet` needs a populated `.env`; avoid plain `docker compose config`, which prints resolved secrets.
+
+To force an additional active-player refresh today without changing the weekly schedule,
+first verify the service is idle, then run:
+
+```bash
+cd /opt/hoop-bids
+sudo docker compose --profile maintenance run --rm --no-deps -e REFRESH_ACTIVE_DAYS=0 refresh
+```
+
+The file lock prevents overlap with the scheduled job. Inspect `refreshStatus.json`
+afterward; a bounded run can finish partially and requires another run to drain a backlog.

@@ -162,7 +162,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   async function ensureRollSample() {
     if (rollSampleRef.current.length > 0) return;
     try {
-      const params = new URLSearchParams({ era: room.draftEra || "all", limit: "40" });
+      const params = new URLSearchParams({ era: room.gameMode === "active-now" ? "active" : room.draftEra || "all", limit: "40" });
       const res = await fetch(`${SERVER_URL}/api/players?${params}`);
       const data = await res.json();
       rollSampleRef.current = (data.players || []).map((p) => p.fullName);
@@ -391,13 +391,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
             {nomination.player.stats && !nomination.player.stats.unavailable
               ? <>
                   <p className="hint-text">
-                    Career averages · {nomination.player.stats.firstSeason}–{nomination.player.stats.lastSeason}
+                    {nomination.player.stats.season ? `${nomination.player.stats.season} regular season` : `Career averages · ${nomination.player.stats.firstSeason}–${nomination.player.stats.lastSeason}`}
                     {` · ${nomination.player.stats.gamesPlayed} games`}
                   </p>
                   <StatHighlightRow stats={nomination.player.stats} />
-                  <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} showHeading />
+                  {room.gameMode !== "active-now" && <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} showHeading />}
                   <details className="mobile-player-details">
-                    <summary>Player profile &amp; career chart</summary>
+                    <summary>Player profile &amp; stats chart</summary>
                     {nomination.player.teamHistory?.length > 0 && <p className="hint-text">Career teams: {nomination.player.teamHistory.map((team) => getHistoricalTeamName(team.abbreviation) || team.abbreviation).join(", ")}</p>}
                     {nomination.player.stats.country && <p className="hint-text">Country: {nomination.player.stats.country}</p>}
                     <StatRadarChart stats={nomination.player.stats} color={getTeamColors(nomination.player.team?.abbreviation).primary} />
@@ -567,7 +567,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                           ·{" "}
                           {nomination.player.draftYear ? `Drafted ${nomination.player.draftYear}` : "Undrafted"}
                         </p>
-                        <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} compact />
+                        {room.gameMode !== "active-now" && <PlayerAccolades nbaPlayerId={nomination.player.nbaPlayerId} compact />}
                         {nomination.player.teamHistory?.length > 1 && (
                           <p className="player-meta player-team-history">
                             Career teams: {nomination.player.teamHistory.map((t) => t.abbreviation).join(", ")}
@@ -579,11 +579,7 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                         {nomination.player.stats && !nomination.player.stats.unavailable && (
                           <>
                             <p className="stats-season">
-                              Career avg, {nomination.player.stats.seasonsPlayed} season
-                              {nomination.player.stats.seasonsPlayed === 1 ? "" : "s"}:{" "}
-                              {nomination.player.stats.firstSeason === nomination.player.stats.lastSeason
-                                ? nomination.player.stats.firstSeason
-                                : `${nomination.player.stats.firstSeason}-${nomination.player.stats.lastSeason}`}
+                              {nomination.player.stats.season ? `${nomination.player.stats.season} regular season` : `Career avg · ${nomination.player.stats.firstSeason}–${nomination.player.stats.lastSeason}`}
                             </p>
                             <StatHighlightRow stats={nomination.player.stats} />
                           </>
@@ -595,12 +591,13 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
                             the room a phone screen has, one predicted number isn't
                             worth crowding out the essentials (photo, name, real
                             stats, bid controls). */}
-                        {!isSolo && !isMobileViewport && (
+                        {!isSolo && (!isMobileViewport || room.gameMode === "active-now") && (
                           <PlayerInsights
                             nbaPlayerId={nomination.player.nbaPlayerId}
                             era={room.draftEra}
                             difficulty={room.difficulty}
                             showSimilar={false}
+                            seasonPlayer={room.gameMode === "active-now" ? nomination.player : null}
                           />
                         )}
                         <p className="nominated-by">

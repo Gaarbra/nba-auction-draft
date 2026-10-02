@@ -37,6 +37,7 @@ import { getStarPlayerIds } from "../services/starPlayers.js";
 import { getSuperstarPlayerIds } from "../services/superstarPlayers.js";
 import { filterPlayersByEra } from "../services/era.js";
 import { fetchPlayerStats } from "../services/statsClient.js";
+import { fetchActiveSnapshot, drawActivePlayer } from "../services/activeNow.js";
 import { saveDraftResults } from "../services/db.js";
 import { computeDraftResults } from "../scoring/computeResults.js";
 import { createKeyedRateLimiter, createSocketEventLimiter } from "../middleware/rateLimit.js";
@@ -144,6 +145,10 @@ async function drawPlayerWithStats(candidates) {
 // drafted -- a reroll needs this to rule out drawing the exact same player
 // it's trying to get away from.
 async function rollPlayerForRoom(room, excludeIds = []) {
+  if (room.gameMode === "active-now") {
+    await sleep(MIN_ROLL_MS);
+    return drawActivePlayer(room, excludeIds);
+  }
   const allPlayers = await getPlayers();
   const eraPool = filterPlayersByEra(allPlayers, room.draftEra);
   const unavailable = new Set([...(room.draft?.draftedPlayerIds || []), ...excludeIds]);
@@ -195,6 +200,9 @@ function toPublicRoom(room) {
     code: room.code,
     status: room.status,
     draftEra: room.draftEra || null,
+    gameMode: room.gameMode || "classic",
+    statsSeason: room.activeNowSnapshot?.season || null,
+    seasonFallback: room.activeNowSnapshot?.usesPreviousSeason || false,
     difficulty: room.difficulty || null,
     biddingMode: room.biddingMode || null,
     visibility: room.visibility || "private",
@@ -436,16 +444,24 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(room));
   });
 
-  socket.on("room:start", (payload = {}, callback) => {
+  socket.on("room:start", async (payload = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
-    const { era, allowPositionSwaps, difficulty, biddingMode } = payload;
+    const { era, allowPositionSwaps, difficulty, biddingMode, gameMode = "classic" } = payload;
     const roomCode = socket.data.roomCode;
     if (!roomCode) {
       return callback?.({ error: "NOT_IN_ROOM" });
     }
 
     const playerId = resolveActingPlayerId(socket, payload);
-    const result = startDraft(roomCode, playerId, era, allowPositionSwaps, difficulty, biddingMode);
+    const room = getRoom(roomCode);
+    if (!room?.players.some((p) => p.id === playerId && p.isHost)) return callback?.({ error: "NOT_HOST" });
+    if (room.status !== "waiting") return callback?.({ error: "ALREADY_STARTED" });
+    let snapshot = null;
+    if (gameMode === "active-now") {
+      try { snapshot = await fetchActiveSnapshot(); }
+      catch { return callback?.({ error: "ACTIVE_NOW_UNAVAILABLE" }); }
+    }
+    const result = startDraft(roomCode, playerId, era, allowPositionSwaps, difficulty, biddingMode, gameMode, snapshot);
     if (result.error) {
       return callback?.({ error: result.error });
     }
@@ -601,7 +617,7 @@ export function registerRoomHandlers(io, socket) {
     io.to(roomCode).emit("room:update", toPublicRoom(result.room));
     // Public competitive sales only; never expose private invite codes or local/solo prices.
     if (result.sale && room.visibility === "public" && !room.isLocal && !room.isSolo) {
-      io.emit("market:sale", { ...result.sale, at: Date.now() });
+      io.emit("market:sale", { ...result.sale, gameMode: result.room.gameMode || "classic", statsSeason: result.room.activeNowSnapshot?.season || null, at: Date.now() });
     }
     maybeComputeResults(io, result.room, roomCode);
   });

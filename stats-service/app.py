@@ -1593,6 +1593,15 @@ def get_full_stats():
     )
 
 
+@app.get("/active-now")
+def active_now_snapshot():
+    try:
+        with open(os.path.join(DATA_DIR, "activeNowCache.json"), encoding="utf-8") as source:
+            return jsonify(json.load(source))
+    except (OSError, ValueError):
+        return jsonify(error="ACTIVE_NOW_UNAVAILABLE"), 503
+
+
 if __name__ == "__main__":
     # Runs the notable-pool warm-up once, in the background, only under
     # local dev (`python app.py`). Deliberately NOT at module level, since

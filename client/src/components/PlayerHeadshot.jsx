@@ -29,7 +29,7 @@ function nbaHeadshotUrl(nbaPlayerId) {
  * usually catches it landing. `allowRetry` (see PriceTicker) skips this
  * where a couple dozen simultaneous retries would just be noise for a
  * purely decorative photo. */
-export default function PlayerHeadshot({ nbaPlayerId, photoUrl, alt, className, allowRetry = true }) {
+export default function PlayerHeadshot({ nbaPlayerId, photoUrl, alt, className, onLoad, allowRetry = true }) {
   const [src, setSrc] = useState(() => photoUrl || (nbaPlayerId ? nbaHeadshotUrl(nbaPlayerId) : PLACEHOLDER_SRC));
   const retriedRef = useRef(false);
   const mountedRef = useRef(true);
@@ -53,6 +53,7 @@ export default function PlayerHeadshot({ nbaPlayerId, photoUrl, alt, className, 
     <img
       src={src}
       alt={alt}
+      onLoad={onLoad}
       className={className}
       onError={() => {
         setSrc(PLACEHOLDER_SRC); // never leave a broken-image icon showing while a retry is pending

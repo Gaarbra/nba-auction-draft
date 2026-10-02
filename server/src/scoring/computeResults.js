@@ -1,3 +1,4 @@
+import { validSeasonStats } from "../services/activeNow.js";
 import { toPlayerStatLine } from "./statsAdapter.js";
 import { rankTeams, pairwiseMatchups } from "./scoring.js";
 import { fetchFullPlayerStatsWithRetry } from "../services/statsClient.js";
@@ -43,7 +44,11 @@ export async function computeDraftResults(room) {
   }
 
   const fetched = await mapWithConcurrency(slots, STATS_FETCH_CONCURRENCY, async (slot) => {
-    const rawStats = slot.drafted ? await fetchFullPlayerStatsWithRetry(slot.drafted.id) : null;
+    const isSeason = room.gameMode === "active-now";
+    if (isSeason && slot.drafted && !validSeasonStats(slot.drafted.stats, room.activeNowSnapshot?.season)) {
+      throw new Error("Missing season snapshot; refusing career-stat fallback");
+    }
+    const rawStats = slot.drafted ? (isSeason ? slot.drafted.stats : await fetchFullPlayerStatsWithRetry(slot.drafted.id)) : null;
     return { statLine: toPlayerStatLine(rawStats || { gamesPlayed: 0, usagePct: null }), photoUrl: rawStats?.photoUrl ?? null };
   });
 
@@ -101,5 +106,5 @@ export async function computeDraftResults(room) {
     };
   });
 
-  return { teams, matchups, computedAt: Date.now() };
+  return { teams, matchups, gameMode: room.gameMode || "classic", statsSeason: room.activeNowSnapshot?.season || null, computedAt: Date.now() };
 }

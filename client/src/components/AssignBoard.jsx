@@ -73,7 +73,7 @@ export default function AssignBoard({
               {player.position && <span className="won-banner-pos">{player.position}</span>}
             </div>
             <p className="won-banner-meta">
-              {player.isActive ? "Currently" : "Played for"}{" "}
+              {stats?.season ? "Season team" : player.isActive ? "Currently" : "Played for"}{" "}
               <span className="won-banner-meta-strong">
                 {getHistoricalTeamName(player.team?.abbreviation) || player.team?.abbreviation || "Free Agent"}
               </span>{" "}
@@ -89,7 +89,7 @@ export default function AssignBoard({
             {hasStats && (
               <>
                 <p className="won-banner-season">
-                  Career avg, {stats.seasonsPlayed} season{stats.seasonsPlayed === 1 ? "" : "s"} · {seasonRange}
+                  {stats.season ? `${stats.season} regular season` : `Career avg · ${seasonRange}`}
                 </p>
                 <StatHighlightRow stats={stats} />
               </>
@@ -115,7 +115,7 @@ export default function AssignBoard({
           )}
           {hasStats && <StatRadarChart stats={stats} color={teamColor} />}
           <div className="won-banner-honors">
-            <PlayerAccolades nbaPlayerId={player.nbaPlayerId} showHeading compact />
+            {!stats?.season && <PlayerAccolades nbaPlayerId={player.nbaPlayerId} showHeading compact />}
           </div>
         </div>
 

@@ -321,7 +321,7 @@ export default function RosterGrid({
                   </div>
                 )}
                 {isMine && !canSwap && <p className="roster-position-note">{room.allowPositionSwaps ? "Position changes are available after the player is nominated." : "Position changes are disabled for this draft."}</p>}
-                <p className="roster-stats-label">Career averages</p>
+                <p className="roster-stats-label">{inspectedPlayer.stats?.season ? `${inspectedPlayer.stats.season} averages` : "Career averages"}</p>
                 {inspectedPlayer.stats && !inspectedPlayer.stats.unavailable
                   ? <StatHighlightRow stats={inspectedPlayer.stats} />
                   : <p className="hint-text">Stats unavailable for this player.</p>}

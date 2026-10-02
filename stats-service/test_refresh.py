@@ -18,7 +18,9 @@ class RefreshTests(unittest.TestCase):
         now = 100 * refresh.DAY
         pool = [{"id": i, "isActive": i < 4} for i in range(1, 6)]
         cache = {1: {"fetchedAt": now}, 2: {"fetchedAt": 0}, 4: {"fetchedAt": 0}}
-        self.assertEqual([p["id"] for p in refresh.due_players(pool, cache, now)], [2, 3, 5])
+        self.assertEqual([p["id"] for p in refresh.due_players(pool, cache, now)], [2, 3])
+        self.assertEqual([p["id"] for p in refresh.due_players(pool, cache, now, active_days=0)], [2, 3, 1])
+        self.assertEqual(refresh.due_players([{"id": 99, "isActive": False}], {}, now), [])
         fetched, published = [], []
         def fetch(pid):
             fetched.append(pid)
@@ -33,7 +35,7 @@ class RefreshTests(unittest.TestCase):
             refresh.refresh_batch(pool, fail, lambda: published.append(True), 20, sleep=lambda _: None)
         self.assertEqual(len(published), 2)
         refresh.refresh_batch(pool, fetch, lambda: None, 1, clock=iter([0, 2]).__next__)
-        self.assertEqual(fetched, [2, 3, 5])
+        self.assertEqual(fetched, [2, 3])
 
     def test_cached_serving_and_atomic_reload(self):
         # Environment is explicit so local .env credentials can never be used.

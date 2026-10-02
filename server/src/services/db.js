@@ -53,6 +53,8 @@ export async function initSchema() {
  * that already finished successfully for the players in it.
  */
 export async function saveDraftResults(room, results) {
+  // Career-trained price analytics must never ingest season-only auctions.
+  if (room.gameMode === "active-now") return;
   if (!pool) return;
 
   const client = await pool.connect().catch((err) => {
