@@ -18,9 +18,10 @@ WORKDIR /app/server
 COPY server/package*.json ./
 RUN npm ci --omit=dev
 COPY --chown=node:node server/ ./
-COPY db/ /app/db/
-COPY stats-service/data/statsCache.json /app/stats-service/data/statsCache.json
+COPY --chown=node:node db/ /app/db/
+COPY --chown=node:node stats-service/data/statsCache.json /app/stats-service/data/statsCache.json
 USER node
+RUN test -r /app/db/schema.sql && test -r /app/stats-service/data/statsCache.json
 EXPOSE 4000
 CMD ["node", "src/index.js"]
 
@@ -30,8 +31,9 @@ WORKDIR /app/stats-service
 COPY stats-service/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home app
 COPY --chown=app:app stats-service/ ./
-COPY server/data/players.json server/data/notablePlayers.json server/data/topTeamPlayers.json /app/server/data/
-COPY db/ /app/db/
+COPY --chown=app:app server/data/players.json server/data/notablePlayers.json server/data/topTeamPlayers.json /app/server/data/
+COPY --chown=app:app db/ /app/db/
 USER app
+RUN test -r /app/db/schema.sql && test -r /app/server/data/players.json && test -r /app/server/data/notablePlayers.json && test -r /app/server/data/topTeamPlayers.json
 EXPOSE 5001
 CMD ["gunicorn", "--workers", "1", "--threads", "4", "--timeout", "120", "--bind", "0.0.0.0:5001", "app:app"]
