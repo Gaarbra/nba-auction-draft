@@ -28,7 +28,15 @@ export function useSocket() {
       setConnected(false);
       if (SITE_KEY && !disposed) reset();
     });
-    socket.on("connect_error", () => setConnectionError("Unable to connect. Check your connection and retry verification."));
+    socket.on("connect_error", (error) => {
+      const messages = {
+        HUMAN_VERIFICATION_FAILED: "The server could not validate your human verification. Please retry. (HUMAN_VERIFICATION_FAILED)",
+        HUMAN_VERIFICATION_NOT_CONFIGURED: "Human verification is not configured on the server. (HUMAN_VERIFICATION_NOT_CONFIGURED)",
+        ORIGIN_REJECTED: "This website address is not allowed to connect. Open https://girma.me/hoopbids/. (ORIGIN_REJECTED)",
+        RATE_LIMITED: "Too many connection attempts. Wait a minute, then retry. (RATE_LIMITED)",
+      };
+      setConnectionError(messages[error.message] || "Unable to reach the game server. Check your connection and retry verification.");
+    });
     const mount = () => {
       if (disposed) return;
       widget = window.turnstile.render(verificationRef.current, {

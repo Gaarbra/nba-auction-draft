@@ -4,6 +4,26 @@ import { verifyHuman, socketSecurity } from "./socketSecurity.js";
 import { createKeyedRateLimiter } from "./rateLimit.js";
 import { createRoom, addPlayerToRoom, reconnectPlayer } from "../rooms/roomStore.js";
 
+test("verification diagnostics explain rejection without exposing credentials or token contents", async (t) => {
+  const logs = [];
+  t.mock.method(console, "warn", (...args) => logs.push(args));
+  const options = { secret: "private-secret", hostname: "example.com" };
+  const accepted = await verifyHuman("private-token", { ...options, fetcher: async () => ({
+    ok: true, status: 200, json: async () => ({ success: false, "error-codes": ["invalid-input-secret", "private-token"], secret: "private-secret" }),
+  }) });
+  assert.equal(accepted, false);
+  assert.deepEqual(logs[0][1].codes, ["invalid-input-secret"]);
+  assert.equal(JSON.stringify(logs).includes("private-token"), false);
+  assert.equal(JSON.stringify(logs).includes("private-secret"), false);
+  logs.length = 0;
+  assert.equal(await verifyHuman("private-token", { ...options, fetcher: async () => ({
+    ok: true, status: 200, json: async () => ({ success: true, hostname: "other.example", action: "connect" }),
+  }) }), false);
+  assert.equal(logs[0][1].verified, true);
+  assert.equal(logs[0][1].hostnameMatches, false);
+  assert.equal(logs[0][1].actionMatches, true);
+});
+
 test("verification fails closed, checks action/hostname, and limits token size", async () => {
   const options = { secret: "test", hostname: "example.com" };
   const verify = (result) => verifyHuman("token", { ...options, fetcher: async () => ({ ok: true, json: async () => result }) });
