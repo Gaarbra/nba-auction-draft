@@ -1,8 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { verifyHuman, socketSecurity } from "./socketSecurity.js";
+import { isAllowedSocketOrigin, verifyHuman, socketSecurity } from "./socketSecurity.js";
 import { createKeyedRateLimiter } from "./rateLimit.js";
 import { createRoom, addPlayerToRoom, reconnectPlayer } from "../rooms/roomStore.js";
+
+test("same-origin polling without Origin passes the origin gate but still requires verification", async () => {
+  const origin = "https://girma.me";
+  const headers = { host: "girma.me", "sec-fetch-site": "same-origin" };
+  assert.equal(isAllowedSocketOrigin(headers, origin), true);
+  assert.equal(isAllowedSocketOrigin({ origin }, origin), true);
+  for (const invalid of [
+    {}, { host: "girma.me" },
+    { ...headers, host: "other.example" },
+    { ...headers, host: "girma.me:444" },
+    { ...headers, "sec-fetch-site": "cross-site" },
+    { ...headers, "sec-fetch-site": "same-site" },
+    { ...headers, origin: "https://other.example" },
+    { ...headers, origin: "null" },
+    { ...headers, origin: "" },
+  ]) assert.equal(isAllowedSocketOrigin(invalid, origin), false);
+  let middleware;
+  socketSecurity({ use: fn => { middleware = fn; } }, { origin, secret: "test-secret", production: true });
+  const socket = { data: {}, handshake: { headers, address: "127.0.0.1" } };
+  let rejection;
+  await middleware(socket, error => { rejection = error; });
+  assert.equal(rejection.message, "HUMAN_VERIFICATION_FAILED");
+});
 
 test("verification diagnostics explain rejection without exposing credentials or token contents", async (t) => {
   const logs = [];

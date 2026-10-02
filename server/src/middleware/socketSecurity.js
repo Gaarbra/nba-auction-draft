@@ -1,5 +1,13 @@
 import { createKeyedRateLimiter } from "./rateLimit.js";
 
+export function isAllowedSocketOrigin(headers, origin) {
+  if (headers.origin !== undefined) return headers.origin === origin;
+  // Same-origin polling GETs omit Origin. Browser-controlled fetch metadata
+  // plus the configured host covers that case without admitting cross-site GETs.
+  return headers["sec-fetch-site"] === "same-origin"
+    && headers.host === new URL(origin).host;
+}
+
 export async function verifyHuman(token, { secret, hostname, fetcher = fetch }) {
   if (typeof token !== "string" || !token || token.length > 2048) {
     console.warn("[turnstile] missing or invalid token format");
@@ -46,7 +54,7 @@ export function socketSecurity(io, { origin, secret, production, trustProxy }) {
       ? forwarded.split(",").at(-1).trim() : socket.handshake.address;
     socket.data.clientIp = ip;
     if (!connections(ip)) return reject("RATE_LIMITED");
-    if (socket.handshake.headers.origin !== origin) return reject("ORIGIN_REJECTED");
+    if (!isAllowedSocketOrigin(socket.handshake.headers, origin)) return reject("ORIGIN_REJECTED");
     if (secret) {
       if (!await verifyHuman(socket.handshake.auth?.token, { secret, hostname: new URL(origin).hostname })) {
         return reject("HUMAN_VERIFICATION_FAILED");

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import { socketSecurity } from "./middleware/socketSecurity.js";
+import { isAllowedSocketOrigin, socketSecurity } from "./middleware/socketSecurity.js";
 import cors from "cors";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
@@ -168,7 +168,7 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: CLIENT_ORIGIN },
   maxHttpBufferSize: 8192,
-  allowRequest: (req, callback) => callback(null, req.headers.origin === CLIENT_ORIGIN),
+  allowRequest: (req, callback) => callback(null, isAllowedSocketOrigin(req.headers, CLIENT_ORIGIN)),
 });
 
 socketSecurity(io, { origin: CLIENT_ORIGIN, secret: process.env.TURNSTILE_SECRET_KEY, production: IS_PRODUCTION, trustProxy: TRUST_PROXY });
