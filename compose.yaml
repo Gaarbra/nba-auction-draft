@@ -27,7 +27,8 @@ services:
       CLIENT_ORIGIN: https://${DOMAIN}
       TRUST_PROXY: "1"
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?Set TURNSTILE_SECRET_KEY}
-      STATS_SERVICE_URL: http://stats:5001
+      STATS_SERVICE_URL: ${STATS_SERVICE_URL:-http://stats:5001}
+      STATS_CACHE_ONLY: "1"
       DATABASE_URL: postgresql://hoop:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD to a random hex value}@db:5432/hoop_bids
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
     volumes: ["server-data:/app/server/data"]
@@ -41,10 +42,14 @@ services:
       retries: 3
   stats:
     <<: *defaults
+    image: hoop-bids-stats:local
     build: { context: ., target: stats }
     environment:
       DATABASE_URL: postgresql://hoop:${POSTGRES_PASSWORD}@db:5432/hoop_bids
-    volumes: ["stats-data:/app/stats-service/data"]
+      PROXY_URL: ${PROXY_URL:?Set PROXY_URL for residential egress}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1,web,server,stats,db,169.254.169.254}
+      STATS_CACHE_ONLY: "1"
+    volumes: ["stats-data:/app/stats-service/data:ro"]
     depends_on:
       db: { condition: service_healthy }
     healthcheck:
@@ -53,6 +58,26 @@ services:
       timeout: 6s
       start_period: 30s
       retries: 5
+  refresh:
+    profiles: [maintenance]
+    image: hoop-bids-stats:local
+    pull_policy: never
+    restart: "no"
+    init: true
+    cpus: ${REFRESH_CPUS:-0.5}
+    mem_limit: ${REFRESH_MEMORY_LIMIT:-1g}
+    memswap_limit: ${REFRESH_MEMORY_LIMIT:-1g}
+    command: ["python", "scripts/refresh_all.py"]
+    environment:
+      DATABASE_URL: postgresql://hoop:${POSTGRES_PASSWORD}@db:5432/hoop_bids
+      PROXY_URL: ${PROXY_URL:?Set PROXY_URL for residential egress}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1,web,server,stats,db,169.254.169.254}
+      STATS_REFRESH_JOB: "1"
+      STATS_CACHE_ONLY: "0"
+      REFRESH_SERVER_CATALOGUES: "0"
+      REFRESH_MAX_RUNTIME_SECONDS: ${REFRESH_MAX_RUNTIME_SECONDS:-1200}
+      REFRESH_AWARDS_MAX_RUNTIME_SECONDS: ${REFRESH_AWARDS_MAX_RUNTIME_SECONDS:-600}
+    volumes: ["stats-data:/app/stats-service/data"]
   db:
     <<: *defaults
     image: postgres:17-alpine

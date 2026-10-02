@@ -10,7 +10,7 @@ const CACHE_FILE = path.join(CACHE_DIR, "players.json");
 // gains new rookies each season), so a week-long cache is still "fresh
 // enough," with no need to re-hit stats-service (and by extension
 // stats.nba.com) on every server start.
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CACHE_TTL_MS = (process.env.STATS_CACHE_ONLY === "1" ? 1 : 168) * 60 * 60 * 1000;
 
 let memoryCache = null;
 let inFlightRefresh = null;

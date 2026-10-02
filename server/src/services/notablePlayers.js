@@ -7,7 +7,7 @@ const CACHE_DIR = path.join(__dirname, "..", "..", "data");
 const CACHE_FILE = path.join(CACHE_DIR, "notablePlayers.json");
 // All-time leaderboards barely move week to week, same reasoning as
 // playerCache.js's 7-day pool cache.
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CACHE_TTL_MS = (process.env.STATS_CACHE_ONLY === "1" ? 1 : 168) * 60 * 60 * 1000;
 
 const STATS_SERVICE_URL = process.env.STATS_SERVICE_URL || "http://127.0.0.1:5001";
 

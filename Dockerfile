@@ -19,6 +19,7 @@ COPY server/package*.json ./
 RUN npm ci --omit=dev
 COPY --chown=node:node server/ ./
 COPY db/ /app/db/
+COPY stats-service/data/statsCache.json /app/stats-service/data/statsCache.json
 USER node
 EXPOSE 4000
 CMD ["node", "src/index.js"]
@@ -29,6 +30,7 @@ WORKDIR /app/stats-service
 COPY stats-service/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home app
 COPY --chown=app:app stats-service/ ./
+COPY server/data/players.json server/data/notablePlayers.json server/data/topTeamPlayers.json /app/server/data/
 COPY db/ /app/db/
 USER app
 EXPOSE 5001

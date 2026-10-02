@@ -8,7 +8,7 @@ const CACHE_FILE = path.join(CACHE_DIR, "topTeamPlayers.json");
 // Standings shift some game to game, not hour to hour -- matches
 // stats-service's own TOP_TEAM_CACHE_TTL_SECONDS, so this Node-side cache
 // never goes stale-relative-to-source, it just saves the round trip.
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const CACHE_TTL_MS = (process.env.STATS_CACHE_ONLY === "1" ? 1 : 24) * 60 * 60 * 1000;
 
 const STATS_SERVICE_URL = process.env.STATS_SERVICE_URL || "http://127.0.0.1:5001";
 

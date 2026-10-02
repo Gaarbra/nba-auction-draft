@@ -13,6 +13,11 @@ from dotenv import load_dotenv
 # environment variables directly, with no .env file involved.
 load_dotenv()
 
+# Configure HTTP_PROXY / HTTPS_PROXY before nba_api creates its shared session.
+from proxy_config import configure_proxy
+
+configure_proxy()
+
 from flask import Flask, jsonify, request
 from nba_api.stats.static import players, teams
 from nba_api.stats.endpoints import (
@@ -32,6 +37,8 @@ import photos
 import s3_archive
 
 app = Flask(__name__)
+CACHE_ONLY = os.environ.get("STATS_CACHE_ONLY") == "1"
+REFRESH_JOB = os.environ.get("STATS_REFRESH_JOB") == "1"
 
 # Module level, not inside `if __name__ == "__main__"`, so this also runs
 # under gunicorn in production (which imports this module directly and
@@ -50,7 +57,7 @@ db.init_schema()
 # instead lets the app start serving right away. SimilarityIndex.query()
 # already returns [] while frame/model are still None, so /similar-players
 # just degrades to an empty result until this finishes.
-_price_model = ml.load_price_model()
+_price_model = None if REFRESH_JOB else ml.load_price_model()
 _similarity_index = ml.SimilarityIndex()
 
 
@@ -63,8 +70,9 @@ def _build_similarity_index_in_background():
         print(f"[ml] similarity index build failed, /similar-players will return empty: {e.__class__.__name__}: {e}")
 
 
-threading.Thread(target=_build_similarity_index_in_background, daemon=True).start()
-print(f"[ml] price model {'loaded' if _price_model else 'NOT FOUND (run scripts/train_price_model.py)'}; similarity index building in background")
+if not REFRESH_JOB:
+    threading.Thread(target=_build_similarity_index_in_background, daemon=True).start()
+    print(f"[ml] price model {'loaded' if _price_model else 'NOT FOUND (run scripts/train_price_model.py)'}; similarity index building in background")
 
 # PORT is the convention most PaaS hosts (Render included) inject
 # automatically; STATS_SERVICE_PORT is kept as a fallback for local dev
@@ -275,6 +283,8 @@ def _atomic_write_json(path, obj):
 
 
 def save_stats_cache_to_disk():
+    if REFRESH_JOB:
+        return  # The refresh job publishes checkpoints in batches.
     try:
         _atomic_write_json(STATS_CACHE_FILE, _cache)
     except OSError as e:
@@ -336,6 +346,8 @@ load_awards_cache_from_disk()
 
 
 def save_awards_cache_to_disk():
+    if REFRESH_JOB:
+        return
     try:
         _atomic_write_json(AWARDS_CACHE_FILE, _awards_cache)
     except OSError as e:
@@ -358,8 +370,8 @@ def get_fallback_photo_url(player_id, full_name):
     genuine never-checked id costs anything, and even that never blocks:
     it's resolved in the background and simply isn't available for THIS
     response."""
-    if player_id in _photo_cache:
-        return _photo_cache[player_id]
+    if CACHE_ONLY or player_id in _photo_cache:
+        return _photo_cache.get(player_id)
 
     if player_id not in _photo_lookup_in_flight:
         _photo_lookup_in_flight.add(player_id)
@@ -417,6 +429,8 @@ load_usage_cache_from_disk()
 
 
 def save_usage_cache_to_disk():
+    if REFRESH_JOB:
+        return
     try:
         serializable = {_usage_cache_key(pid, season): entry for (pid, season), entry in _usage_cache.items()}
         _atomic_write_json(USAGE_CACHE_FILE, serializable)
@@ -429,9 +443,66 @@ def save_usage_cache_to_disk():
 # arriving close together shouldn't each spawn their own stats.nba.com call.
 _stats_refresh_in_flight = set()
 
+# One writer (the refresh container); serving workers only read atomic snapshots.
+_snapshot_lock = threading.Lock()
+_snapshot_checked_at = 0
+_snapshot_versions = {}
+
+
+@app.before_request
+def reload_saved_snapshots():
+    global _snapshot_checked_at
+    if not CACHE_ONLY or time.monotonic() - _snapshot_checked_at < 30:
+        return
+    with _snapshot_lock:
+        if time.monotonic() - _snapshot_checked_at < 30:
+            return
+        _snapshot_checked_at = time.monotonic()
+        for filename, target, field in (
+            ("statsCache.json", "_cache", None),
+            ("awardsCache.json", "_awards_cache", None),
+            ("photoCache.json", "_photo_cache", None),
+            ("usageCache.json", "_usage_cache", None),
+            ("players.json", "_pool_cache", "players"),
+            ("notablePlayers.json", "_notable_cache", "ids"),
+            ("topTeamPlayers.json", "_top_team_cache", "ids"),
+        ):
+            path = os.path.join(DATA_DIR, filename)
+            if field and not os.path.exists(path):
+                path = os.path.join(os.path.dirname(DATA_DIR), "..", "server", "data", filename)
+            try:
+                version = os.stat(path).st_mtime_ns
+                if _snapshot_versions.get(filename) == version:
+                    continue
+                with open(path, encoding="utf-8") as file:
+                    raw = json.load(file)
+                if not isinstance(raw, dict):
+                    raise ValueError("Expected snapshot object")
+                if field:
+                    values = raw[field]
+                    if not isinstance(values, list):
+                        raise ValueError("Expected snapshot list")
+                    entry = {field: values, "fetchedAt": raw["fetchedAt"] / 1000}
+                    if target == "_top_team_cache":
+                        entry = {"playerIds": set(values), "teamAbbreviation": raw["teamAbbreviation"], "fetchedAt": entry["fetchedAt"]}
+                    elif field == "ids":
+                        entry["ids"] = set(values)
+                elif target == "_usage_cache":
+                    entry = {(int(key.split(":", 1)[0]), key.split(":", 1)[1]): value for key, value in raw.items()}
+                else:
+                    entry = {int(key): value for key, value in raw.items()}
+                globals()[target] = entry
+                _snapshot_versions[filename] = version
+            except FileNotFoundError:
+                pass
+            except (OSError, ValueError, KeyError, TypeError, IndexError) as error:
+                print(f"[snapshots] keeping previous {filename}: {type(error).__name__}")
+
 
 def fetch_stats_for_player(player_id):
     cached = _cache.get(player_id)
+    if CACHE_ONLY:
+        return cached["stats"] if cached else None
     if cached:
         if (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS:
             print(f"[cache HIT] player_id={player_id}")
@@ -538,10 +609,13 @@ def _fetch_and_cache_stats(player_id):
                 return round(total / total_gp, 1) if total is not None else None
 
             try:
-                bio = fetch_player_bio(player_id)
+                saved = _cache.get(player_id, {}).get("stats") or {}
+                bio = ({key: saved.get(key) for key in ("position", "draftYear", "country")}
+                       if REFRESH_JOB and saved.get("position") and saved.get("draftYear")
+                       else fetch_player_bio(player_id))
             except Exception as e:
-                print(f"[bio lookup failed] player_id={player_id} ({e.__class__.__name__}: {e})")
-                bio = {"position": None, "draftYear": None, "country": None}
+                print(f"[bio lookup failed] player_id={player_id} ({e.__class__.__name__})")
+                bio = {key: saved.get(key) for key in ("position", "draftYear", "country")}
 
             history = team_history(df)
 
@@ -572,6 +646,8 @@ def _fetch_and_cache_stats(player_id):
                 "country": bio.get("country"),
             }
 
+    if stats is None and _cache.get(player_id, {}).get("stats"):
+        raise ValueError("Empty response would replace saved career stats")
     _cache[player_id] = {"stats": stats, "fetchedAt": time.time()}
     save_stats_cache_to_disk()
 
@@ -668,6 +744,8 @@ def _fetch_and_cache_awards(player_id):
     awards.sort(key=lambda a: (AWARD_TIER_ORDER.get(a["tier"], 4), -a["count"]))
     awards = awards[:MAX_AWARD_CHIPS]
 
+    if not awards and _awards_cache.get(player_id, {}).get("awards"):
+        raise ValueError("Empty response would replace saved awards")
     _awards_cache[player_id] = {"fetchedAt": time.time(), "awards": awards}
     save_awards_cache_to_disk()
     return awards
@@ -681,6 +759,8 @@ def fetch_player_awards(player_id):
     [] rather than raising on any failure: an accolades strip is a nice-to-
     have next to the reveal, not something worth breaking the card over."""
     cached = _awards_cache.get(player_id)
+    if CACHE_ONLY:
+        return cached["awards"] if cached else []
     if cached and (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS:
         return cached["awards"]
 
@@ -711,6 +791,8 @@ def fetch_usage_pct(player_id, season):
     live fetch of that season, not one per player."""
     cache_key = (player_id, season)
     cached = _usage_cache.get(cache_key)
+    if CACHE_ONLY:
+        return cached["value"] if cached else None
     if cached and (time.time() - cached["fetchedAt"]) < CACHE_TTL_SECONDS:
         return cached["value"]
 
@@ -763,6 +845,8 @@ def fetch_players_pool():
     one call per player. This is what the room/draft system draws random
     nominations from."""
     cached = _pool_cache["players"]
+    if CACHE_ONLY:
+        return cached or []
     if cached and (time.time() - _pool_cache["fetchedAt"]) < POOL_CACHE_TTL_SECONDS:
         return cached
 
@@ -811,6 +895,8 @@ def fetch_notable_player_ids():
     especially against a big pool like "All Eras" where a random draw would
     otherwise almost always miss the players anyone actually recognizes."""
     cached = _notable_cache["ids"]
+    if CACHE_ONLY:
+        return cached or set()
     if cached is not None and (time.time() - _notable_cache["fetchedAt"]) < NOTABLE_CACHE_TTL_SECONDS:
         return cached
 
@@ -847,6 +933,8 @@ def fetch_top_team_player_ids():
     together as one unit since a wrong or stale team id would make the
     roster meaningless on its own."""
     cached = _top_team_cache["playerIds"]
+    if CACHE_ONLY:
+        return _top_team_cache["teamAbbreviation"], cached or set()
     if cached is not None and (time.time() - _top_team_cache["fetchedAt"]) < TOP_TEAM_CACHE_TTL_SECONDS:
         return _top_team_cache["teamAbbreviation"], cached
 
@@ -1239,6 +1327,8 @@ def warmup_status():
 
 @app.get("/debug-reachability")
 def debug_reachability():
+    if CACHE_ONLY:
+        return jsonify({"error": "LIVE_LOOKUPS_DISABLED"}), 403
     """One-off diagnostic: is stats.nba.com the only blocked host from
     wherever this is deployed, or does that block extend to NBA's separate
     photo CDN and/or Wikipedia too? Answers whether photos.py's lookups
@@ -1514,7 +1604,8 @@ if __name__ == "__main__":
     # still benefits from the disk cache (each worker persists what it
     # fetches and reloads it on restart); it just doesn't proactively
     # bulk-warm the notable pool the way local dev does here.
-    threading.Thread(target=warm_notable_pool, daemon=True).start()
+    if not CACHE_ONLY:
+        threading.Thread(target=warm_notable_pool, daemon=True).start()
 
     # host="0.0.0.0" so this is reachable from outside the container/machine
     # it runs on (Flask's dev-server default of 127.0.0.1 only accepts local

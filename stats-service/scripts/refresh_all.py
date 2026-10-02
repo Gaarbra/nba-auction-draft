@@ -1,188 +1,152 @@
-"""Refreshes the data files stats-service/server ship to production:
-server/data/players.json, server/data/notablePlayers.json,
-stats-service/data/statsCache.json, and stats-service/data/awardsCache.json.
-
-This exists because Render's own outbound IP is confirmed blocked by
-stats.nba.com (every live lookup from there fails outright, see
-app.py's ON_RENDER handling), so production can never refresh this data on
-its own. It has to be fetched from somewhere that *can* reach stats.nba.com
-and shipped via a normal commit + push, which then triggers Render's usual
-auto-deploy. Meant to be run on a schedule (see
-.github/workflows/refresh-data.yml) rather than only by hand.
-
-Run from stats-service/:  python scripts/refresh_all.py
+"""Bounded, resumable refresh. Run only where the NBA API is reachable.
+Docker uses a shared data volume; local/CI runs also update server catalogues.
 """
-
-import json
 import os
-import random
+from pathlib import Path
 import sys
 import time
+import signal
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from dotenv import load_dotenv  # noqa: E402
-
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
-
-import app as stats_app  # noqa: E402  (side-effect-safe to import, see warm_full_pool.py)
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SERVER_DATA_DIR = os.path.join(ROOT_DIR, "server", "data")
-PLAYERS_FILE = os.path.join(SERVER_DATA_DIR, "players.json")
-NOTABLE_FILE = os.path.join(SERVER_DATA_DIR, "notablePlayers.json")
-
-# Same jittered, one-at-a-time pacing as warm_full_pool.py. stats.nba.com's
-# rate limiting tracks request rate, not total volume.
-DELAY_RANGE = (1.0, 1.6)
-FAILURE_THRESHOLD = 3
-COOLDOWN_SECONDS = 45
-SAVE_EVERY = 25
-
-# Bounded so a routine scheduled run can't hang for hours. In steady state
-# only a handful of players are ever missing between runs (a new draftee, a
-# rare late-career debut), so this ceiling is normally never hit. A big
-# backlog (e.g. right after a season's rookie class gets added to the pool)
-# just means the run picks up where it left off next time instead of
-# finishing in one shot.
-MAX_RUNTIME_SECONDS = int(os.environ.get("REFRESH_MAX_RUNTIME_SECONDS", 20 * 60))
-# Separate, smaller budget: awards change far less often than "is this
-# rookie in the pool yet," so a scheduled run should spend most of its time
-# on stats and only a modest slice keeping awards topped up.
-AWARDS_MAX_RUNTIME_SECONDS = int(os.environ.get("REFRESH_AWARDS_MAX_RUNTIME_SECONDS", 10 * 60))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "stats-service"))
+DAY = 86400
 
 
-def refresh_players_pool():
-    print("Refreshing player pool...")
-    pool = stats_app.fetch_players_pool()
-    entry = {"fetchedAt": int(time.time() * 1000), "players": pool}
-    with open(PLAYERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(entry, f, indent=2)
-    print(f"  wrote {len(pool)} players")
-    return pool
+def due_players(pool, cache, now, active_days=7):
+    # Retired careers are stable: refresh only missing data, not 5,000 careers weekly.
+    due = [p for p in pool if p["id"] not in cache or
+           (p["isActive"] and now - cache[p["id"]].get("fetchedAt", 0) >= active_days * DAY)]
+    return sorted(due, key=lambda p: (not p["isActive"], cache.get(p["id"], {}).get("fetchedAt", 0), p["id"]))
 
 
-def refresh_notable_players():
-    print("Refreshing notable-players pool...")
-    ids = stats_app.fetch_notable_player_ids()
-    entry = {"fetchedAt": int(time.time() * 1000), "ids": ids}
-    with open(NOTABLE_FILE, "w", encoding="utf-8") as f:
-        json.dump(entry, f, indent=2)
-    print(f"  wrote {len(ids)} ids")
-    return ids
-
-
-def warm_missing_stats(all_ids):
-    already_cached = set(stats_app._cache.keys())
-    to_fetch = [pid for pid in all_ids if pid not in already_cached]
-    print(f"Stats cache: {len(already_cached)} already cached, {len(to_fetch)} missing.")
-    if not to_fetch:
-        return
-
-    start = time.time()
-    consecutive_failures = 0
-    fetched = 0
-    no_stats = 0
-    failed = 0
-
-    for i, player_id in enumerate(to_fetch, 1):
-        if time.time() - start > MAX_RUNTIME_SECONDS:
-            print(
-                f"  hit the {MAX_RUNTIME_SECONDS}s runtime budget, stopping early "
-                f"({i - 1}/{len(to_fetch)} attempted), picks up where it left off next run."
-            )
-            break
-
-        try:
-            result = stats_app.fetch_stats_for_player(player_id)
-            # A clean return -- whether it found real stats or confirmed
-            # there are none to find -- isn't a failure, it's cached either
-            # way; only an actual exception (network error, timeout, rate
-            # limit) below counts toward the cooldown.
-            if result:
-                fetched += 1
-            else:
-                no_stats += 1
-            consecutive_failures = 0
-        except Exception as e:
-            failed += 1
-            consecutive_failures += 1
-            print(f"  [{i}/{len(to_fetch)}] id={player_id} failed: {e.__class__.__name__}: {e}")
-
-        if i % SAVE_EVERY == 0:
-            print(f"  [{i}/{len(to_fetch)}] fetched={fetched} no_stats={no_stats} failed={failed}")
-
-        if consecutive_failures >= FAILURE_THRESHOLD:
-            print(f"  {consecutive_failures} failures in a row, cooling down {COOLDOWN_SECONDS}s...")
-            time.sleep(COOLDOWN_SECONDS)
-            consecutive_failures = 0
-
-        time.sleep(random.uniform(*DELAY_RANGE))
-
-    print(f"Stats warm-up done. fetched={fetched} no_stats={no_stats} failed={failed}. Cache now {len(stats_app._cache)} total.")
-
-
-def warm_missing_awards():
-    # Same candidate set as scripts/warm_awards.py: only players with a
-    # confirmed real career (already in the stats cache) are worth an
-    # awards lookup at all.
-    candidate_ids = [pid for pid, entry in stats_app._cache.items() if entry.get("stats")]
-    already_cached = set(stats_app._awards_cache.keys())
-    to_fetch = [pid for pid in candidate_ids if pid not in already_cached]
-    print(f"Awards cache: {len(already_cached)} already cached, {len(to_fetch)} missing.")
-    if not to_fetch:
-        return
-
-    start = time.time()
-    consecutive_failures = 0
-    fetched = 0
-    no_awards = 0
-    failed = 0
-
-    for i, player_id in enumerate(to_fetch, 1):
-        if time.time() - start > AWARDS_MAX_RUNTIME_SECONDS:
-            print(
-                f"  hit the {AWARDS_MAX_RUNTIME_SECONDS}s awards runtime budget, stopping early "
-                f"({i - 1}/{len(to_fetch)} attempted), picks up where it left off next run."
-            )
-            break
-
-        try:
-            # Goes straight to the live fetch (not fetch_player_awards'
-            # public wrapper) so this never silently no-ops if ON_RENDER
-            # were ever accidentally set for a run of this script -- see
-            # scripts/warm_awards.py for the identical reasoning.
-            awards = stats_app._fetch_and_cache_awards(player_id)
-            if awards:
-                fetched += 1
-            else:
-                no_awards += 1
-            consecutive_failures = 0
-        except Exception as e:
-            failed += 1
-            consecutive_failures += 1
-            print(f"  [{i}/{len(to_fetch)}] id={player_id} failed: {e.__class__.__name__}: {e}")
-
-        if i % SAVE_EVERY == 0:
-            print(f"  [{i}/{len(to_fetch)}] fetched={fetched} no_awards={no_awards} failed={failed}")
-
-        if consecutive_failures >= FAILURE_THRESHOLD:
-            print(f"  {consecutive_failures} failures in a row, cooling down {COOLDOWN_SECONDS}s...")
-            time.sleep(COOLDOWN_SECONDS)
-            consecutive_failures = 0
-
-        time.sleep(random.uniform(*DELAY_RANGE))
-
-    print(f"Awards warm-up done. fetched={fetched} no_awards={no_awards} failed={failed}. Cache now {len(stats_app._awards_cache)} total.")
+def refresh_batch(candidates, fetch, publish, budget, clock=time.monotonic, sleep=time.sleep):
+    deadline = clock() + budget
+    completed = failed = consecutive = 0
+    try:
+        for player in candidates:
+            if clock() >= deadline:
+                break
+            try:
+                fetch(player["id"])
+                completed += 1
+                consecutive = 0
+            except Exception as error:
+                failed += 1
+                consecutive += 1
+                print(f"[refresh] id={player['id']} failed: {type(error).__name__}")
+                if consecutive >= 3:
+                    raise RuntimeError("Three consecutive failures; keeping saved data and stopping") from None
+                sleep(10 * consecutive)
+            if completed and completed % 25 == 0:
+                publish()
+            sleep(2)
+    finally:
+        publish()
+    print(f"[refresh] completed={completed} failed={failed} pending={len(candidates)-completed}")
+    return failed
 
 
 def main():
-    players = refresh_players_pool()
-    refresh_notable_players()
-    warm_missing_stats([p["id"] for p in players])
-    warm_missing_awards()
-    print("Done.")
+    # Set before importing app: never build ML indexes or start background fetches here.
+    os.environ["STATS_REFRESH_JOB"] = "1"
+    os.environ["STATS_CACHE_ONLY"] = "0"
+    os.environ.pop("RENDER", None)
+    from dotenv import load_dotenv
+    load_dotenv(ROOT / "stats-service" / ".env")
+    data = ROOT / "stats-service" / "data"
+    data.mkdir(exist_ok=True)
+    # Linux job lock also protects against manual runs overlapping the weekly timer.
+    import fcntl
+    with open(data / ".refresh.lock", "a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("[refresh] Another refresh is already running; skipped.")
+            return 0
+        import app as service
+
+        def publish():
+            service._atomic_write_json(service.STATS_CACHE_FILE, service._cache)
+            service._atomic_write_json(service.AWARDS_CACHE_FILE, service._awards_cache)
+            service._atomic_write_json(service.USAGE_CACHE_FILE, {
+                service._usage_cache_key(*key): value for key, value in service._usage_cache.items()
+            })
+
+        def catalogue(name, value):
+            service._atomic_write_json(str(data / name), value)
+            if os.environ.get("REFRESH_SERVER_CATALOGUES", "1") == "1":
+                service._atomic_write_json(str(ROOT / "server" / "data" / name), value)
+
+        started = time.time()
+        status = {"startedAt": started, "state": "running"}
+        def interrupted(signum, frame):
+            raise RuntimeError("Refresh interrupted; checkpointing")
+        signal.signal(signal.SIGTERM, interrupted)
+        service._atomic_write_json(str(data / "refreshStatus.json"), status)
+        try:
+            pool = service.fetch_players_pool()
+            if not pool:
+                raise ValueError("Empty player catalogue; preserving saved data")
+            catalogue("players.json", {"players": pool, "fetchedAt": time.time() * 1000})
+            time.sleep(2)
+            notable = service.fetch_notable_player_ids()
+            if not notable:
+                raise ValueError("Empty notable catalogue; preserving saved data")
+            catalogue("notablePlayers.json", {"ids": sorted(notable), "fetchedAt": time.time() * 1000})
+            time.sleep(2)
+            team, ids = service.fetch_top_team_player_ids()
+            if team and ids:
+                catalogue("topTeamPlayers.json", {"ids": sorted(ids), "teamAbbreviation": team, "fetchedAt": time.time() * 1000})
+            failed = refresh_batch(
+                due_players(pool, service._cache, time.time()),
+                service._fetch_and_cache_stats, publish,
+                max(1, int(os.environ.get("REFRESH_MAX_RUNTIME_SECONDS", "1200"))),
+            )
+            award_pool = [p for p in pool if service._cache.get(p["id"], {}).get("stats")]
+            failed += refresh_batch(
+                due_players(award_pool, service._awards_cache, time.time(), active_days=30),
+                service._fetch_and_cache_awards, publish,
+                max(1, int(os.environ.get("REFRESH_AWARDS_MAX_RUNTIME_SECONDS", "600"))),
+            )
+            # Existing endpoint fetches the entire league per season. Warm each
+            # season once; historical seasons with saved data need no weekly work.
+            seasons = {}
+            for player in pool:
+                stats = service._cache.get(player["id"], {}).get("stats") or {}
+                season = stats.get("lastSeason")
+                if season and season >= service.EARLIEST_USG_SEASON:
+                    seasons[season] = player["id"]
+            current = max(seasons, default="")
+            pending_usage = []
+            for season, pid in sorted(seasons.items(), reverse=True):
+                entries = [v for (_, s), v in service._usage_cache.items() if s == season]
+                if entries and (season != current or time.time() - max(v["fetchedAt"] for v in entries) < 7 * DAY):
+                    continue
+                pending_usage.append((season, pid))
+            usage_deadline = time.monotonic() + 300
+            status["pendingUsageSeasons"] = len(pending_usage)
+            for season, pid in pending_usage:
+                if time.monotonic() >= usage_deadline:
+                    break
+                service.fetch_usage_pct(pid, season)
+                publish()
+                status["pendingUsageSeasons"] -= 1
+                time.sleep(2)
+            status["state"] = "partial" if failed else "complete"
+            status["pendingStats"] = len(due_players(pool, service._cache, time.time()))
+            status["pendingAwards"] = len(due_players(award_pool, service._awards_cache, time.time(), 30))
+            if status["pendingStats"] or status["pendingAwards"] or status["pendingUsageSeasons"]:
+                status["state"] = "partial"
+            return 1 if failed else 0
+        except Exception as error:
+            status.update(state="failed", error=type(error).__name__)
+            print(f"[refresh] Stopped: {type(error).__name__}; saved data retained.")
+            return 1
+        finally:
+            publish()
+            status["finishedAt"] = time.time()
+            service._atomic_write_json(str(data / "refreshStatus.json"), status)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
