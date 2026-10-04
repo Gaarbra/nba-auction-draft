@@ -1,5 +1,4 @@
-"""Archives raw stats.nba.com API responses to S3, unprocessed. Phase 2 of
-the planned AWS work (see AWS_MIGRATION.md; Phase 1 was the RDS move).
+"""Optional backups of raw stats.nba.com API responses to S3.
 
 Everywhere else in this app, a live nba_api response gets parsed down into
 the small derived shape the product actually needs right now (career
@@ -35,8 +34,7 @@ def _get_client():
     not worth paying at module load for a feature that might not even be
     configured, so the import itself lives in here, not at the top of the
     file. Credentials come from boto3's standard chain (AWS_ACCESS_KEY_ID /
-    AWS_SECRET_ACCESS_KEY env vars, same `sync: false`-in-render.yaml
-    pattern as DATABASE_URL), never hardcoded and never read directly by
+    AWS_SECRET_ACCESS_KEY env vars), never hardcoded and never read directly by
     this module."""
     global _client, _client_init_attempted, _warned_not_configured
     if _client_init_attempted:

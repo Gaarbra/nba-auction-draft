@@ -2,3 +2,12 @@ node_modules/
 dist/
 .env
 graphify-out/
+
+# Local AI tools and generated design reports
+/.agents/
+/.claude/
+/.codex/
+/.impeccable/
+/.github/agents/
+/.github/skills/
+/skills-lock.json

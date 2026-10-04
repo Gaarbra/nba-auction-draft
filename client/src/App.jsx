@@ -103,7 +103,7 @@ export default function App() {
 
   // A dead invite link is the one real "you tried to go somewhere that
   // doesn't exist" moment this app has -- there's no client-side router to
-  // 404 on otherwise (render.yaml rewrites every path to this same
+  // 404 on otherwise (Caddy serves app paths with the same
   // index.html). Reads the code once on load and scrubs it from the URL
   // right away, same as any app that treats a query param as one-time
   // input rather than durable state.

@@ -22,7 +22,7 @@ Unlike typical season-long fantasy basketball (roster management over months, re
 
 - Real-time multiplayer via Socket.IO (server: Node/Express) plus a from-scratch "Local" mode for pass-and-play on one device.
 - Player stats/photos come from a separate Python/Flask `stats-service` backed by `nba_api` / stats.nba.com data, cached to survive that upstream being unreachable from the hosting provider.
-- Deployed on Render.com free tier (client, server, stats-service as separate services). Cold starts and idle spin-down are real, user-facing constraints already mitigated (stale-while-revalidate caches, a wake-up ping on page load).
+- Deployed on Servercheap with Docker Compose and Caddy. Gameplay reads saved data; the weekly maintenance job refreshes it through the configured proxy.
 - In-room text chat exists alongside the draft (profanity/slur-filtered).
 - Host picks player pool (era), difficulty, and bidding style (orderly turn order vs. open bidding) before starting a draft.
 

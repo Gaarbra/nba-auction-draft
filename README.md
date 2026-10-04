@@ -73,7 +73,7 @@ This was built for casual play with friends over a shared room code, not for pub
 
 ### Draft flow
 
-Before starting, the host picks a player pool for the room: a career-start decade, "Active Now," or "All Eras." Turn order gets randomized once at draft start, so the host doesn't automatically go first, and then play proceeds round-robin from there. On your turn, you just click "Reveal Random Player." The server draws a random undrafted player from the room's pool and checks with `stats-service` for that player before actually committing to them. If that player has no findable stats, it draws again, up to 6 times, which biases the draft pretty heavily toward always landing on someone with real career stats to show. That whole check happens before the pick gets broadcast to the room, so the frontend plays a short "rolling" animation (cycling through real names sampled from the room's pool, for at least about 1.4 seconds) while it's in flight, and only lands on the confirmed player once their stats are resolved. The starting bid is fixed at 1 coin. There's no searching for or hand-picking which player comes up. Other players can raise the bid (any amount above the current bid, up to their own budget) or pass, and once everyone but the high bidder has passed, that player picks an open roster slot for their new player. If picking a slot would leave too little budget for the remaining open slots, the app shows a warning, but it doesn't block the pick. That decision is left up to the player. Solo rooms skip bidding entirely: reveal, then assign right away, at a flat 1-coin price every time, since there's no one else to bid it up. Since that removes any real decision from a solo pick, a solo draft gets one reroll for the whole draft (not per pick) to spend on whichever nomination you'd rather not keep. Solo picks are also excluded from the data the price-prediction model behind the Market tab's "Suggested value" trains on (`stats-service/scripts/train_price_model.py`), since a price nobody actually had to compete for isn't a real market signal. A draft is marked complete once every player's roster is full, 5 out of 5.
+Before starting, the host picks a player pool for the room: a career-start decade, "Active Now," or "All Eras." Turn order gets randomized once at draft start, so the host doesn't automatically go first, and then play proceeds round-robin from there. On your turn, you just click "Reveal Random Player." The server draws a random undrafted player from the room's pool and checks with `stats-service` for that player before actually committing to them. If that player has no findable stats, it draws again, up to 6 times, which biases the draft pretty heavily toward always landing on someone with real career stats to show. That whole check happens before the pick gets broadcast to the room, so the frontend plays a short "rolling" animation (cycling through real names sampled from the room's pool, for at least about 1.4 seconds) while it's in flight, and only lands on the confirmed player once their stats are resolved. The starting bid is fixed at 1 coin. There's no searching for or hand-picking which player comes up. Other players can raise the bid (any amount above the current bid, up to their own budget) or pass, and once everyone but the high bidder has passed, that player picks an open roster slot for their new player. If picking a slot would leave too little budget for the remaining open slots, the app shows a warning, but it doesn't block the pick. That decision is left up to the player. Solo rooms skip bidding entirely: reveal, then assign right away, without spending coins, since there's no one else to bid it up. Since that removes any real decision from a solo pick, a solo draft gets one reroll for the whole draft (not per pick) to spend on whichever nomination you'd rather not keep. Solo picks are also excluded from the data the price-prediction model behind the Market tab's "Suggested value" trains on (`stats-service/scripts/train_price_model.py`), since a price nobody actually had to compete for isn't a real market signal. A draft is marked complete once every player's roster is full, 5 out of 5.
 
 ### Scoring & results
 
@@ -118,21 +118,11 @@ Both estimates get flagged (`usagePctEstimated`), so the results screen can mark
 
 The results screen also ranks all the teams by Final Team Score and shows a simple win-probability estimate for every matchup between two teams. That's a logistic curve applied to the score gap between them, tuned so that a gap of about 50 points reads as roughly a 73/27 split. It's a documented heuristic we picked by hand, not something fitted to real outcome data.
 
-## Deploying (Render)
+## Deployment
 
-`render.yaml` at the repo root is a Render Blueprint that deploys all three pieces, the static frontend, the Node backend, and the Python stats service, as separate free-tier services from this one repo.
-
-1. Push this repo to GitHub, if it isn't already there.
-2. In the Render dashboard: **New > Blueprint**, then connect the repo. Render reads `render.yaml` and proposes the three services (`hoop-bids-client`, `hoop-bids-server`, `hoop-bids-stats-service`).
-3. Apply the blueprint. The first deploy will fail to fully connect the services to each other. That's expected, see the next step.
-4. Once all three have deployed at least once, each one has a real URL under its own **Settings** tab (something like `https://hoop-bids-client.onrender.com`). Go to each service's **Environment** tab and fill in the placeholder vars that `render.yaml` left blank:
-   - `hoop-bids-server`: `STATS_SERVICE_URL` set to the stats service's URL, `CLIENT_ORIGIN` set to the client's URL
-   - `hoop-bids-client`: `VITE_SERVER_URL` set to the server's URL (this one gets baked in at build time, so saving it triggers a full rebuild, not just a restart)
-   - Required: set `TURNSTILE_SECRET_KEY` on the server and `VITE_TURNSTILE_SITE_KEY` on the client for a widget allowing your client hostname. Rebuild the client.
-   - Optional: `VITE_POSTHOG_KEY`/`VITE_POSTHOG_HOST` on `hoop-bids-client` for PostHog analytics (draft nominations, bids, assignments, results viewed). Get the key from your PostHog project's **Project settings > API keys** (the public one, not a personal API key). Left unset, PostHog just doesn't load.
-5. Give friends the client's URL. That's the one people actually open.
-
-Free-tier services spin down after 15 minutes idle and take roughly 30-50 seconds to wake back up on the next request, so expect a slow first load if nobody's used the room in a while. There's no persistent disk needed either way, since the player-pool cache and every room live in memory and rebuild themselves, so the free tier's lack of storage isn't actually a problem here.
+Production runs on Servercheap using Docker Compose, Caddy and PostgreSQL.
+See [SERVERCHEAP.md](SERVERCHEAP.md) for installation, updates, backups and the Saturday data refresh.
+Gameplay uses saved data; the maintenance job refreshes NBA data through the configured proxy.
 
 ## Project structure
 
@@ -143,8 +133,8 @@ client/                React (Vite) frontend
 stats-service/         Flask + nba_api microservice. Player pool, per-game stats, headshots, everything NBA-data-related
 ```
 
-## Budget deployment
+## Additional documentation
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for Docker Compose, domain setup, bot protection,
-current low-cost hosting options, and a backup-first migration from AWS.
-Production now requires Turnstile keys; rebuild the client with its public site key.
+- [Active Now](ACTIVE_NOW.md): season-only player stats and scoring.
+- [Product](PRODUCT.md): design and product context.
+- [Legal review](LEGAL_REVIEW.md): outstanding privacy and content-rights work.

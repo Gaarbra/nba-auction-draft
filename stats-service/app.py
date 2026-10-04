@@ -42,7 +42,7 @@ REFRESH_JOB = os.environ.get("STATS_REFRESH_JOB") == "1"
 
 # Module level, not inside `if __name__ == "__main__"`, so this also runs
 # under gunicorn in production (which imports this module directly and
-# never hits that guard, see render.yaml). It's idempotent (CREATE TABLE IF
+# never hits that guard, see Dockerfile). It's idempotent (CREATE TABLE IF
 # NOT EXISTS) and a no-op if DATABASE_URL isn't set, so it's safe to call
 # from every worker process without any coordination between them.
 db.init_schema()
@@ -259,7 +259,7 @@ def load_stats_cache_from_disk():
 
 # Module level, not just under `if __name__ == "__main__"`. That guard used
 # to only run for local `python app.py` dev, which meant gunicorn
-# (production, see render.yaml) never loaded the committed statsCache.json
+# (production, see Dockerfile) never loaded the committed statsCache.json
 # at all, and started every worker with an empty cache regardless of what
 # shipped with the code. Safe to call per-worker: it's just reading a file
 # into that worker's own memory, with nothing to coordinate across workers.
@@ -1606,7 +1606,7 @@ if __name__ == "__main__":
     # Runs the notable-pool warm-up once, in the background, only under
     # local dev (`python app.py`). Deliberately NOT at module level, since
     # production runs this file under gunicorn with multiple worker
-    # processes (see render.yaml's --workers 2), and each worker importing
+    # processes when configured that way, and each worker importing
     # this module would otherwise kick off its own independent warm-up,
     # multiplying the request rate right back into the kind of burst that
     # trips stats.nba.com's rate limiting in the first place. Production
@@ -1621,7 +1621,7 @@ if __name__ == "__main__":
     # connections). Needed for both Docker-style deploys and the Node
     # server calling in from a separate host on a cloud platform. In
     # production this file isn't actually the entry point at all: gunicorn
-    # runs it directly (see render.yaml) since Flask's built-in server isn't
+    # runs it directly (see Dockerfile) since Flask's built-in server isn't
     # meant to take real traffic.
     #
     # threaded=True so a live request (e.g. a real nomination, or a

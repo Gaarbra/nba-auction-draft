@@ -5,7 +5,7 @@ import LogoMark from "./LogoMark.jsx";
  * link (?room=CODE) and that specific room turns out to be a dead end:
  * already started, already full, or just gone. This app has no
  * client-side router (every URL renders the same single-page app, see
- * render.yaml's SPA rewrite), so there's no "unknown route" to 404 on --
+ * Caddyfile's SPA fallback), so there's no "unknown route" to 404 on --
  * a broken invite link is the one real "you tried to go somewhere that
  * doesn't exist" moment it actually has, and this is the dedicated page
  * for it, instead of just the small inline error text a mistyped room
