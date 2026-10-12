@@ -48,7 +48,7 @@ function getHintText(playerCount, isHost, isLocal, maxPlayers) {
 
 export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, onStartDraft }) {
   const [gameMode, setGameMode] = useState("classic");
-  const maxPlayers = room.maxPlayers ?? 4;
+  const maxPlayers = room.maxPlayers ?? 8;
   const [limitError, setLimitError] = useState("");
   const emptySlots = maxPlayers - room.players.length;
   const currentPlayer = room.players.find((p) => p.id === currentPlayerId);

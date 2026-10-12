@@ -12,6 +12,8 @@ www.{$DOMAIN} {
   }
   @appMetadata path /hoopbids/sw.js /hoopbids/manifest.webmanifest
   header @appMetadata Cache-Control "no-cache"
+  @appEntry path /hoopbids /hoopbids/ /hoopbids/index.html
+  header @appEntry Cache-Control "no-cache"
   @backend path /api/* /socket.io/* /health
   handle @backend {
     reverse_proxy server:4000

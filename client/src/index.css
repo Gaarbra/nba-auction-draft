@@ -1811,6 +1811,13 @@ form input {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
+.room-card .dropdown-menu {
+  position: static;
+  margin-top: 6px;
+  max-height: min(360px, 50dvh);
+  overscroll-behavior: contain;
+}
+
 .dropdown-option {
   width: 100%;
   text-align: left;

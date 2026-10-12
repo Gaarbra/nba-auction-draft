@@ -70,6 +70,7 @@ export default function TeamDropdown({ options, value, onChange, placeholder = "
       {open && (
         <motion.ul
           className="dropdown-menu team-dropdown-menu"
+          data-lenis-prevent
           role="listbox"
           initial={{ opacity: 0, y: -6, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
