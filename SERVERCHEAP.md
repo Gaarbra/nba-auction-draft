@@ -104,3 +104,9 @@ sudo docker compose --profile maintenance run --rm --no-deps refresh python scri
 
 Keep the terminal session open until completion. Gameplay continues using saved
 data. The usual Saturday job remains active-player-only.
+
+The backfill waits 3-5 seconds between players. A failed fetch gets two retries
+after roughly 30 and 90 seconds, then a five-minute pause before moving on.
+Three consecutive players exhausting their retries stop the run with a nonzero
+exit status. Saved peaks remain on disk and are skipped on the next run.
+This reduces request pressure but cannot guarantee access through the proxy.
