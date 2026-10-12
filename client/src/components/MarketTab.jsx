@@ -9,7 +9,7 @@ import StatRadarChart from "./StatRadarChart.jsx";
 import PlayerInsights from "./PlayerInsights.jsx";
 import TeamBadge from "./TeamBadge.jsx";
 import PlayerAccolades from "./PlayerAccolades.jsx";
-import { loadMarketCatalogue } from "../marketCatalogue.js";
+import { loadMarketCatalogue, marketTeams, playedInMarketEra } from "../marketCatalogue.js";
 import { getTeamColors } from "../teamColors.js";
 import { getHistoricalTeamName } from "../teamNames.js";
 
@@ -29,11 +29,6 @@ const ERA_BUCKETS = [
   { id: "2020s", label: "2020s", start: 2020, end: 2029 },
 ];
 
-function eraIdFor(draftYear) {
-  if (draftYear == null) return null;
-  const bucket = ERA_BUCKETS.find((b) => draftYear >= b.start && draftYear <= b.end);
-  return bucket ? bucket.id : null;
-}
 
 // Ranks a team roster or a name search's matches by real career
 // points-per-game -- "top players" by the numbers, not alphabetically --
@@ -191,12 +186,12 @@ export default function MarketTab({ socket }) {
 
   const eraFiltered = useMemo(() => {
     if (era === "all") return index;
-    return index.filter((p) => eraIdFor(p.draftYear) === era);
+    return index.filter((p) => playedInMarketEra(p, era));
   }, [index, era]);
 
   const teamOptions = useMemo(() => {
     const counts = new Map();
-    for (const p of eraFiltered) counts.set(p.team, (counts.get(p.team) || 0) + 1);
+    for (const p of eraFiltered) for (const abbreviation of marketTeams(p, era)) counts.set(abbreviation, (counts.get(abbreviation) || 0) + 1);
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([abbr, count]) => {
@@ -207,7 +202,7 @@ export default function MarketTab({ socket }) {
         const label = historicalName ? `${historicalName} (${abbr})` : abbr;
         return { value: abbr, label: `${label} · ${count} player${count === 1 ? "" : "s"}` };
       });
-  }, [eraFiltered]);
+  }, [eraFiltered, era]);
 
   // A team that no longer has any players in the newly-selected era gets
   // cleared rather than silently showing a stale, now-empty player list.
@@ -218,8 +213,8 @@ export default function MarketTab({ socket }) {
 
   const teamPlayers = useMemo(() => {
     if (!team) return [];
-    return eraFiltered.filter((p) => p.team === team).sort(byPointsPerGame);
-  }, [eraFiltered, team]);
+    return eraFiltered.filter((p) => marketTeams(p, era).includes(team)).map(p => ({ ...p, team })).sort(byPointsPerGame);
+  }, [eraFiltered, team, era]);
 
   useEffect(() => {
     if (playerId && team && !teamPlayers.some((p) => String(p.id) === String(playerId))) setPlayerId(null);
@@ -241,7 +236,7 @@ export default function MarketTab({ socket }) {
   }, [search, team, teamPlayers, eraFiltered, positionTag, index]);
   const shownResults = searchResults.slice(0, SEARCH_RESULTS_LIMIT);
 
-  const selectedMeta = index.find((p) => String(p.id) === String(playerId));
+  const selectedMeta = searchResults.find((p) => String(p.id) === String(playerId)) || index.find((p) => String(p.id) === String(playerId));
 
   // Fetch this player's real per-game stats whenever the selection changes.
   useEffect(() => {
@@ -305,7 +300,7 @@ export default function MarketTab({ socket }) {
       <header className="market-page-heading">
         <div>
           <h1>Player market</h1>
-          <p>Scout career stats, compare value, and follow completed auctions.</p>
+          <p>Browse teams by seasons played and current rosters. Stats and values are career-based.</p>
         </div>
       </header>
       {/* Real numbers only -- the Stitch mock's own "24H volume"/"Market

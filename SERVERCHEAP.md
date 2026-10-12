@@ -110,3 +110,25 @@ after roughly 30 and 90 seconds, then a five-minute pause before moving on.
 Three consecutive players exhausting their retries stop the run with a nonzero
 exit status. Saved peaks remain on disk and are skipped on the next run.
 This reduces request pressure but cannot guarantee access through the proxy.
+
+## Market team and era history
+
+The market uses actual team-season records, not draft year or one primary team.
+A player can appear under several franchises. Seasons are grouped by start year
+(for example, 2009-10 belongs to the 2000s). Current roster membership comes from
+the weekly player catalogue, even before the new regular season begins. Market
+stats and suggested values remain career-based, not specific to a team stint.
+
+Old caches have team totals but no season dates. Those teams remain available
+under All eras; the market does not invent dates for a specific decade. To add
+missing dates, run the existing resumable backfill with `--team-history` after
+stopping any other refresh writer:
+
+```bash
+sudo docker compose --profile maintenance run --rm --no-deps refresh python scripts/warm_peak_seasons.py --team-history
+```
+
+This uses the configured proxy and may re-fetch historical players whose peaks
+are already saved. It skips players once both peak data and dated history exist.
+The regular weekly refresh continues to fetch only active players and updates
+their team histories plus the current roster catalogue automatically.

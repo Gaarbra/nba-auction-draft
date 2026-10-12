@@ -251,6 +251,8 @@ export async function fetchMarketIndex() {
       const team = stats?.mostPlayedTeam || stats?.team;
       return team ? { id: player.id, fullName: player.fullName, team,
         position: stats.position, draftYear: stats.draftYear,
+        teamHistory: stats.teamHistory || [], firstSeason: stats.firstSeason, lastSeason: stats.lastSeason,
+        currentTeam: player.currentTeam, rosterSeason: player.rosterSeason,
         gamesPlayed: stats.gamesPlayed, pointsPerGame: stats.pointsPerGame } : null;
     }));
     const list = saved.filter(Boolean);

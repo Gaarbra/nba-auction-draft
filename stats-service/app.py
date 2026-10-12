@@ -195,12 +195,13 @@ def team_history(df):
     raw (non-deduped) rows on purpose: a traded season's per-team rows are
     exactly what's needed to split GP by team, unlike the TOT-collapsed rows
     dedupe_traded_seasons() produces for career per-game totals."""
-    real_rows = df[df["TEAM_ABBREVIATION"] != "TOT"]
+    real_rows = df[(df["TEAM_ABBREVIATION"] != "TOT") & (df["GP"] > 0)]
     if real_rows.empty:
         return []
     totals = real_rows.groupby("TEAM_ABBREVIATION")["GP"].sum()
     return [
-        {"abbreviation": team, "gamesPlayed": int(gp)}
+        {"abbreviation": team, "gamesPlayed": int(gp),
+         "seasons": sorted(real_rows.loc[real_rows["TEAM_ABBREVIATION"] == team, "SEASON_ID"].dropna().unique().tolist())}
         for team, gp in totals.sort_values(ascending=False).items()
     ]
 
@@ -964,18 +965,26 @@ def fetch_players_pool():
     if cached and (time.time() - _pool_cache["fetchedAt"]) < POOL_CACHE_TTL_SECONDS:
         return cached
 
-    resp = commonallplayers.CommonAllPlayers(is_only_current_season=0, timeout=30)
+    from active_now import season_for
+    from datetime import date
+    roster_season = season_for(date.today())
+    resp = commonallplayers.CommonAllPlayers(is_only_current_season=0, season=roster_season, timeout=30)
     df = resp.get_data_frames()[0]
 
     pool = []
     for _, row in df.iterrows():
         from_year = row.get("FROM_YEAR")
         to_year = row.get("TO_YEAR")
+        current_team = row.get("TEAM_ABBREVIATION")
+        if not isinstance(current_team, str) or not current_team.strip() or current_team == "TOT":
+            current_team = None
         pool.append(
             {
                 "id": int(row["PERSON_ID"]),
                 "fullName": row["DISPLAY_FIRST_LAST"],
                 "isActive": bool(row["ROSTERSTATUS"]),
+                "currentTeam": current_team if row["ROSTERSTATUS"] else None,
+                "rosterSeason": roster_season,
                 "fromYear": int(from_year) if str(from_year).isdigit() else None,
                 "toYear": int(to_year) if str(to_year).isdigit() else None,
             }
@@ -1558,26 +1567,11 @@ def get_superstar_players():
 
 @app.get("/market-index")
 def get_market_index():
-    """A lightweight, browsable index of every player this service already
-    has real cached stats for. The Market tab's era/team/player pickers
-    are built from this, not a live nba_api call. Two things make this
-    reliable on Render specifically: it only reads `_cache` (loaded once at
-    startup from the committed statsCache.json, never touches stats.nba.com
-    itself), and full names come from nba_api's *static* players module,
-    which ships as bundled data in the package, not a network call, so
-    this works even though Render's outbound IP is blocked from the live
-    API. `team` prefers mostPlayedTeam over the last-active team (see
-    fetch_player_bio's docstring on why "last team" is a worse identity for
-    a career-spanning browse than "the team you actually associate this
-    player with").
-
-    Calls players.get_players() (the full static list) once, not
-    players.find_player_by_id() per player: that helper does a fresh linear
-    scan over the ~5,100-player static list on every call, about 20ms each,
-    which is fine for the odd single lookup elsewhere in this file, but
-    5,000+ of them back to back is minutes, not milliseconds. Confirmed by
-    timing it directly before landing this fix."""
+    """Saved career stats plus actual team seasons and the latest roster catalogue.
+    No live NBA requests are made while browsing the market.
+    """
     identities_by_id = {p["id"]: p for p in players.get_players()}
+    roster_by_id = {p["id"]: p for p in (_pool_cache.get("players") or [])}
 
     index = []
     for player_id, entry in _cache.items():
@@ -1595,6 +1589,11 @@ def get_market_index():
                 "team": team,
                 "position": stats.get("position"),
                 "draftYear": stats.get("draftYear"),
+                "teamHistory": stats.get("teamHistory", []),
+                "firstSeason": stats.get("firstSeason"),
+                "lastSeason": stats.get("lastSeason"),
+                "currentTeam": roster_by_id.get(player_id, {}).get("currentTeam"),
+                "rosterSeason": roster_by_id.get(player_id, {}).get("rosterSeason"),
                 # Real, already-cached career totals, used client-side for
                 # the Market tab's "hot picks" panel (most career games
                 # played per position, a defensible real proxy for "a

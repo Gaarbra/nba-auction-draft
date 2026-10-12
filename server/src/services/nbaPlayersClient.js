@@ -24,6 +24,8 @@ export async function fetchAllPlayers({ onProgress } = {}) {
     isActive: Boolean(p.isActive),
     fromYear: p.fromYear ?? null,
     toYear: p.toYear ?? null,
+    currentTeam: p.currentTeam ?? null,
+    rosterSeason: p.rosterSeason ?? null,
   }));
 
   onProgress?.({ page: 1, playersFetched: players.length, done: true });

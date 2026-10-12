@@ -14,6 +14,7 @@ Run from stats-service/:  python scripts/warm_peak_seasons.py
 """
 
 import json
+import argparse
 import os
 import random
 import sys
@@ -35,14 +36,16 @@ FAILURE_THRESHOLD = 3
 COOLDOWN_SECONDS = 300
 
 
-def needs_peak(player_id, cache):
+def needs_peak(player_id, cache, include_team_history=False):
     entry = cache.get(player_id)
     if entry is None:
         return True  # never fetched; a fresh fetch will include peakSeason
     stats = entry.get("stats")
     if stats is None:
         return False  # confirmed no career stats; nothing to compute
-    return not stats.get("peakSeason")
+    history = stats.get("teamHistory") or []
+    missing_dates = not history or any(not isinstance(stint.get("seasons"), list) for stint in history)
+    return not stats.get("peakSeason") or (include_team_history and missing_dates)
 
 
 def fetch_peak_with_retry(player_id, fetch, sleep=time.sleep):
@@ -65,7 +68,7 @@ def fetch_peak_with_retry(player_id, fetch, sleep=time.sleep):
     return "failed"
 
 
-def main():
+def main(include_team_history=False):
     import app as stats_app
 
     if stats_app.CACHE_ONLY:
@@ -73,9 +76,10 @@ def main():
     with open(PLAYERS_POOL_FILE, "r", encoding="utf-8") as f:
         pool_data = json.load(f)
     all_players = pool_data.get("players", pool_data)
-    to_fetch = [p["id"] for p in all_players if needs_peak(p["id"], stats_app._cache)]
+    to_fetch = [p["id"] for p in all_players if needs_peak(p["id"], stats_app._cache, include_team_history)]
 
-    print(f"Full pool: {len(all_players)} players. Missing peakSeason: {len(to_fetch)}.")
+    target = "peakSeason or team-season history" if include_team_history else "peakSeason"
+    print(f"Full pool: {len(all_players)} players. Missing {target}: {len(to_fetch)}.")
     print("Pacing: 3-5s between players; up to 3 attempts; 5-minute outage pauses.", flush=True)
     if not to_fetch:
         print("Nothing to do.")
@@ -112,4 +116,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--team-history", action="store_true", help="Also backfill missing team-season dates")
+    main(parser.parse_args().team_history)

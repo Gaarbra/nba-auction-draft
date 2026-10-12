@@ -30,6 +30,9 @@ class PeakRetryTests(unittest.TestCase):
     def test_resume_skips_saved_peaks(self):
         cache = {1: {'stats': {'peakSeason': {'season': '2015-16'}}}, 2: {'stats': None}, 3: {'stats': {}}}
         self.assertFalse(job.needs_peak(1, cache))
+        self.assertTrue(job.needs_peak(1, cache, include_team_history=True))
+        cache[1]["stats"]["teamHistory"] = [{"abbreviation": "MIA", "seasons": ["2015-16"]}]
+        self.assertFalse(job.needs_peak(1, cache, include_team_history=True))
         self.assertFalse(job.needs_peak(2, cache))
         self.assertTrue(job.needs_peak(3, cache))
         self.assertTrue(job.needs_peak(4, cache))
