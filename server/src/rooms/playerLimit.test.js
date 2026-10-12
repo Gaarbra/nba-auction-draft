@@ -6,7 +6,7 @@ test("host limits are enforced for joining and public listings", () => {
   const room = createRoom("public");
   const host = addPlayerToRoom(room.code, { name: "Host", socketId: "host" }).player;
   assert.equal(setRoomPlayerLimit(room.code, "stranger", 2).error, "NOT_HOST");
-  for (const limit of [0, 1, 5, 2.5, "2", null]) assert.equal(setRoomPlayerLimit(room.code, host.id, limit).error, "INVALID_PLAYER_LIMIT");
+  for (const limit of [0, 1, 9, 2.5, "2", null]) assert.equal(setRoomPlayerLimit(room.code, host.id, limit).error, "INVALID_PLAYER_LIMIT");
   assert.equal(setRoomPlayerLimit(room.code, host.id, 2).error, undefined);
   assert.equal(listPublicRooms().find((r) => r.code === room.code).maxPlayers, 2);
   addPlayerToRoom(room.code, { name: "Guest", socketId: "guest" });

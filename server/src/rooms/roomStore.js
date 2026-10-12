@@ -138,7 +138,7 @@ const VALID_BIDDING_MODES = new Set(["open", "orderly"]);
 const rooms = new Map();
 
 const MIN_PLAYERS = 1;
-const MAX_PLAYERS = 4;
+const MAX_PLAYERS = 8;
 const STARTING_BUDGET = 20;
 
 // How long a disconnected player's slot is held open for them to reclaim via
@@ -311,7 +311,7 @@ export function startDraft(code, playerId, era, allowPositionSwaps, difficulty, 
     return { error: "INVALID_BIDDING_MODE" };
   }
 
-  if (!["classic", "active-now"].includes(gameMode)) return { error: "INVALID_GAME_MODE" };
+  if (!["classic", "active-now", "peak"].includes(gameMode)) return { error: "INVALID_GAME_MODE" };
   if (gameMode === "active-now" && (!activeNowSnapshot || activeNowSnapshot.players.length < room.players.length * 5 + 1)) {
     return { error: "ACTIVE_NOW_UNAVAILABLE" };
   }

@@ -12,7 +12,20 @@ import { recordDraftResult } from "../winStreak.js";
 const prefersReducedMotion =
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-const RANK_LABELS = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
+const RANK_LABELS = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 5: "5th", 6: "6th", 7: "7th", 8: "8th" };
+
+// Final-score tiers, tuned to real achievable team scores (5 starters, Op+DIR
+// each, synergy ×0.85–1.10). Colors live in index.css under the matching
+// .tier-* classes. Ordered high-to-low so the first match wins.
+const SCORE_TIERS = [
+  { min: 120, cls: "tier-legendary", label: "Legendary" },
+  { min: 70, cls: "tier-competitive", label: "Competitive" },
+  { min: -Infinity, cls: "tier-rebuilding", label: "Rebuilding" },
+];
+
+function scoreTier(score) {
+  return SCORE_TIERS.find((tier) => score >= tier.min);
+}
 
 const ERROR_MESSAGES = {
   NOT_HOST: "Only the host can return everyone to the lobby.",
@@ -56,6 +69,7 @@ function CheckIcon() {
  *  matching the Stitch results mock without hiding anyone's team. */
 function TeamCard({ team, index, isYou }) {
   const [open, setOpen] = useState(index === 0 || isYou);
+  const tier = scoreTier(team.finalScore);
 
   return (
     <motion.div
@@ -76,7 +90,8 @@ function TeamCard({ team, index, isYou }) {
           {team.forfeited && <span className="status-badge forfeited">Left the draft</span>}
         </span>
         <span className="results-score-block">
-          <span className="results-final-score">{formatScore(team.finalScore)}</span>
+          <span className={`results-final-score ${tier.cls}`}>{formatScore(team.finalScore)}</span>
+          <span className={`results-score-tier ${tier.cls}`}>{tier.label}</span>
           {open && (
             <span className={`results-score-meta ${team.synergyMultiplier < 1 ? "score-penalty" : team.synergyMultiplier > 1 ? "score-positive" : ""}`}>
               Sum USG%: {formatPct(team.sumUsagePct)} · Synergy ×{team.synergyMultiplier.toFixed(2)}

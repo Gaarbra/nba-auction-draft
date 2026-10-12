@@ -1,6 +1,6 @@
 # Hoop Bids
 
-A multiplayer NBA auction draft web app. Up to 4 players join a room, take turns nominating and bidding on real NBA players with a fixed coin budget, and build out a 5-slot roster (PG/SG/SF/PF/C).
+A multiplayer NBA auction draft web app. Up to 8 players join a room, take turns nominating and bidding on real NBA players with a fixed coin budget, and build out a 5-slot roster (PG/SG/SF/PF/C).
 
 ## Stack
 - **Frontend**: React (Vite), lives in `client/`
@@ -8,7 +8,7 @@ A multiplayer NBA auction draft web app. Up to 4 players join a room, take turns
 - **Stats service**: Python/Flask + `nba_api`, lives in `stats-service/`
 
 ## Status
-Room creation and joining works, with live presence for 1 to 4 players (solo included), a host-triggered draft start, and the full nominate/bid/assign-to-roster loop. Every player and every stat comes from official NBA data through `nba_api`, so there's no third-party player database anywhere in the pipeline. Nominated players show real headshots and real career per-game stats. If you try to assign a player to a position that doesn't match how they're actually listed, the app asks you to confirm first. The host can also turn on free position swaps mid-draft, which is backed by a tile-based roster board with headshots, team-colored tiles, and hover tooltips. The whole thing is styled like a dark, high-contrast scoreboard, and each player's remaining budget shows up as a row of 20 coin icons. If someone's connection drops, they get a 60-second grace window to reconnect before the draft moves on without them (more on that under "Reconnecting" below). Once every roster is full, a results screen ranks all the teams using a real scoring formula, with a documented estimate filling in for the handful of stats (USG%, pre-1974 defensive numbers) that just don't exist in any official, freely available source.
+Room creation and joining works, with live presence for 1 to 8 players (solo included), a host-triggered draft start, and the full nominate/bid/assign-to-roster loop. Every player and every stat comes from official NBA data through `nba_api`, so there's no third-party player database anywhere in the pipeline. Nominated players show real headshots and real career per-game stats. If you try to assign a player to a position that doesn't match how they're actually listed, the app asks you to confirm first. The host can also turn on free position swaps mid-draft, which is backed by a tile-based roster board with headshots, team-colored tiles, and hover tooltips. The whole thing is styled like a dark, high-contrast scoreboard, and each player's remaining budget shows up as a row of 20 coin icons. If someone's connection drops, they get a 60-second grace window to reconnect before the draft moves on without them (more on that under "Reconnecting" below). Once every roster is full, a results screen ranks all the teams using a real scoring formula, with a documented estimate filling in for the handful of stats (USG%, pre-1974 defensive numbers) that just don't exist in any official, freely available source.
 
 ## Getting started
 

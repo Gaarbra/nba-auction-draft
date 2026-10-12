@@ -85,3 +85,22 @@ sudo docker compose --profile maintenance run --rm --no-deps -e REFRESH_ACTIVE_D
 
 The file lock prevents overlap with the scheduled job. Inspect `refreshStatus.json`
 afterward; a bounded run can finish partially and requires another run to drain a backlog.
+
+## Peak Season data backfill
+
+Peak Season requires the `peakSeason` field introduced with that game mode. Older
+saved careers do not contain it. Missing peak data is reported as unavailable;
+the game does not substitute career averages.
+
+After deploying the updated stats image, run this one-time backfill on the VPS.
+It uses the configured proxy and may fetch thousands of historical careers, so
+it consumes proxy traffic. Run it separately from the Saturday refresh to avoid
+concurrent writes to the stats cache. It skips already populated peaks on rerun.
+
+```bash
+cd /opt/hoop-bids
+sudo docker compose --profile maintenance run --rm --no-deps refresh python scripts/warm_peak_seasons.py
+```
+
+Keep the terminal session open until completion. Gameplay continues using saved
+data. The usual Saturday job remains active-player-only.

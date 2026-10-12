@@ -44,6 +44,7 @@ const ERROR_MESSAGES = {
   NOT_YOUR_ASSIGNMENT: "It's not your pick to assign.",
   INVALID_POSITION: "That's not a valid position.",
   SLOT_TAKEN: "That slot is already filled.",
+  PEAK_STATS_UNAVAILABLE: "Peak-season data is not available for this draw. Try again or choose Classic until the data backfill finishes.",
   PLAYER_NOT_FOUND: "That player couldn't be found.",
   RATE_LIMITED: "Slow down a bit. Try again in a few seconds.",
   REROLL_SOLO_ONLY: "Rerolling is only available in solo drafts.",
@@ -323,8 +324,15 @@ export default function DraftBoard({ room, currentPlayerId, socket, onLeaveRoom 
   return (
     <div className={`draft-layout${isSolo ? " draft-solo" : ""}${isRolling ? " is-rolling" : ""}`}>
       <div className="draft-board">
-      {(room.draftEra && room.draftEra !== "all") || room.biddingMode === "orderly" ? (
+      {draft?.turnOrder?.length ? (
         <div className="draft-meta">
+          {/* One round per nomination (pick): the Nth player taken is Round N.
+              draftedPlayerIds counts completed picks, so the pick on the clock
+              right now is that count + 1. Total is 5 starters per team. */}
+          <span className="meta-chip meta-chip-round">
+            Round {Math.min((draft.draftedPlayerIds?.length || 0) + 1, draft.turnOrder.length * 5)}
+            <span className="meta-chip-round-total"> / {draft.turnOrder.length * 5}</span>
+          </span>
           {room.draftEra && room.draftEra !== "all" && <span className="meta-chip">Pool: {room.draftEra}</span>}
           {room.biddingMode === "orderly" && <span className="meta-chip">Orderly bidding</span>}
         </div>

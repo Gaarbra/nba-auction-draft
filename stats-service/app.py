@@ -205,6 +205,116 @@ def team_history(df):
     ]
 
 
+# ---- Peak Season mode -------------------------------------------------------
+# Picks a player's single best season (used by game mode "peak") instead of
+# their career average. "Best" is ranked by a mirror of scoring.js's Op + DIR,
+# the same formula the game already judges teams with, so the chosen season is
+# the one that would score highest under the game's own rules. This only RANKS
+# seasons; the real end-of-draft score is still computed by scoring.js over the
+# per-game line returned here.
+# ponytail: box-score Op+DIR selector, not a full advanced-metric peak finder.
+PEAK_MIN_GAMES = 15
+
+
+def _season_per_game(row):
+    """One deduped season row (a pandas Series) -> a per-game dict in the same
+    shape as a cached career stat line. Returns None for a 0-game row."""
+    gp = int(row["GP"]) if row.get("GP") is not None and row["GP"] == row["GP"] else 0
+    if gp <= 0:
+        return None
+
+    def pg(key):
+        v = row.get(key)
+        if v is None or v != v:  # None or NaN (stat untracked that era)
+            return None
+        return round(v / gp, 1)
+
+    return {
+        "season": row["SEASON_ID"],
+        "gamesPlayed": gp,
+        "pointsPerGame": pg("PTS"),
+        "reboundsPerGame": pg("REB"),
+        "assistsPerGame": pg("AST"),
+        "stealsPerGame": pg("STL"),
+        "blocksPerGame": pg("BLK"),
+        "fgaPerGame": pg("FGA"),
+        "ftaPerGame": pg("FTA"),
+        "tovPerGame": pg("TOV"),
+        "minutesPerGame": pg("MIN"),
+    }
+
+
+def _peak_score(pg):
+    """Op + DIR for a single per-game line, mirroring scoring.js closely
+    enough to rank one player's own seasons against each other."""
+    pts = pg["pointsPerGame"] or 0
+    fga = pg["fgaPerGame"] or 0
+    fta = pg["ftaPerGame"] or 0
+    ast = pg["assistsPerGame"] or 0
+    tov = pg["tovPerGame"] or 0
+    denom = 2 * (fga + 0.44 * fta)
+    ts = pts / denom if denom else 0
+    op = pts * ts + ast * 1.5 - tov * 2.0
+
+    stl = pg["stealsPerGame"]
+    blk = pg["blocksPerGame"]
+    reb = pg["reboundsPerGame"] or 0
+    if stl is not None and blk is not None:
+        dir_rating = stl * 2.5 + blk * 2.0 + reb * 0.3
+    else:
+        # Pre-1974 (no STL/BLK): a reb-based stand-in in the same spirit as
+        # statsAdapter.js's DWS estimate, just to keep these seasons rankable.
+        dir_rating = (reb / 15.0) * 5.0
+    return op + dir_rating
+
+
+def _compute_peak_season(season_rows):
+    """The best single season from a career's deduped season rows, or None.
+    Prefers seasons of at least PEAK_MIN_GAMES so a short cameo can't win;
+    falls back to all seasons if none clear that floor."""
+    qualifying = [r for r in season_rows if r.get("GP") is not None and r["GP"] == r["GP"] and int(r["GP"]) >= PEAK_MIN_GAMES]
+    rows = qualifying or season_rows
+    best = None
+    best_score = None
+    for row in rows:
+        pg = _season_per_game(row)
+        if not pg:
+            continue
+        score = _peak_score(pg)
+        if best_score is None or score > best_score:
+            best_score = score
+            best = pg
+    return best
+
+
+PEAK_STAT_KEYS = (
+    "pointsPerGame", "reboundsPerGame", "assistsPerGame", "stealsPerGame",
+    "blocksPerGame", "fgaPerGame", "ftaPerGame", "tovPerGame",
+    "minutesPerGame", "gamesPlayed",
+)
+
+
+def _apply_peak_mode(stats):
+    """Returns a copy of `stats` with per-game numbers swapped for the player's
+    single best season (Peak Season mode). Career-level fields (position,
+    draftYear, team, teamHistory) are kept. Returns None when peak data is missing."""
+    peak = stats.get("peakSeason")
+    if not peak or not peak.get("season"):
+        return None
+    merged = {**stats}
+    for key in PEAK_STAT_KEYS:
+        if key in peak:
+            merged[key] = peak[key]
+    season = peak.get("season")
+    if season:
+        merged["firstSeason"] = season
+        merged["lastSeason"] = season
+        merged["seasonsPlayed"] = 1
+        merged["season"] = season
+        merged["usagePct"] = None
+    return merged
+
+
 def fetch_player_bio(player_id):
     """Position and draft year, from commonplayerinfo. Note: this endpoint's
     own TEAM_NAME/TEAM_ABBREVIATION fields are NOT used for "current team."
@@ -618,6 +728,7 @@ def _fetch_and_cache_stats(player_id):
                 bio = {key: saved.get(key) for key in ("position", "draftYear", "country")}
 
             history = team_history(df)
+            peak_season = _compute_peak_season(season_rows)
 
             stats = {
                 "firstSeason": season_rows[0]["SEASON_ID"],
@@ -644,6 +755,9 @@ def _fetch_and_cache_stats(player_id):
                 "position": bio["position"],
                 "draftYear": bio["draftYear"],
                 "country": bio.get("country"),
+                # The player's single best season, for game mode "peak". None
+                # when no season could be ranked (e.g. a 0-game record).
+                "peakSeason": peak_season,
             }
 
     if stats is None and _cache.get(player_id, {}).get("stats"):
@@ -1539,6 +1653,11 @@ def get_stats():
     if stats is None:
         return jsonify({"error": "NO_STATS_AVAILABLE"}), 404
 
+    if request.args.get("mode") == "peak":
+        stats = _apply_peak_mode(stats)
+        if stats is None:
+            return jsonify({"error": "PEAK_STATS_UNAVAILABLE"}), 404
+
     # Only set when NBA's own CDN has no real photo for this player (see
     # get_fallback_photo_url). Resolves instantly from cache for anyone
     # already checked (the offline warm_photos.py batch, or a previous
@@ -1571,6 +1690,11 @@ def get_full_stats():
 
     if stats is None:
         return jsonify({"error": "NO_STATS_AVAILABLE"}), 404
+
+    if request.args.get("mode") == "peak":
+        stats = _apply_peak_mode(stats)
+        if stats is None:
+            return jsonify({"error": "PEAK_STATS_UNAVAILABLE"}), 404
 
     usage_pct = None
     if stats["lastSeason"] >= EARLIEST_USG_SEASON:

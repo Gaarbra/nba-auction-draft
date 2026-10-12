@@ -43,12 +43,14 @@ export async function computeDraftResults(room) {
     }
   }
 
+  const mode = room.gameMode === "peak" ? "peak" : undefined;
   const fetched = await mapWithConcurrency(slots, STATS_FETCH_CONCURRENCY, async (slot) => {
     const isSeason = room.gameMode === "active-now";
     if (isSeason && slot.drafted && !validSeasonStats(slot.drafted.stats, room.activeNowSnapshot?.season)) {
       throw new Error("Missing season snapshot; refusing career-stat fallback");
     }
-    const rawStats = slot.drafted ? (isSeason ? slot.drafted.stats : await fetchFullPlayerStatsWithRetry(slot.drafted.id)) : null;
+    const rawStats = slot.drafted ? (isSeason ? slot.drafted.stats : await fetchFullPlayerStatsWithRetry(slot.drafted.id, mode)) : null;
+    if (mode === "peak" && slot.drafted && !rawStats?.season) throw new Error("Missing peak-season stats; refusing career fallback");
     return { statLine: toPlayerStatLine(rawStats || { gamesPlayed: 0, usagePct: null }), photoUrl: rawStats?.photoUrl ?? null };
   });
 

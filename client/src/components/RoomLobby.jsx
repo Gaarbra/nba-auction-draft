@@ -12,7 +12,7 @@ function sanitizeCode(raw) {
   return raw.toUpperCase().replace(CODE_ALPHABET, "").slice(0, 5);
 }
 
-const MAX_LOCAL_PLAYERS = 4;
+const MAX_LOCAL_PLAYERS = 8;
 const MIN_LOCAL_PLAYERS = 2;
 
 export default function RoomLobby({
@@ -230,7 +230,7 @@ export default function RoomLobby({
         {mode === "local" && (
           <div className="local-players-field">
             <p className="hint-text local-players-hint">
-              Everyone plays from this device, passing it around each turn. Add 2-4 names.
+              Everyone plays from this device, passing it around each turn. Add 2-8 names.
             </p>
             {localNames.map((value, index) => (
               <div key={index} className="local-name-row">

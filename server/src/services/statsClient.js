@@ -1,4 +1,38 @@
+import { savedPlayerStats } from "./savedStats.js";
+import { getPlayers } from "./playerCache.js";
+
 const STATS_SERVICE_URL = process.env.STATS_SERVICE_URL || "http://127.0.0.1:5001";
+
+// Peak Season mode: swap a saved career line for the player's single best
+// season (the stats-service applies the same swap on its live/cached path via
+// ?mode=peak). This mirror only runs on the savedStats offline fallback below,
+// so peak mode still works when the stats-service itself is unreachable.
+const PEAK_STAT_KEYS = [
+  "pointsPerGame", "reboundsPerGame", "assistsPerGame", "stealsPerGame",
+  "blocksPerGame", "fgaPerGame", "ftaPerGame", "tovPerGame",
+  "minutesPerGame", "gamesPlayed",
+];
+
+function applyPeakMode(stats) {
+  const peak = stats?.peakSeason;
+  if (!peak?.season) return null;
+  const merged = { ...stats };
+  for (const key of PEAK_STAT_KEYS) {
+    if (key in peak) merged[key] = peak[key];
+  }
+  if (peak.season) {
+    merged.firstSeason = peak.season;
+    merged.lastSeason = peak.season;
+    merged.seasonsPlayed = 1;
+    merged.season = peak.season;
+    merged.usagePct = null;
+  }
+  return merged;
+}
+
+function peakQuery(mode) {
+  return mode === "peak" ? "&mode=peak" : "";
+}
 
 /**
  * Fire-and-forget wake-up ping for stats-service. On Render's free tier it
@@ -18,9 +52,9 @@ export function pingStatsService() {
  * nbaPlayersClient.js) already carries the real id for every player, so
  * there's no need for stats-service to fuzzy-match on name anymore.
  */
-export async function fetchPlayerStats(playerId) {
+export async function fetchPlayerStats(playerId, mode) {
   try {
-    const res = await fetch(`${STATS_SERVICE_URL}/stats?id=${encodeURIComponent(playerId)}`, {
+    const res = await fetch(`${STATS_SERVICE_URL}/stats?id=${encodeURIComponent(playerId)}${peakQuery(mode)}`, {
       // A cache hit answers in single-digit ms; this timeout only matters on
       // a genuine miss, where the live stats.nba.com lookup is confirmed to
       // never succeed on Render (outbound IP is blocked). This was 3000ms,
@@ -31,14 +65,18 @@ export async function fetchPlayerStats(playerId) {
     });
     if (!res.ok) {
       console.warn(`[statsClient] ${res.status} for id=${playerId}`);
-      return null;
+      throw new Error(`stats response ${res.status}`);
     }
     const data = await res.json();
-    if (!data.stats) return null;
+    if (!data.stats) throw new Error("Missing stats");
+    if (mode === "peak" && !data.stats.season) throw new Error("Missing peak season");
     return { stats: data.stats, nbaPlayerId: data.player?.id ?? null };
   } catch (err) {
     console.warn(`[statsClient] fetch failed for id=${playerId}: ${err.message}`);
-    return null;
+    const saved = await savedPlayerStats(playerId);
+    const stats = mode === "peak" ? applyPeakMode(saved) : saved;
+    if (!stats) return null;
+    return { stats, nbaPlayerId: Number(playerId) };
   }
 }
 
@@ -48,26 +86,28 @@ export async function fetchPlayerStats(playerId) {
  * results computation, not the live nomination reveal, since the USG%
  * lookup costs an extra stats.nba.com call.
  */
-export async function fetchFullPlayerStats(playerId) {
+export async function fetchFullPlayerStats(playerId, mode) {
   try {
     // Longer than fetchPlayerStats on purpose: this endpoint does an extra
     // real-USG% lookup server-side (a heavier query, not cached by the
     // warm-up), with its own 20s internal timeout (see fetch_usage_pct in
     // app.py). This needs to stay comfortably above that, or Node gives up
     // right as Python was about to return a good response.
-    const res = await fetch(`${STATS_SERVICE_URL}/full-stats?id=${encodeURIComponent(playerId)}`, {
+    const res = await fetch(`${STATS_SERVICE_URL}/full-stats?id=${encodeURIComponent(playerId)}${peakQuery(mode)}`, {
       signal: AbortSignal.timeout(25000),
     });
     if (!res.ok) {
       console.warn(`[statsClient] full-stats ${res.status} for id=${playerId}`);
-      return null;
+      throw new Error(`full-stats response ${res.status}`);
     }
     const data = await res.json();
-    if (!data.stats) return null;
+    if (!data.stats) throw new Error("Missing full stats");
+    if (mode === "peak" && !data.stats.season) throw new Error("Missing peak season");
     return data.stats;
   } catch (err) {
     console.warn(`[statsClient] full-stats fetch failed for id=${playerId}: ${err.message}`);
-    return null;
+    const stats = await savedPlayerStats(playerId);
+    return mode === "peak" ? applyPeakMode(stats) : stats;
   }
 }
 
@@ -87,10 +127,10 @@ function sleep(ms) {
  * outcome than one quick retry when the first attempt was just transient
  * (a timeout, a 502, stats.nba.com hiccuping).
  */
-export async function fetchFullPlayerStatsWithRetry(playerId, attempts = FULL_STATS_MAX_ATTEMPTS) {
+export async function fetchFullPlayerStatsWithRetry(playerId, mode, attempts = FULL_STATS_MAX_ATTEMPTS) {
   let lastResult = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    lastResult = await fetchFullPlayerStats(playerId);
+    lastResult = await fetchFullPlayerStats(playerId, mode);
     if (lastResult) return lastResult;
     if (attempt < attempts - 1) {
       const backoffMs = FULL_STATS_RETRY_BASE_MS * 2 ** attempt + Math.random() * 200;
@@ -204,7 +244,19 @@ export async function fetchMarketIndex() {
     return list;
   } catch (err) {
     console.warn(`[statsClient] market-index fetch failed: ${err.message}`);
-    return marketIndexCache?.players ?? [];
+    if (marketIndexCache) return marketIndexCache.players;
+    const players = await getPlayers();
+    const saved = await Promise.all(players.map(async (player) => {
+      const stats = await savedPlayerStats(player.id);
+      const team = stats?.mostPlayedTeam || stats?.team;
+      return team ? { id: player.id, fullName: player.fullName, team,
+        position: stats.position, draftYear: stats.draftYear,
+        gamesPlayed: stats.gamesPlayed, pointsPerGame: stats.pointsPerGame } : null;
+    }));
+    const list = saved.filter(Boolean);
+    // Retry the service after a minute; don't cache a fallback for a full hour.
+    marketIndexCache = { players: list, fetchedAt: Date.now() - MARKET_INDEX_CACHE_TTL_MS + 60_000 };
+    return list;
   }
 }
 

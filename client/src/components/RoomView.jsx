@@ -19,6 +19,16 @@ const BIDDING_MODES = [
   { id: "orderly", label: "Orderly", hint: "One at a time, in turn order, wait your turn to raise or pass" },
 ];
 
+const GAME_MODES = [
+  { value: "classic", label: "Classic · career stats" },
+  { value: "active-now", label: "Active Now · season stats" },
+  { value: "peak", label: "Peak Season · best season stats" },
+];
+
+// Mirrors MAX_PLAYERS on the server (roomStore.js). Counts below the people
+// already in the room are filtered out at render time, not disabled.
+const PLAYER_LIMIT_OPTIONS = [2, 3, 4, 5, 6, 7, 8];
+
 function getHintText(playerCount, isHost, isLocal, maxPlayers) {
   if (isLocal) {
     return isHost ? "Everyone's added. Start whenever you're ready." : "Waiting for the host to start.";
@@ -132,23 +142,26 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
 
       {isHost && (
         <>
-          {!room.isSolo && !room.isLocal && <label className="era-picker-label">
+          {!room.isSolo && !room.isLocal && <div className="era-picker-label">
             Player limit
-            <select aria-label="Player limit" value={maxPlayers} onChange={(event) => {
-              setLimitError("");
-              socket.emit("room:set-player-limit", { maxPlayers: Number(event.target.value) }, (response) => {
-                if (response?.error) setLimitError(response.error === "PLAYER_LIMIT_TOO_SMALL" ? "The limit cannot be smaller than the number of players already here." : "Could not change the player limit. Try again.");
-              });
-            }}>
-              {[2, 3, 4].map((count) => <option key={count} value={count} disabled={count < room.players.length}>{count} players</option>)}
-            </select>
-          </label>}
+            <Dropdown
+              value={maxPlayers}
+              onChange={(value) => {
+                setLimitError("");
+                socket.emit("room:set-player-limit", { maxPlayers: Number(value) }, (response) => {
+                  if (response?.error) setLimitError(response.error === "PLAYER_LIMIT_TOO_SMALL" ? "The limit cannot be smaller than the number of players already here." : "Could not change the player limit. Try again.");
+                });
+              }}
+              options={PLAYER_LIMIT_OPTIONS.filter((count) => count >= room.players.length).map((count) => ({ value: count, label: `${count} players` }))}
+            />
+          </div>}
           {limitError && <p className="error-text" role="alert">{limitError}</p>}
           <div className="era-picker-label">
             Game mode
-            <Dropdown value={gameMode} onChange={setGameMode} options={[{ value: "classic", label: "Classic · career stats" }, { value: "active-now", label: "Active Now · season stats" }]} />
+            <Dropdown value={gameMode} onChange={setGameMode} options={GAME_MODES} />
           </div>
           {gameMode === "active-now" && <p className="hint-text">Active players. One regular season only. Ratings, suggested bids and final scores use the current season; before it starts, they use last season. Updated every Saturday.</p>}
+          {gameMode === "peak" && <p className="hint-text">Every player scores from their single best season ever, not their career average. Pick any era below; ratings and final scores use that peak season.</p>}
           <div className="era-picker-label" hidden={gameMode === "active-now"}>
             Player pool for this draft
             <Dropdown

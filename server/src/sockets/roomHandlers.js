@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   createRoom,
+  config,
   setRoomPlayerLimit,
   addPlayerToRoom,
   addLocalPlayersToRoom,
@@ -75,7 +76,7 @@ function resolveActingPlayerId(socket, payload) {
 }
 
 function toNominatedPlayer(candidate, result) {
-  if (!result) return { player: candidate, stats: { unavailable: true }, nbaPlayerId: null };
+  if (!result) return { player: candidate, stats: { unavailable: true }, nbaPlayerId: candidate.id };
 
   // Pool entries carry only id/name/active-status/career span; position,
   // team, and draft year come from the stats response instead. Which team
@@ -106,7 +107,7 @@ function toNominatedPlayer(candidate, result) {
 // quality bump. Difficulty instead comes entirely from which pool this
 // draws from (see draft:nominate below): a big, real, all-time-leaders pool
 // vs. the full pool.
-async function drawPlayerWithStats(candidates) {
+async function drawPlayerWithStats(candidates, mode) {
   const pool = [...candidates];
   let lastCandidate = null;
 
@@ -114,10 +115,11 @@ async function drawPlayerWithStats(candidates) {
     const index = Math.floor(Math.random() * pool.length);
     const [candidate] = pool.splice(index, 1);
     lastCandidate = candidate;
-    const result = await fetchPlayerStats(candidate.id);
+    const result = await fetchPlayerStats(candidate.id, mode);
     if (result) return toNominatedPlayer(candidate, result);
   }
 
+  if (mode === "peak") throw new Error("PEAK_STATS_UNAVAILABLE");
   return toNominatedPlayer(lastCandidate, null);
 }
 
@@ -191,7 +193,8 @@ async function rollPlayerForRoom(room, excludeIds = []) {
   // The actual draw (with its stats-lookup retries) runs alongside a fixed
   // minimum delay, so the shared rolling animation always plays for at
   // least MIN_ROLL_MS even when the draw resolves instantly from cache.
-  const [{ player, stats, nbaPlayerId }] = await Promise.all([drawPlayerWithStats(drawPool), sleep(MIN_ROLL_MS)]);
+  const mode = room.gameMode === "peak" ? "peak" : undefined;
+  const [{ player, stats, nbaPlayerId }] = await Promise.all([drawPlayerWithStats(drawPool, mode), sleep(MIN_ROLL_MS)]);
 
   return { player: { ...player, stats, nbaPlayerId } };
 }
@@ -391,7 +394,7 @@ export function registerRoomHandlers(io, socket) {
   // is allowed to act as. See resolveActingPlayerId above.
   socket.on("room:create-local", ({ names } = {}, callback) => {
     if (!allowEvent()) return callback?.({ error: "RATE_LIMITED" });
-    if (!Array.isArray(names) || names.length < 2 || names.length > 4) {
+    if (!Array.isArray(names) || names.length < 2 || names.length > config.MAX_PLAYERS) {
       return callback?.({ error: "INVALID_LOCAL_PLAYERS" });
     }
     for (const n of names) {
@@ -508,7 +511,7 @@ export function registerRoomHandlers(io, socket) {
     try {
       roll = await rollPlayerForRoom(room);
     } catch {
-      roll = { error: "PLAYER_NOT_FOUND" };
+      roll = { error: room.gameMode === "peak" ? "PEAK_STATS_UNAVAILABLE" : "PLAYER_NOT_FOUND" };
     } finally {
       rollingDraft.isRolling = false;
     }
@@ -558,7 +561,7 @@ export function registerRoomHandlers(io, socket) {
     try {
       roll = await rollPlayerForRoom(room, [room.draft.nomination.player.id]);
     } catch {
-      roll = { error: "PLAYER_NOT_FOUND" };
+      roll = { error: room.gameMode === "peak" ? "PEAK_STATS_UNAVAILABLE" : "PLAYER_NOT_FOUND" };
     } finally {
       rollingDraft.isRolling = false;
     }

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .env
+backups/
+*.dump
 graphify-out/
 
 # Local AI tools and generated design reports

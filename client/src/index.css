@@ -1599,6 +1599,16 @@ form input {
   border-color: color-mix(in srgb, var(--lose) 45%, var(--line));
 }
 
+.meta-chip-round {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.meta-chip-round-total {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
 .draft-header-right {
   display: flex;
   align-items: center;
@@ -3346,8 +3356,9 @@ form input {
 }
 
 .results-team-card:not(.open) .results-final-score {
+  /* Collapsed cards de-emphasize by SIZE, not by graying out, so the tier
+     color below still reads for every team at a glance. */
   font-size: 22px;
-  color: var(--text-dim);
 }
 
 .results-score-meta {
@@ -3359,6 +3370,23 @@ form input {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
+
+/* Score tiers (see SCORE_TIERS in ResultsScreen.jsx): color the final-score
+   number and its label by how strong the team scored. */
+.results-final-score.tier-legendary { color: var(--accent-bright); }
+.results-final-score.tier-competitive { color: var(--win); }
+.results-final-score.tier-rebuilding { color: var(--text-dim); }
+
+.results-score-tier {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.results-score-tier.tier-legendary { color: var(--accent-bright); }
+.results-score-tier.tier-competitive { color: var(--win); }
+.results-score-tier.tier-rebuilding { color: var(--text-faint); }
 
 .results-roster {
   margin-top: 16px;
@@ -3620,24 +3648,81 @@ form input {
   transition: color 0.15s ease;
 }
 
-/* One-thumb-reach primary action on phones (Stitch's Apple-modernization
-   pass on this screen): the rematch decision is the one thing worth
-   fighting for screen space, so it pins to the bottom edge instead of
-   competing with the standings list for scroll position. Everything else
-   in the rematch panel -- vote list, host/leave actions -- stays in normal
-   flow above it. */
+/* Phone layout. An earlier pass pinned the Confirm-rematch button to the
+   bottom edge as a position:fixed bar, but it floated OVER the standings and
+   the Return-to-lobby button instead of clearing them. Here the whole rematch
+   panel (vote list + both action buttons) just sits in normal flow below the
+   standings as its own card: nothing overlaps, both buttons are always fully
+   visible, and each is full-width and thumb-sized. */
 @media (max-width: 640px) {
-  .results-screen {
-    padding-bottom: 84px;
+  .results-title {
+    font-size: 28px;
+    margin-bottom: 20px;
   }
 
-  .rematch-confirm {
-    position: fixed;
-    left: 16px;
-    right: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    z-index: 30;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  .results-team-card {
+    padding: 16px;
+  }
+
+  .results-team-header {
+    gap: 10px;
+  }
+
+  .results-team-name {
+    font-size: 16px;
+    /* Wrap at spaces for a long name; only break a genuinely unbreakable word. */
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  /* Score drops to its own full-width line below the name, so a long name gets
+     the whole card width instead of being crushed into a narrow column beside
+     the score. */
+  .results-score-block {
+    flex-basis: 100%;
+    align-items: flex-start;
+    text-align: left;
+    margin-top: 2px;
+  }
+
+  .results-final-score {
+    font-size: 30px;
+  }
+
+  .results-team-card:not(.open) .results-final-score {
+    font-size: 20px;
+  }
+
+  /* The row's stat line (Op / DIR / Penalty) drops to its own full-width line
+     under the player instead of colliding with a long name beside it. */
+  .results-player-row {
+    flex-wrap: wrap;
+  }
+
+  .results-player-id {
+    flex: 1 1 100%;
+  }
+
+  .results-player-name {
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .results-player-scores {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    gap: 14px;
+    /* Line up under the name, past the 40px headshot + its 12px gap. */
+    padding-left: 52px;
+  }
+
+  .matchup-row {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .rematch-panel {
+    padding: 18px;
   }
 }
 
