@@ -1,83 +1,98 @@
-import { useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { useEffect, useId, useRef, useState } from "react";
 
-/** A styled stand-in for a native <select>: same idea (pick one of a list
- * of options), but themeable to match the rest of the app instead of
- * whatever plain OS-native dropdown the browser would otherwise draw. Not
- * used anywhere load-bearing enough to need full listbox ARIA semantics;
- * kept simple (a button + an absolutely-positioned menu) on purpose. */
-export default function Dropdown({ options, value, onChange, placeholder = "Select…", className = "" }) {
+export default function Dropdown({ options, value, onChange, label = "Choose an option", placeholder = "Select…", className = "" }) {
   const [open, setOpen] = useState(false);
+  const [placement, setPlacement] = useState({ above: false, height: 260 });
   const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const menuId = useId();
+  const selected = options.find((option) => option.value === value);
+
+  function closeMenu() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  function openMenu() {
+    const rect = triggerRef.current.getBoundingClientRect();
+    const below = window.innerHeight - rect.bottom - 12;
+    const above = rect.top - 12;
+    const opensAbove = below < 260 && above > below;
+    setPlacement({ above: opensAbove, height: Math.max(0, Math.min(260, opensAbove ? above : below)) });
+    setOpen(true);
+  }
 
   useEffect(() => {
     if (!open) return undefined;
-    function handleClickOutside(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+    const menu = menuRef.current;
+    (menu.querySelector('[aria-selected="true"]') || menu.querySelector('[role="option"]'))?.focus();
+    function handleOutside(event) {
+      if (!rootRef.current?.contains(event.target)) setOpen(false);
     }
-    function handleEscape(e) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
+    function handleResize() { setOpen(false); }
+    document.addEventListener("pointerdown", handleOutside);
+    window.addEventListener("resize", handleResize);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("pointerdown", handleOutside);
+      window.removeEventListener("resize", handleResize);
     };
   }, [open]);
 
-  const selected = options.find((o) => o.value === value);
+  function handleMenuKey(event, index) {
+    const last = options.length - 1;
+    const target = { ArrowDown: (index + 1) % options.length, ArrowUp: (index + last) % options.length, Home: 0, End: last }[event.key];
+    if (target !== undefined) {
+      event.preventDefault();
+      menuRef.current.querySelectorAll('[role="option"]')[target]?.focus();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+    } else if (event.key.length === 1 && event.key !== " " && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const match = options.findIndex((_, offset) => options[(index + 1 + offset) % options.length].label.toLowerCase().startsWith(event.key.toLowerCase()));
+      if (match !== -1) {
+        event.preventDefault();
+        menuRef.current.querySelectorAll('[role="option"]')[(index + 1 + match) % options.length]?.focus();
+      }
+    }
+  }
 
   return (
-    <div className={`dropdown ${className}`} ref={rootRef}>
-      <button
-        type="button"
+    <div className={`dropdown ${className}`} ref={rootRef}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
+      <button type="button" ref={triggerRef}
         className={`dropdown-trigger ${open ? "open" : ""}`}
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span className="dropdown-trigger-label">{selected ? selected.label : placeholder}</span>
-        <motion.span
-          className="dropdown-chevron"
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.15 }}
-          aria-hidden="true"
-        >
-          ▾
-        </motion.span>
+        onClick={() => open ? closeMenu() : openMenu()}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            openMenu();
+          }
+        }}
+        aria-label={`${label}: ${selected?.label || placeholder}`}
+        aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? menuId : undefined}>
+        <span className="dropdown-trigger-label">{selected?.label || placeholder}</span>
+        <svg className="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </button>
-      {/* No AnimatePresence/exit, same reasoning as the footer modal and
-          DraftBoard's nomination panel: an exit animation that never
-          resolves would leave the menu stuck open, overlapping whatever's
-          rendered underneath it. Entrance-only still feels right for a
-          menu that only ever opens for a moment. */}
       {open && (
-        <motion.ul
-          className="dropdown-menu"
-          data-lenis-prevent
-          role="listbox"
-          initial={{ opacity: 0, y: -6, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.12 }}
-        >
-          {options.map((option) => (
-            <li key={option.value}>
-              <button
-                type="button"
-                role="option"
+        <ul id={menuId} ref={menuRef} className={`dropdown-menu ${placement.above ? "dropdown-menu-above" : ""}`}
+          style={{ maxHeight: placement.height }} data-lenis-prevent role="listbox" aria-label={label}>
+          {options.map((option, index) => (
+            <li key={option.value} role="presentation">
+              <button type="button" role="option" tabIndex={-1}
                 aria-selected={option.value === value}
                 className={`dropdown-option ${option.value === value ? "selected" : ""}`}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-              >
-                {option.label}
+                onKeyDown={(event) => handleMenuKey(event, index)}
+                onClick={() => { onChange(option.value); closeMenu(); }}>
+                <span>{option.label}</span>
+                {option.value === value && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>}
               </button>
             </li>
           ))}
-        </motion.ul>
+        </ul>
       )}
     </div>
   );

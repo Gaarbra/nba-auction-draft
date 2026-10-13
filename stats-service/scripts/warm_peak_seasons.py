@@ -36,6 +36,36 @@ FAILURE_THRESHOLD = 3
 COOLDOWN_SECONDS = 300
 
 
+def peak_coverage(players, cache):
+    counts = dict(ready=0, no_stats=0, missing_peak=0, never_fetched=0)
+    for player in players:
+        entry = cache.get(str(player["id"]))
+        if entry is None:
+            counts["never_fetched"] += 1
+        elif entry.get("stats") is None:
+            counts["no_stats"] += 1
+        elif (entry["stats"].get("peakSeason") or {}).get("season"):
+            counts["ready"] += 1
+        else:
+            counts["missing_peak"] += 1
+    return counts
+
+
+def print_status():
+    cache_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "statsCache.json")
+    with open(PLAYERS_POOL_FILE, encoding="utf-8") as handle:
+        pool = json.load(handle)
+    with open(cache_file, encoding="utf-8") as handle:
+        cache = json.load(handle)
+    players = pool["players"] if isinstance(pool, dict) else pool
+    counts = peak_coverage(players, cache)
+    print(f"Full pool: {len(players)} | Peak ready: {counts['ready']} | Cached no stats (skipped): {counts['no_stats']}")
+    print(f"Missing peak: {counts['missing_peak']} | Never fetched: {counts['never_fetched']}")
+    remaining = counts["missing_peak"] + counts["never_fetched"]
+    print(f"Backfill incomplete: {remaining} players remaining." if remaining else "Backfill complete for all players with available stats.")
+    return 1 if remaining else 0
+
+
 def needs_peak(player_id, cache, include_team_history=False):
     entry = cache.get(player_id)
     if entry is None:
@@ -118,4 +148,8 @@ def main(include_team_history=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--team-history", action="store_true", help="Also backfill missing team-season dates")
-    main(parser.parse_args().team_history)
+    parser.add_argument("--status", action="store_true", help="Read saved peak coverage only; no requests or writes (exit 1 if incomplete)")
+    args = parser.parse_args()
+    if args.status:
+        raise SystemExit(print_status())
+    main(args.team_history)

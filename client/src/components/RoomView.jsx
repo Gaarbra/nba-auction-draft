@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import CoinRow from "./CoinRow.jsx";
 import PlayerStatusBadge from "./PlayerStatusBadge.jsx";
 import VoteKickBanner, { KickButton } from "./VoteKick.jsx";
 import Dropdown from "./Dropdown.jsx";
@@ -50,7 +49,6 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
   const [gameMode, setGameMode] = useState("classic");
   const maxPlayers = room.maxPlayers ?? 8;
   const [limitError, setLimitError] = useState("");
-  const emptySlots = maxPlayers - room.players.length;
   const currentPlayer = room.players.find((p) => p.id === currentPlayerId);
   const isHost = Boolean(currentPlayer?.isHost);
 
@@ -114,37 +112,35 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
       <h3>
         Players ({room.players.length}/{maxPlayers})
       </h3>
-      <ul className="player-list">
-        {room.players.map((p) => (
-          <li key={p.id} className={p.id === currentPlayerId ? "you" : ""}>
-            <span className="player-name">
-              {p.name}
+      <ul className="lobby-players" aria-label="Players in the lobby" aria-live="polite" aria-relevant="additions removals">
+        {room.players.map((p) => {
+          const name = <span className="player-name">
+              <span className="lobby-player-name">{p.name}</span>
               {p.isHost && <span className="host-badge">Host</span>}
               {p.id === currentPlayerId && <span className="you-badge">You</span>}
               <PlayerStatusBadge player={p} reconnectGraceMs={room.reconnectGraceMs} />
-            </span>
-            <span className="player-list-right">
-              {!room.isSolo && <CoinRow budget={p.budget} />}
-              <KickButton room={room} currentPlayerId={currentPlayerId} socket={socket} targetPlayerId={p.id} />
-            </span>
-          </li>
-        ))}
-        {!room.isLocal &&
-          !room.isSolo &&
-          Array.from({ length: emptySlots }).map((_, i) => (
-            <li key={`empty-${i}`} className="empty-slot">
-              Waiting for player…
-            </li>
-          ))}
+            </span>;
+          return <li key={p.id} className={p.id === currentPlayerId ? "you" : ""}>
+            {isHost && !room.isLocal && !room.isSolo && p.id !== currentPlayerId && !room.voteKick ? (
+              <details className="lobby-player-menu" name="lobby-player-actions">
+                <summary aria-label={`Manage ${p.name}`} title={`Manage ${p.name}`}>{name}</summary>
+                <div className="lobby-player-actions">
+                  <KickButton room={room} currentPlayerId={currentPlayerId} socket={socket} targetPlayerId={p.id} />
+                </div>
+              </details>
+            ) : name}
+          </li>;
+        })}
       </ul>
 
       <p className="hint-text">{getHintText(room.players.length, isHost, room.isLocal, maxPlayers)}</p>
 
       {isHost && (
-        <>
+        <div className="room-settings">
           {!room.isSolo && !room.isLocal && <div className="era-picker-label">
             Player limit
             <Dropdown
+              label="Player limit"
               value={maxPlayers}
               onChange={(value) => {
                 setLimitError("");
@@ -158,13 +154,12 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
           {limitError && <p className="error-text" role="alert">{limitError}</p>}
           <div className="era-picker-label">
             Game mode
-            <Dropdown value={gameMode} onChange={setGameMode} options={GAME_MODES} />
+            <Dropdown label="Game mode" value={gameMode} onChange={setGameMode} options={GAME_MODES} />
           </div>
-          {gameMode === "active-now" && <p className="hint-text">Active players. One regular season only. Ratings, suggested bids and final scores use the current season; before it starts, they use last season. Updated every Saturday.</p>}
-          {gameMode === "peak" && <p className="hint-text">Every player scores from their single best season ever, not their career average. Pick any era below; ratings and final scores use that peak season.</p>}
           <div className="era-picker-label" hidden={gameMode === "active-now"}>
             Player pool for this draft
             <Dropdown
+              label="Player pool for this draft"
               className="era-picker"
               value={era}
               onChange={setEra}
@@ -175,7 +170,9 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
               }
             />
           </div>
-          <label className="era-picker-label">
+          {gameMode === "active-now" && <p className="hint-text">Active players. One regular season only. Ratings, suggested bids and final scores use the current season; before it starts, they use last season. Updated every Saturday.</p>}
+          {gameMode === "peak" && <p className="hint-text">Every player scores from their single best season ever, not their career average. Pick any era; ratings and final scores use that peak season.</p>}
+          <div className="era-picker-label room-difficulty">
             Difficulty (how often you land a stronger player)
             <div className="difficulty-picker">
               {DIFFICULTIES.map((d) => (
@@ -190,12 +187,12 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
                 </button>
               ))}
             </div>
-          </label>
+          </div>
           {/* Bidding mode and position-swap-with-others don't mean anything
               with no one else at the table -- solo never bids and there's
               no other roster to swap with. */}
           {!room.isSolo && (
-            <label className="era-picker-label">
+            <div className="era-picker-label">
               Bidding
               <div className="difficulty-picker">
                 {BIDDING_MODES.map((m) => (
@@ -210,7 +207,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
                   </button>
                 ))}
               </div>
-            </label>
+            </div>
           )}
           {!room.isSolo && (
             <label className="swap-setting-label">
@@ -231,7 +228,7 @@ export default function RoomView({ room, currentPlayerId, socket, onLeaveRoom, o
           >
             {room.players.length === 1 ? "Start Solo Draft" : "Start Draft"}
           </motion.button>
-        </>
+        </div>
       )}
 
       <button type="button" onClick={onLeaveRoom} className="leave-btn">

@@ -359,7 +359,7 @@ export default function MarketTab({ socket }) {
         >
           <div className="market-era-select">
             <span className="market-filter-label">Era</span>
-            <Dropdown options={ERA_OPTIONS} value={era} onChange={setEra} />
+            <Dropdown label="Era" options={ERA_OPTIONS} value={era} onChange={setEra} />
           </div>
           <div className="market-franchise-chip">
             <TeamDropdown

@@ -10,6 +10,19 @@ job = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(job)
 
 class PeakRetryTests(unittest.TestCase):
+    def test_coverage_distinguishes_completed_skipped_and_unprocessed(self):
+        players = [{'id': i} for i in range(1, 6)]
+        cache = {
+            '1': {'stats': {'peakSeason': {'season': '2015-16'}}},
+            '2': {'stats': None},
+            '3': {'stats': {'pointsPerGame': 10}},
+            '4': {'stats': {'peakSeason': {'pointsPerGame': 20}}},
+            '99': {'stats': {'peakSeason': {'season': '2020-21'}}},
+        }
+        self.assertEqual(job.peak_coverage(players, cache), {
+            'ready': 1, 'no_stats': 1, 'missing_peak': 2, 'never_fetched': 1,
+        })
+
     def test_retry_recovers_and_backs_off(self):
         fetch = Mock(side_effect=[TimeoutError(), TimeoutError(), {'peakSeason': {'season': '2015-16'}}])
         sleep = Mock()

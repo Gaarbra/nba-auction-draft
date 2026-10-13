@@ -92,6 +92,18 @@ Peak Season requires the `peakSeason` field introduced with that game mode. Olde
 saved careers do not contain it. Missing peak data is reported as unavailable;
 the game does not substitute career averages.
 
+Check coverage without making NBA requests or changing the cache (after deploying
+the image containing this command):
+
+```bash
+sudo docker compose exec stats python scripts/warm_peak_seasons.py --status
+```
+
+It reports peak-ready players, cached no-stats players (skipped), missing peaks,
+and players never fetched. Exit code 1 means the backfill is incomplete. For the
+local checkout, run `python stats-service/scripts/warm_peak_seasons.py --status`.
+Local cache coverage does not establish the VPS volume's coverage.
+
 After deploying the updated stats image, run this one-time backfill on the VPS.
 It uses the configured proxy and may fetch thousands of historical careers, so
 it consumes proxy traffic. Run it separately from the Saturday refresh to avoid
