@@ -36,27 +36,30 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ml import CATEGORICAL_COLS, FEATURE_COLS, NUMERIC_COLS, PRICE_MODEL_PATH, true_shooting_pct  # noqa: E402
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
+# Kept importable with no side effects (the weekly refresh job imports train()
+# below), so DATABASE_URL resolution and the psycopg import both live inside
+# functions rather than at module load.
+
+
+def _database_url():
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        return url
     # Load stats-service/.env the same way app.py does, in case this is run
     # standalone without the shell already having it exported.
     try:
         from dotenv import load_dotenv
 
         load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
-        DATABASE_URL = os.environ.get("DATABASE_URL")
     except ImportError:
         pass
-
-if not DATABASE_URL:
-    print("DATABASE_URL is not set, nothing to train from. Set it in stats-service/.env.")
-    sys.exit(1)
-
-import psycopg  # noqa: E402
-from psycopg.rows import dict_row  # noqa: E402
+    return os.environ.get("DATABASE_URL")
 
 
-def load_training_data():
+def load_training_data(database_url):
+    import psycopg
+    from psycopg.rows import dict_row
+
     query = """
         SELECT
             dp.acquired_for,
@@ -92,11 +95,13 @@ def load_training_data():
           -- separately-stored flag that could drift out of sync with it.
           AND (SELECT COUNT(*) FROM draft_teams dt2 WHERE dt2.draft_id = d.id) > 1
     """
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+    with psycopg.connect(database_url, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(query)
             rows = cur.fetchall()
     df = pd.DataFrame(rows)
+    if df.empty:
+        return df
     # Postgres NUMERIC columns come back as decimal.Decimal, which doesn't
     # mix with plain floats (0.44 * a_decimal raises TypeError). Cast every
     # numeric-ish column to float right away so the rest of this script
@@ -147,12 +152,25 @@ def evaluate(model, X, y, label):
     return mae
 
 
-def main():
-    df = load_training_data()
-    print(f"Loaded {len(df)} labeled picks from Postgres.\n")
-    if len(df) < 30:
-        print("Fewer than 30 rows, not worth training on yet. Play more drafts first.")
-        sys.exit(1)
+def train(output_path=None, min_rows=30, evaluate_candidates=True):
+    """Train and save the price model. Returns a result dict (never calls
+    sys.exit), so the weekly refresh job (refresh_all.py) can call this and
+    carry on regardless of the outcome.
+
+    output_path defaults to ml.PRICE_MODEL_PATH (the committed seed location,
+    which is what a manual CLI run updates). The weekly job passes
+    ml.RUNTIME_PRICE_MODEL_PATH so the retrained model lands on the persistent
+    data volume the serving container reads.
+    """
+    output_path = output_path or PRICE_MODEL_PATH
+    database_url = _database_url()
+    if not database_url:
+        return {"trained": False, "reason": "no_database_url", "rows": 0}
+
+    df = load_training_data(database_url)
+    print(f"Loaded {len(df)} labeled picks from Postgres.")
+    if len(df) < min_rows:
+        return {"trained": False, "reason": "insufficient_data", "rows": len(df), "min_rows": min_rows}
 
     df["ts_pct"] = df.apply(
         lambda r: true_shooting_pct(r["points_per_game"], r["fga_per_game"], r["fta_per_game"]), axis=1
@@ -164,35 +182,53 @@ def main():
     print(f"Price distribution: min={y.min():.0f} max={y.max():.0f} mean={y.mean():.2f} median={y.median():.0f}")
     print(f"  {(y <= 1).mean() * 100:.0f}% of picks went for 1 coin or less (the minimum bid).\n")
 
-    print("5-fold cross-validated performance (out-of-fold predictions, not train-set fit):")
     candidates = {
         "Ridge (linear)": Ridge(alpha=5.0),
         "RandomForest": RandomForestRegressor(n_estimators=200, max_depth=5, min_samples_leaf=4, random_state=42),
         "GradientBoosting": GradientBoostingRegressor(n_estimators=150, max_depth=2, learning_rate=0.05, random_state=42),
     }
-    scored = {}
-    for name, regressor in candidates.items():
-        model = make_model(regressor)
-        scored[name] = evaluate(model, X, y, name)
 
-    best_name = min(scored, key=scored.get)
-    print(f"\nBest by cross-validated MAE: {best_name}")
+    if evaluate_candidates:
+        print("5-fold cross-validated performance (out-of-fold predictions, not train-set fit):")
+        scored = {name: evaluate(make_model(regressor), X, y, name) for name, regressor in candidates.items()}
+        best_name = min(scored, key=scored.get)
+        best_mae = scored[best_name]
+    else:
+        # Skip the (slow) cross-validation when a human isn't watching the
+        # metrics -- the weekly job just needs a fresh model, not a report.
+        best_name, best_mae = "GradientBoosting", None
+    print(f"Best by cross-validated MAE: {best_name}")
 
-    # Refit the winner on ALL the data for the model that actually gets
-    # saved and served. Cross-validation above is purely for honest
-    # evaluation, not what ships.
+    # Refit the winner on ALL the data for the model that actually gets saved
+    # and served. Cross-validation above is purely for honest evaluation.
     final_model = make_model(candidates[best_name])
     final_model.fit(X, y)
 
-    os.makedirs(os.path.dirname(PRICE_MODEL_PATH), exist_ok=True)
-    joblib.dump(final_model, PRICE_MODEL_PATH)
-    print(f"Saved to {PRICE_MODEL_PATH}")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    temp_path = output_path + ".tmp"
+    try:
+        joblib.dump(final_model, temp_path)
+        os.replace(temp_path, output_path)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+    print(f"Saved to {output_path}")
+    return {"trained": True, "rows": len(df), "model": best_name, "mae": best_mae, "path": output_path}
 
+
+def main():
+    result = train()
+    if not result["trained"]:
+        if result["reason"] == "no_database_url":
+            print("DATABASE_URL is not set, nothing to train from. Set it in stats-service/.env.")
+        else:
+            print(f"Only {result['rows']} rows (< {result.get('min_rows', 30)}), not worth training yet. Play more drafts first.")
+        sys.exit(1)
     print(
-        "\nCaveat: this is trained on a small, mostly self-generated sample "
-        "(this project's own dev/test drafts, not organic multi-person "
-        "auctions). Treat it as a working pipeline, not a production-accurate "
-        "predictor yet, re-run this script as real usage accumulates."
+        "\nCaveat: early on this trains on a small, mostly self-generated sample "
+        "(dev/test drafts, not organic multi-person auctions). Treat it as a "
+        "working pipeline, not a production-accurate predictor, until real usage "
+        "accumulates."
     )
 
 

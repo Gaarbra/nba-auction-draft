@@ -63,6 +63,36 @@ sudo docker stats --no-stream
 
 Tune `REFRESH_CPUS`, `REFRESH_MEMORY_LIMIT`, and the two runtime budgets in `/opt/hoop-bids/.env` if measurements justify it. Timer runs read them on each execution. Docker enforces the [CPU and memory limits](https://docs.docker.com/reference/compose-file/services/); the [systemd timer](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html) handles scheduling. No Redis or additional paid scheduler is needed.
 
+## Suggested-price model
+
+The "Suggested value" hint and the Market tab's value graph come from a price
+model trained on completed multiplayer drafts (`draft_picks.acquired_for`).
+It maintains itself:
+
+- **Retention.** Each completed multiplayer draft is saved to Postgres, then the
+  oldest drafts beyond the most recent `DRAFT_RETENTION_LIMIT` (default 200) are
+  pruned (cascading to their teams/picks). That same history is the training
+  data, so 200 bounds both storage and training-set size. Set
+  `DRAFT_RETENTION_LIMIT` in `.env` to change it.
+- **Weekly retrain.** The Saturday refresh retrains the model on that history
+  and writes it to the data volume (`stats-service/data/price_model.joblib`),
+  which the serving container hot-reloads within one request — no restart.
+  Under 30 labeled picks it skips training and keeps the committed seed model
+  (`stats-service/models/price_model.joblib`), so predictions still work on a
+  fresh database. See `status.priceModel` in `refreshStatus.json` for the last
+  outcome.
+- **Similar players.** The serving process rebuilds its similarity index at
+  startup and hourly (`SIMILARITY_REBUILD_SECONDS`), so after a fresh or wiped
+  database fills in, `/similar-players` starts returning results without a
+  restart.
+
+A manual retrain (updates the committed seed, for shipping a new baseline):
+
+```bash
+cd /opt/hoop-bids
+sudo docker compose --profile maintenance run --rm --no-deps refresh python scripts/train_price_model.py
+```
+
 ## Local checks
 
 ```bash

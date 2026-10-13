@@ -25,7 +25,25 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 # gone on the next restart. Committing the model file to git and shipping it
 # with the code is what actually makes it persist.
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
+# The committed seed model: shipped in git / the Docker image, so a brand-new
+# deploy (or a freshly-wiped database) serves sensible prices on day one,
+# before any real draft history has accumulated to retrain from.
 PRICE_MODEL_PATH = os.path.join(MODELS_DIR, "price_model.joblib")
+# The runtime model, written by the weekly retrain (refresh_all.py -> train())
+# into the persistent data volume the serving container also mounts. Preferred
+# over the seed whenever present, so the weekly retrain's fresher model wins
+# without having to commit a new artifact or restart the service.
+RUNTIME_PRICE_MODEL_PATH = os.path.join(DATA_DIR, "price_model.joblib")
+
+
+def active_price_model_path():
+    """The model file the serving code should load: the retrained runtime model
+    if it exists, otherwise the committed seed, otherwise None (no model yet)."""
+    if os.path.exists(RUNTIME_PRICE_MODEL_PATH):
+        return RUNTIME_PRICE_MODEL_PATH
+    if os.path.exists(PRICE_MODEL_PATH):
+        return PRICE_MODEL_PATH
+    return None
 
 # --- price model feature schema -------------------------------------------
 #
@@ -114,14 +132,17 @@ def build_feature_row(stats, era=None, slot=None, difficulty=None):
     return row
 
 
-def load_price_model():
-    """Returns the fitted sklearn Pipeline, or None if it hasn't been
-    trained yet (run scripts/train_price_model.py). Callers must treat
-    that as "no prediction available," not as an error."""
-    if not os.path.exists(PRICE_MODEL_PATH):
+def load_price_model(path=None):
+    """Returns the fitted sklearn Pipeline, or None if there's no model yet
+    (run scripts/train_price_model.py, or wait for the weekly retrain).
+    Defaults to active_price_model_path() (runtime model, else seed); pass an
+    explicit path to load a specific file. Callers must treat None as "no
+    prediction available," not as an error."""
+    path = path or active_price_model_path()
+    if not path or not os.path.exists(path):
         return None
     try:
-        return joblib.load(PRICE_MODEL_PATH)
+        return joblib.load(path)
     except Exception as e:
         print(f"[ml] failed to load price model: {e.__class__.__name__}: {e}")
         return None
@@ -134,6 +155,8 @@ def predict_price(model, stats, era=None, slot=None, difficulty=None):
     row = build_feature_row(stats, era, slot, difficulty)
     df = pd.DataFrame([row], columns=FEATURE_COLS)
     raw = float(model.predict(df)[0])
+    if not np.isfinite(raw):
+        raise ValueError("Price model returned a non-finite prediction")
     return max(PRICE_CLIP_MIN, min(PRICE_CLIP_MAX, raw))
 
 

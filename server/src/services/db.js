@@ -18,6 +18,13 @@ const DATABASE_URL = process.env.DATABASE_URL || null;
 // known simplification in anything more production-grade.
 const DATABASE_SSL = process.env.DATABASE_SSL === "require";
 
+// Keep only the most recent N completed drafts. Old drafts are the price
+// model's training data, so this caps how much it learns from, but it also
+// caps storage growth, which is the point: a few hundred drafts is plenty for
+// this model. ON DELETE CASCADE (see db/schema.sql) takes the teams/picks with
+// each pruned draft. Tune via DRAFT_RETENTION_LIMIT.
+const DRAFT_RETENTION_LIMIT = Number(process.env.DRAFT_RETENTION_LIMIT) || 200;
+
 // Entirely optional, same philosophy as stats-service/db.py: with no
 // DATABASE_URL, `pool` stays null and every exported function becomes a
 // no-op, so the app plays exactly as it did before there was a database at
@@ -116,6 +123,16 @@ export async function saveDraftResults(room, results) {
         );
       }
     }
+
+    // Prune anything beyond the retention window (oldest first) in the same
+    // transaction, so storage stays bounded as new drafts come in.
+    await client.query(
+      `DELETE FROM drafts
+       WHERE id NOT IN (
+         SELECT id FROM drafts ORDER BY completed_at DESC, id DESC LIMIT $1
+       )`,
+      [DRAFT_RETENTION_LIMIT]
+    );
 
     await client.query("COMMIT");
   } catch (err) {

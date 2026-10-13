@@ -3,6 +3,7 @@ import os
 import random
 import threading
 import time
+from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
@@ -58,7 +59,39 @@ db.init_schema()
 # already returns [] while frame/model are still None, so /similar-players
 # just degrades to an empty result until this finishes.
 _price_model = None if REFRESH_JOB else ml.load_price_model()
+# (path, mtime) of the file _price_model was loaded from, so get_price_model()
+# can hot-reload it when the weekly retrain writes a newer model to the data
+# volume -- no service restart needed.
+_price_model_meta = {"path": None, "mtime": None}
+_price_model_lock = threading.Lock()
 _similarity_index = ml.SimilarityIndex()
+# The serving process rebuilds the similarity index on this cadence as well as
+# at startup, so a freshly-deployed (or freshly-wiped) database that fills in
+# over time starts returning /similar-players results without a restart.
+SIMILARITY_REBUILD_SECONDS = int(os.environ.get("SIMILARITY_REBUILD_SECONDS", str(60 * 60)))
+
+
+def get_price_model():
+    """The current price model, reloaded if the file on disk changed since it
+    was last loaded (e.g. the weekly retrain wrote a new one). Cheap on the hot
+    path: one stat() per call, an actual joblib.load only when it changed."""
+    global _price_model
+    path = ml.active_price_model_path()
+    if path is None:
+        return _price_model
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return _price_model
+    if _price_model_meta["path"] != path or _price_model_meta["mtime"] != mtime:
+        with _price_model_lock:
+            if _price_model_meta["path"] != path or _price_model_meta["mtime"] != mtime:
+                reloaded = ml.load_price_model(path)
+                if reloaded is not None:
+                    _price_model = reloaded
+                    _price_model_meta.update(path=path, mtime=mtime)
+                    print(f"[ml] price model loaded from {os.path.relpath(path, os.path.dirname(__file__))}")
+    return _price_model
 
 
 def _build_similarity_index_in_background():
@@ -70,8 +103,22 @@ def _build_similarity_index_in_background():
         print(f"[ml] similarity index build failed, /similar-players will return empty: {e.__class__.__name__}: {e}")
 
 
+def _similarity_rebuild_loop():
+    while True:
+        time.sleep(SIMILARITY_REBUILD_SECONDS)
+        _build_similarity_index_in_background()
+
+
 if not REFRESH_JOB:
+    if _price_model is not None:
+        _seed_path = ml.active_price_model_path()
+        if _seed_path:
+            try:
+                _price_model_meta.update(path=_seed_path, mtime=os.path.getmtime(_seed_path))
+            except OSError:
+                pass
     threading.Thread(target=_build_similarity_index_in_background, daemon=True).start()
+    threading.Thread(target=_similarity_rebuild_loop, daemon=True).start()
     print(f"[ml] price model {'loaded' if _price_model else 'NOT FOUND (run scripts/train_price_model.py)'}; similarity index building in background")
 
 # PORT is the convention most PaaS hosts (Render included) inject
@@ -388,9 +435,21 @@ def _atomic_write_json(path, obj):
     new one, never a torn state."""
     os.makedirs(DATA_DIR, exist_ok=True)
     tmp = f"{path}.tmp-{os.getpid()}"
-    with open(tmp, "w") as f:
-        json.dump(obj, f)
-    os.replace(tmp, path)
+    try:
+        with open(tmp, "w") as f:
+            json.dump(obj, f)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    # Only prune abandoned copies of this snapshot after publishing its replacement.
+    # Recent files may belong to another writer; current data and history stay intact.
+    for stale in Path(path).parent.glob(Path(path).name + ".tmp-*"):
+        try:
+            if stale.is_file() and not stale.is_symlink() and stale.stat().st_mtime < time.time() - 86400:
+                stale.unlink()
+        except OSError:
+            pass
 
 
 def save_stats_cache_to_disk():
@@ -1340,7 +1399,8 @@ def get_predicted_price():
     `slot` is optional (the client won't know it before an assignment
     happens for a fresh nomination); era/difficulty default sensibly inside
     ml.build_feature_row if omitted too."""
-    if _price_model is None:
+    model = get_price_model()
+    if model is None:
         return jsonify({"error": "MODEL_NOT_TRAINED"}), 404
 
     player = resolve_player(request)
@@ -1361,7 +1421,7 @@ def get_predicted_price():
     difficulty = request.args.get("difficulty")
 
     try:
-        predicted = ml.predict_price(_price_model, stats, era=era, slot=slot, difficulty=difficulty)
+        predicted = ml.predict_price(model, stats, era=era, slot=slot, difficulty=difficulty)
     except Exception as e:
         print(f"[predict-price] prediction failed player_id={player['id']} ({e.__class__.__name__}: {e})")
         return jsonify({"error": "PREDICTION_FAILED"}), 502
@@ -1369,7 +1429,7 @@ def get_predicted_price():
     # Best-effort: the hover-tooltip breakdown of what drove this number.
     # Never lets an explanation failure take down the prediction itself.
     try:
-        explanation = ml.explain_prediction(_price_model, stats, era=era, slot=slot, difficulty=difficulty)
+        explanation = ml.explain_prediction(model, stats, era=era, slot=slot, difficulty=difficulty)
     except Exception as e:
         print(f"[predict-price] explanation failed player_id={player['id']} ({e.__class__.__name__}: {e})")
         explanation = []

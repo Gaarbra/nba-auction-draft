@@ -141,6 +141,24 @@ def main():
                 publish()
                 status["pendingUsageSeasons"] -= 1
                 time.sleep(2)
+            # Weekly price-model retrain on the accumulated (retention-bounded)
+            # draft history in Postgres. Writes to the data volume
+            # (ml.RUNTIME_PRICE_MODEL_PATH) so the serving container hot-reloads
+            # it with no restart. Best-effort: too little data, no DATABASE_URL,
+            # or any training error just gets recorded and never fails the
+            # stats refresh.
+            try:
+                sys.path.insert(0, str(ROOT / "stats-service" / "scripts"))
+                import ml
+                import train_price_model
+
+                retrain = train_price_model.train(output_path=ml.RUNTIME_PRICE_MODEL_PATH, evaluate_candidates=False)
+                status["priceModel"] = retrain
+                print(f"[refresh] price model: {retrain}")
+            except Exception as error:
+                print(f"[refresh] price model retrain skipped: {type(error).__name__}: {error}")
+                status["priceModel"] = {"trained": False, "reason": type(error).__name__}
+
             status["state"] = "partial" if failed else "complete"
             status["pendingStats"] = sum(service._cache.get(p["id"], {}).get("fetchedAt", 0) < started for p in stats_candidates)
             status["pendingAwards"] = sum(service._awards_cache.get(p["id"], {}).get("fetchedAt", 0) < started for p in award_candidates)
