@@ -379,11 +379,12 @@ def fetch_player_bio(player_id):
     df = info.get_data_frames()[0]
 
     if df.empty:
-        bio = {"position": None, "draftYear": None, "country": None}
+        bio = {"position": None, "draftYear": None, "country": None, "currentTeam": None}
     else:
         row = df.iloc[0]
         draft_year = row.get("DRAFT_YEAR")
         country = row.get("COUNTRY")
+        current_team = row.get("TEAM_ABBREVIATION")
         bio = {
             "position": abbreviate_position(row.get("POSITION")),
             "draftYear": int(draft_year) if str(draft_year).isdigit() else None,
@@ -391,6 +392,13 @@ def fetch_player_bio(player_id):
             # "Canada", ...) -- not normalized further here. The client's
             # countryFlags.js is what turns this into a flag.
             "country": country if country else None,
+            # The player's CURRENT roster team. This is only trustworthy for
+            # ACTIVE players (NBA keeps it in sync with trades/signings
+            # immediately); for retired players it can point at a stale
+            # mid-career team (Wilt comes back "Warriors", not "Lakers"), which
+            # is exactly why _fetch_and_cache_stats only uses it when the player
+            # is active and otherwise falls back to last_real_team(df).
+            "currentTeam": current_team if current_team else None,
         }
 
     _bio_cache[player_id] = {"bio": bio, "fetchedAt": time.time()}
@@ -548,7 +556,10 @@ def get_fallback_photo_url(player_id, full_name):
 
         def _resolve():
             try:
-                _photo_cache[player_id] = None if photos.has_nba_headshot(player_id) else photos.find_wikipedia_photo(full_name)
+                # NBA CDN -> Basketball-Reference -> Wikipedia.
+                _photo_cache[player_id] = None if photos.has_nba_headshot(player_id) else (
+                    photos.find_basketball_reference_photo(full_name) or photos.find_wikipedia_photo(full_name)
+                )
                 save_photo_cache_to_disk()
             except Exception as e:
                 print(f"[photo lookup failed] player_id={player_id} ({e.__class__.__name__}: {e})")
@@ -778,14 +789,28 @@ def _fetch_and_cache_stats(player_id):
             def per_game(total):
                 return round(total / total_gp, 1) if total is not None else None
 
+            identity = players.find_player_by_id(player_id)
+            is_active = bool(identity["is_active"]) if identity else False
             try:
                 saved = _cache.get(player_id, {}).get("stats") or {}
+                # Active players always re-fetch the bio so "team" below reflects
+                # their CURRENT roster team, which NBA updates on a trade/signing
+                # right away -- before any games exist in the career rows, which
+                # would otherwise keep showing last season's team for a whole
+                # offseason. Retired players reuse the saved bio during the
+                # weekly job (position/draftYear don't change, and their
+                # career-based team is the correct one anyway).
                 bio = ({key: saved.get(key) for key in ("position", "draftYear", "country")}
-                       if REFRESH_JOB and saved.get("position") and saved.get("draftYear")
+                       if REFRESH_JOB and not is_active and saved.get("position") and saved.get("draftYear")
                        else fetch_player_bio(player_id))
             except Exception as e:
                 print(f"[bio lookup failed] player_id={player_id} ({e.__class__.__name__})")
                 bio = {key: saved.get(key) for key in ("position", "draftYear", "country")}
+
+            # Current roster team for active players (see fetch_player_bio);
+            # the career last-season row for everyone else.
+            current_team = bio.get("currentTeam")
+            display_team = current_team if (is_active and current_team) else last_real_team(df)
 
             history = team_history(df)
             peak_season = _compute_peak_season(season_rows)
@@ -804,12 +829,11 @@ def _fetch_and_cache_stats(player_id):
                 "ftaPerGame": per_game(total_fta),
                 "tovPerGame": per_game(total_tov),
                 "minutesPerGame": per_game(total_min),
-                # "team" stays the last real team they suited up for (kept for
-                # backward compat); "mostPlayedTeam" is the one Node picks for
+                # "team" is the current roster team for active players (updates
+                # on trades/signings immediately), else the last real team they
+                # suited up for. "mostPlayedTeam" is the one Node picks for
                 # color/branding on a retired player (see roomHandlers.js).
-                # An active player's last team already IS their current one,
-                # so this split only matters once someone's career is over.
-                "team": last_real_team(df),
+                "team": display_team,
                 "mostPlayedTeam": history[0]["abbreviation"] if history else None,
                 "teamHistory": history,
                 "position": bio["position"],

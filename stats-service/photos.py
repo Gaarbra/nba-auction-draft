@@ -28,6 +28,50 @@ REQUEST_TIMEOUT = 10
 NBA_HEADSHOT_URL = "https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
 HAS_PHOTO_MIN_BYTES = 30_000
 
+# Basketball-Reference headshot. Tried BEFORE Wikipedia for players NBA has no
+# photo for. Heads up (the app deliberately avoided BR elsewhere for these
+# reasons): BR's terms discourage this kind of programmatic access, the images
+# are licensed (not ours to redistribute), and the id scheme below can collide
+# on shared name-keys, so a wrong player's photo is possible. BR may also block
+# hotlinking, in which case the <img> load fails in the browser and the client
+# falls back to the placeholder. Kept to a single cached, best-effort HEAD.
+BBREF_HEADSHOT_URL = "https://www.basketball-reference.com/req/202106291/images/headshots/{bbref_id}.jpg"
+# Generational suffixes that aren't part of a Basketball-Reference id key.
+_NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
+
+
+def basketball_reference_id(full_name):
+    """BR's id scheme: first five letters of the last name + first two of the
+    first name + a two-digit disambiguator. We only ever try "01" (the first,
+    usually most prominent, holder of that key). Guessing a higher number risks
+    returning a DIFFERENT player who shares the key, which is worse than no
+    photo. Returns None when a reliable key can't be built."""
+    cleaned = "".join(c for c in full_name.lower() if c.isalpha() or c.isspace())
+    parts = [p for p in cleaned.split() if p not in _NAME_SUFFIXES]
+    if len(parts) < 2:
+        return None
+    first, last = parts[0], parts[-1]
+    if len(last) < 2 or len(first) < 1:
+        return None
+    return f"{last[:5]}{first[:2]}01"
+
+
+def find_basketball_reference_photo(full_name):
+    """Best-effort Basketball-Reference headshot URL, or None. One HEAD request
+    (no image bytes). Only ever called from the offline/background photo
+    resolver, never a live reveal. See BBREF_HEADSHOT_URL above for the caveats."""
+    bbref_id = basketball_reference_id(full_name)
+    if not bbref_id:
+        return None
+    url = BBREF_HEADSHOT_URL.format(bbref_id=bbref_id)
+    try:
+        resp = requests.head(url, timeout=REQUEST_TIMEOUT, headers=REQUEST_HEADERS, allow_redirects=True)
+        if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image"):
+            return url
+    except requests.RequestException:
+        return None
+    return None
+
 
 def has_nba_headshot(player_id):
     """True if NBA's CDN actually has a real photo for this player (see

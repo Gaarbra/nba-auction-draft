@@ -68,7 +68,8 @@ def main():
             stats_app._photo_cache[player_id] = None
         else:
             name = names_by_id.get(player_id)
-            fallback_url = photos.find_wikipedia_photo(name) if name else None
+            # NBA CDN -> Basketball-Reference -> Wikipedia.
+            fallback_url = (photos.find_basketball_reference_photo(name) or photos.find_wikipedia_photo(name)) if name else None
             stats_app._photo_cache[player_id] = fallback_url
             if fallback_url:
                 found_fallback += 1
