@@ -60,6 +60,17 @@ class PeakRetryTests(unittest.TestCase):
                     job.main()
                 self.assertEqual(fetch.call_count, 3)
                 self.assertEqual(sum(c.args[0] == 300 for c in sleep.call_args_list), 2)
+                app._atomic_write_json.assert_called_once_with(app.STATS_CACHE_FILE, app._cache)
+
+    def test_maintenance_checkpoints_and_interrupt_keeps_progress(self):
+        app = Mock(CACHE_ONLY=False, REFRESH_JOB=True, _cache={})
+        with tempfile.TemporaryDirectory() as directory:
+            pool = Path(directory) / 'players.json'
+            pool.write_text(json.dumps({'players': [{'id': i} for i in range(26)]}))
+            with patch.dict('sys.modules', {'app': app}), patch.object(job, 'PLAYERS_POOL_FILE', str(pool)), patch.object(job, 'fetch_peak_with_retry', side_effect=['done'] * 25 + [KeyboardInterrupt()]), patch.object(job.time, 'sleep'):
+                with self.assertRaises(KeyboardInterrupt):
+                    job.main()
+                self.assertEqual(app._atomic_write_json.call_count, 2)
 
 if __name__ == '__main__':
     unittest.main()

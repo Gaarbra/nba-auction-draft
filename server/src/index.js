@@ -107,6 +107,17 @@ app.get("/api/players/cache-info", async (req, res) => {
   res.json(await getCacheInfo());
 });
 
+app.get("/api/data-status", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const response = await fetch(`${process.env.STATS_SERVICE_URL || "http://127.0.0.1:5001"}/data-status`, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) throw new Error("Status unavailable");
+    res.json(await response.json());
+  } catch {
+    res.status(503).json({ error: "DATA_STATUS_UNAVAILABLE" });
+  }
+});
+
 // Both ML features: never a hard error for the client to handle. A missing
 // model or a stats-service hiccup just means "no prediction/no similar
 // players right now," not a broken page. See stats-service/ml.py.

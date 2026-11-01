@@ -30,6 +30,10 @@ test("Active Now values, nominations and scoring use one frozen season without c
     await assert.rejects(computeDraftResults(room), /refusing career-stat fallback/);
   } finally { globalThis.fetch = oldFetch; }
   assert.throws(() => prepareActiveSnapshot({ ...snapshot, fetchedAt: 0 }), /UNAVAILABLE/);
+  const missingUsage = prepareActiveSnapshot({ ...snapshot, players: [{ ...player, stats: { ...stats, usagePct: null } }] });
+  assert.equal(missingUsage.players.length, 1);
+  assert.ok(Number.isFinite(missingUsage.players[0].suggestedPrice));
+  assert.equal(toPlayerStatLine(missingUsage.players[0].stats).usagePctEstimated, true);
   const lobby = createRoom("private", true);
   const host = addPlayerToRoom(lobby.code, { name: "Host", socketId: "test" }).player;
   assert.equal(startDraft(lobby.code, host.id, "all", true, "normal", "open", "wrong").error, "INVALID_GAME_MODE");

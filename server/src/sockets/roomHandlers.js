@@ -38,7 +38,7 @@ import { getTopTeamPlayerIds } from "../services/topTeamPlayers.js";
 import { getStarPlayerIds } from "../services/starPlayers.js";
 import { getSuperstarPlayerIds } from "../services/superstarPlayers.js";
 import { filterPlayersByEra } from "../services/era.js";
-import { fetchPlayerStats } from "../services/statsClient.js";
+import { fetchPlayerStats, fetchMarketIndex } from "../services/statsClient.js";
 import { fetchActiveSnapshot, drawActivePlayer } from "../services/activeNow.js";
 import { saveDraftResults } from "../services/db.js";
 import { computeDraftResults } from "../scoring/computeResults.js";
@@ -84,7 +84,7 @@ function toNominatedPlayer(candidate, result) {
   // but a retired player's last team is often just a late-career bench
   // stint, so use whichever team they played the most games for instead.
   // That's what team color/branding should follow.
-  const primaryTeam = candidate.isActive ? result.stats.team : result.stats.mostPlayedTeam || result.stats.team;
+  const primaryTeam = candidate.isActive ? candidate.currentTeam || result.stats.team : result.stats.mostPlayedTeam || result.stats.team;
 
   return {
     player: {
@@ -155,7 +155,8 @@ async function rollPlayerForRoom(room, excludeIds = []) {
   const allPlayers = await getPlayers();
   const eraPool = filterPlayersByEra(allPlayers, room.draftEra);
   const unavailable = new Set([...(room.draft?.draftedPlayerIds || []), ...excludeIds]);
-  const available = eraPool.filter((p) => !unavailable.has(p.id));
+  const peakIds = room.gameMode === "peak" ? new Set((await fetchMarketIndex()).filter(p => p.peakReady).map(p => p.id)) : null;
+  const available = eraPool.filter((p) => !unavailable.has(p.id) && (!peakIds || peakIds.has(p.id)));
 
   if (available.length === 0) return { error: "NO_PLAYERS_LEFT" };
 
@@ -473,6 +474,15 @@ export function registerRoomHandlers(io, socket) {
     if (gameMode === "active-now") {
       try { snapshot = await fetchActiveSnapshot(); }
       catch { return callback?.({ error: "ACTIVE_NOW_UNAVAILABLE" }); }
+    }
+    if (gameMode === "peak") {
+      try {
+        const ready = new Set((await fetchMarketIndex()).filter(p => p.peakReady).map(p => p.id));
+        const pool = filterPlayersByEra(await getPlayers(), era);
+        if (pool.filter(p => ready.has(p.id)).length < room.players.length * 5 + 1) {
+          return callback?.({ error: "PEAK_STATS_UNAVAILABLE" });
+        }
+      } catch { return callback?.({ error: "PEAK_STATS_UNAVAILABLE" }); }
     }
     const result = startDraft(roomCode, playerId, era, allowPositionSwaps, difficulty, biddingMode, gameMode, snapshot);
     if (result.error) {

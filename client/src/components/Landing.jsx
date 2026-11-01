@@ -2,6 +2,7 @@ import { useState } from "react";
 import RoomLobby from "./RoomLobby.jsx";
 import MarketTicker from "./MarketTicker.jsx";
 import { getStreak } from "../winStreak.js";
+import useDataStatus, { dataUpdatedLabel } from "../useDataStatus.js";
 
 /** The front door: hero + the actual room-creation console on one screen,
  * replacing the old multi-section scrolling pitch (LandingPage.jsx) that
@@ -28,6 +29,7 @@ export default function Landing({
   // finishes and returns here, which is exactly when the streak just
   // changed, so a stale value never lingers.
   const [streak] = useState(getStreak);
+  const { status, unavailable } = useDataStatus();
 
   return (
     <div className="landing-lobby">
@@ -50,7 +52,7 @@ export default function Landing({
 
           <div className="landing-lobby-stats">
             <div className="landing-lobby-stat">
-              <span className="landing-lobby-stat-value">5,200+</span>
+              <span className="landing-lobby-stat-value">{status?.playerCount?.toLocaleString() ?? "—"}</span>
               <span className="landing-lobby-stat-label">players, every era</span>
             </div>
             <div className="landing-lobby-stat">
@@ -58,9 +60,17 @@ export default function Landing({
               <span className="landing-lobby-stat-label">starting budget</span>
             </div>
             <div className="landing-lobby-stat">
-              <span className="landing-lobby-stat-value">1-4</span>
+              <span className="landing-lobby-stat-value">1–8</span>
               <span className="landing-lobby-stat-label">players per room</span>
             </div>
+          </div>
+          <div className="data-update-status" aria-live="polite">
+            {status ? <>
+              <span>{status.peakCount.toLocaleString()} peak seasons ready · {status.activeCount.toLocaleString()} Active Now players</span>
+              <span>{status.season || "Season data pending"} · Season stats updated {dataUpdatedLabel(status.seasonUpdatedAt)}</span>
+              {status.seasonStale && <span>Active Now is waiting for a fresh season update.</span>}
+            </> : <span>{unavailable ? "Data update status unavailable." : "Checking saved player data…"}</span>}
+            {unavailable && status && <span>Connection lost. Showing the last saved update.</span>}
           </div>
         </div>
 
@@ -76,7 +86,7 @@ export default function Landing({
         />
       </div>
 
-      <MarketTicker />
+      <MarketTicker status={status} />
     </div>
   );
 }

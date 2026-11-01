@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
+import { useState } from "react";
 
 // Career-high-ish ceilings per stat, used purely to normalize the radar's
 // 0-1 axes. Not a claim about the literal all-time record, just enough
@@ -26,8 +27,9 @@ function pointAt(angleDeg, r) {
  * line, drawn as raw SVG and animated in with Motion. No charting library needed
  * for something this simple, and it means the fill color can follow the player's
  * team like everything else in the app already does. */
-export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
+export default function StatRadarChart({ stats, color = "#ff7a1a", interactive = false }) {
   const reduceMotion = useReducedMotion();
+  const [selected, setSelected] = useState(0);
   if (!stats || stats.unavailable) return null;
 
   const points = AXES.map((axis, i) => {
@@ -42,7 +44,7 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
   });
   const polygonPoints = points.map((p) => p.point.join(",")).join(" ");
 
-  return (
+  const chart = (
     <svg width={SIZE} height={SIZE} viewBox={`-16 -16 ${SIZE + 32} ${SIZE + 32}`} className="stat-radar" role="img" aria-label="Career per-game stat radar">
       {[0.33, 0.66, 1].map((f) => (
         <polygon
@@ -70,16 +72,21 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
       />
 
       {points.map((p, i) => (
+        <g key={p.key} onPointerEnter={interactive ? () => setSelected(i) : undefined}
+          onClick={interactive ? () => setSelected(i) : undefined}>
+        {interactive && <circle cx={p.point[0]} cy={p.point[1]} r={14} fill="transparent" />}
         <motion.circle
           key={p.key}
           cx={p.point[0]}
           cy={p.point[1]}
-          r={2.75}
+          r={interactive && i === selected ? 5 : 2.75}
           fill={color}
           initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: reduceMotion ? 0 : 0.2 }}
         />
+        <title>{p.label}: {p.raw == null ? "Not recorded" : `${p.raw} per game`}</title>
+        </g>
       ))}
 
       {points.map((p, i) => {
@@ -100,4 +107,12 @@ export default function StatRadarChart({ stats, color = "#ff7a1a" }) {
       })}
     </svg>
   );
+  return interactive ? <div className="interactive-stat-profile">
+    {chart}
+    <div className="stat-profile-controls" role="group" aria-label="Explore per-game stats">
+      {points.map((point, index) => <button key={point.key} type="button" aria-pressed={selected === index}
+        onClick={() => setSelected(index)}>{point.label}</button>)}
+    </div>
+    <p className="hint-text" aria-live="polite"><strong>{points[selected].label}: {points[selected].raw ?? "Not recorded"}</strong>{points[selected].raw != null && " per game"}</p>
+  </div> : chart;
 }

@@ -162,7 +162,7 @@ export async function fetchPredictedPrice(playerId, { era, difficulty, slot } = 
     if (!res.ok) return { predictedPrice: null, explanation: [] };
     const data = await res.json();
     return {
-      predictedPrice: typeof data.predictedPrice === "number" ? data.predictedPrice : null,
+      predictedPrice: Number.isFinite(data.predictedPrice) ? data.predictedPrice : null,
       explanation: Array.isArray(data.explanation) ? data.explanation : [],
     };
   } catch (err) {
@@ -215,7 +215,7 @@ export async function fetchUsagePct(playerId) {
 }
 
 let marketIndexCache = null; // { players, fetchedAt } | null
-const MARKET_INDEX_CACHE_TTL_MS = 60 * 60 * 1000; // an hour, see fetchMarketIndex
+const MARKET_INDEX_CACHE_TTL_MS = 30_000; // Publish saved refresh progress promptly.
 
 /**
  * The Market tab's era/team/player picker data: every player stats-service
@@ -248,12 +248,13 @@ export async function fetchMarketIndex() {
     const players = await getPlayers();
     const saved = await Promise.all(players.map(async (player) => {
       const stats = await savedPlayerStats(player.id);
-      const team = stats?.mostPlayedTeam || stats?.team;
+      const team = player.currentTeam || stats?.mostPlayedTeam || stats?.team;
       return team ? { id: player.id, fullName: player.fullName, team,
-        position: stats.position, draftYear: stats.draftYear,
-        teamHistory: stats.teamHistory || [], firstSeason: stats.firstSeason, lastSeason: stats.lastSeason,
+        peakReady: Boolean(stats?.peakSeason?.season),
+        position: stats?.position, draftYear: stats?.draftYear,
+        teamHistory: stats?.teamHistory || [], firstSeason: stats?.firstSeason, lastSeason: stats?.lastSeason,
         currentTeam: player.currentTeam, rosterSeason: player.rosterSeason,
-        gamesPlayed: stats.gamesPlayed, pointsPerGame: stats.pointsPerGame } : null;
+        gamesPlayed: stats?.gamesPlayed, pointsPerGame: stats?.pointsPerGame } : null;
     }));
     const list = saved.filter(Boolean);
     // Retry the service after a minute; don't cache a fallback for a full hour.

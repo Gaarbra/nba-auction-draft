@@ -48,7 +48,9 @@ const ERROR_MESSAGES = {
   NO_PLAYERS_LEFT: "No players left in this era's pool.",
   RECONNECT_FAILED: "Your previous session couldn't be resumed. Please rejoin.",
   RATE_LIMITED: "Slow down a bit. Try again in a few seconds.",
-  INVALID_LOCAL_PLAYERS: "Enter between 2 and 4 player names.",
+  INVALID_LOCAL_PLAYERS: "Enter between 2 and 8 player names.",
+  ACTIVE_NOW_UNAVAILABLE: "Current-season data is missing or overdue for an update. Check the homepage data status and try again after the refresh.",
+  PEAK_STATS_UNAVAILABLE: "Not enough saved peak seasons for this player pool yet. Try All Eras or wait for the backfill to finish.",
 };
 
 function loadSession() {

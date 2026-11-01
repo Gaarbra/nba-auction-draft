@@ -19,6 +19,7 @@ import os
 import random
 import sys
 import time
+import signal
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -29,6 +30,9 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 PLAYERS_POOL_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "server", "data", "players.json"
 )
+runtime_pool = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "players.json")
+if os.path.exists(runtime_pool):
+    PLAYERS_POOL_FILE = runtime_pool
 
 DELAY_RANGE = (3, 5)
 RETRY_DELAYS = (30, 90)
@@ -120,25 +124,37 @@ def main(include_team_history=False):
     no_stats = 0
     failed = 0
 
-    for i, player_id in enumerate(to_fetch, 1):
-        outcome = fetch_peak_with_retry(player_id, stats_app._fetch_and_cache_stats)
-        if outcome == "failed":
-            failed += 1
-            consecutive_failures += 1
-        else:
-            consecutive_failures = 0
-            done += outcome == "done"
-            no_stats += outcome == "no_stats"
+    def interrupted(signum, frame):
+        raise SystemExit("Backfill interrupted; saving progress.")
 
-        print(f"  [{i}/{len(to_fetch)}] done={done} no_stats={no_stats} failed={failed}", flush=True)
+    previous_handler = signal.signal(signal.SIGTERM, interrupted)
+    try:
+        for i, player_id in enumerate(to_fetch, 1):
+            outcome = fetch_peak_with_retry(player_id, stats_app._fetch_and_cache_stats)
+            if outcome == "failed":
+                failed += 1
+                consecutive_failures += 1
+            else:
+                consecutive_failures = 0
+                done += outcome == "done"
+                no_stats += outcome == "no_stats"
 
-        if consecutive_failures >= FAILURE_THRESHOLD:
-            raise SystemExit("Stopping after 3 consecutive players exhausted their retries; saved progress retained. Retry later.")
-        if outcome == "failed":
-            print(f"  Cooling down {COOLDOWN_SECONDS}s before the next player...", flush=True)
-            time.sleep(COOLDOWN_SECONDS)
+            if i % 25 == 0:
+                stats_app._atomic_write_json(stats_app.STATS_CACHE_FILE, stats_app._cache)
 
-        time.sleep(random.uniform(*DELAY_RANGE))
+            print(f"  [{i}/{len(to_fetch)}] done={done} no_stats={no_stats} failed={failed}", flush=True)
+
+            if consecutive_failures >= FAILURE_THRESHOLD:
+                raise SystemExit("Stopping after 3 consecutive players exhausted their retries; saved progress retained. Retry later.")
+            if outcome == "failed":
+                print(f"  Cooling down {COOLDOWN_SECONDS}s before the next player...", flush=True)
+                time.sleep(COOLDOWN_SECONDS)
+
+            time.sleep(random.uniform(*DELAY_RANGE))
+
+    finally:
+        signal.signal(signal.SIGTERM, previous_handler)
+        stats_app._atomic_write_json(stats_app.STATS_CACHE_FILE, stats_app._cache)
 
     print(f"Done. done={done} no_stats={no_stats} failed={failed}.")
     if failed:
@@ -152,4 +168,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.status:
         raise SystemExit(print_status())
-    main(args.team_history)
+    # Use the same lock as weekly/daily maintenance; concurrent cache writers
+    # could otherwise overwrite each other's completed players.
+    import fcntl
+    with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", ".refresh.lock"), "a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit("Another data refresh is running; try after it finishes.")
+        main(args.team_history)

@@ -1,10 +1,11 @@
 import { playerScore } from "../scoring/scoring.js";
 import { toPlayerStatLine } from "../scoring/statsAdapter.js";
 
-const FIELDS = ["pointsPerGame", "reboundsPerGame", "assistsPerGame", "stealsPerGame", "blocksPerGame", "fgaPerGame", "ftaPerGame", "tovPerGame", "minutesPerGame", "usagePct", "gamesPlayed"];
+const FIELDS = ["pointsPerGame", "reboundsPerGame", "assistsPerGame", "stealsPerGame", "blocksPerGame", "fgaPerGame", "ftaPerGame", "tovPerGame", "minutesPerGame", "gamesPlayed"];
 
 export function validSeasonStats(stats, season) {
   return stats?.statsBasis === "season" && stats.season === season && stats.gamesPlayed > 0
+    && (stats.usagePct == null || (Number.isFinite(stats.usagePct) && stats.usagePct >= 0))
     && FIELDS.every((field) => Number.isFinite(stats[field]) && stats[field] >= 0);
 }
 

@@ -168,6 +168,10 @@ def main():
         except Exception as error:
             status.update(state="failed", error=type(error).__name__)
             print(f"[refresh] Stopped: {type(error).__name__}; saved data retained.")
+            # File/line only: exception messages can contain proxy credentials.
+            import traceback
+            for frame in traceback.extract_tb(error.__traceback__):
+                print(f"[refresh] at {Path(frame.filename).name}:{frame.lineno} in {frame.name}", flush=True)
             return 1
         finally:
             publish()

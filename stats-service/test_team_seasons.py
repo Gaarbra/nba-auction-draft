@@ -26,7 +26,19 @@ class TeamSeasonTests(unittest.TestCase):
             with app.app.test_request_context('/market-index'):
                 players = app.get_market_index().json['players']
             self.assertEqual(players[0]['currentTeam'],'PHI')
+            self.assertEqual(players[0]['team'],'PHI')
             self.assertEqual(players[0]['teamHistory'],career['teamHistory'])
+
+    def test_rookie_outside_bundled_library_resolves_and_appears_in_market(self):
+        rookie = {'id':99999999,'fullName':'New Rookie','isActive':True,'currentTeam':'BOS','rosterSeason':'2026-27'}
+        with patch.object(app,'_pool_cache',{'players':[rookie]}), patch.object(app,'_cache',{}):
+            with app.app.test_request_context('/stats?id=99999999'):
+                self.assertEqual(app.resolve_player(app.request)['full_name'],'New Rookie')
+            with app.app.test_request_context('/market-index'):
+                self.assertEqual(app.get_market_index().json['players'][0]['fullName'],'New Rookie')
+            with patch.object(app,'_cache',{99999999:{'stats':{'team':'BOS','peakSeason':{'season':'2026-27'}}}}):
+                with app.app.test_request_context('/market-index'):
+                    self.assertTrue(app.get_market_index().json['players'][0]['peakReady'])
 
     def test_catalogue_refresh_captures_offseason_roster(self):
         rows = pd.DataFrame([{'PERSON_ID':2544, 'DISPLAY_FIRST_LAST':'LeBron James', 'ROSTERSTATUS':1, 'FROM_YEAR':'2003', 'TO_YEAR':'2026', 'TEAM_ABBREVIATION':'PHI'}])

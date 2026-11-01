@@ -36,6 +36,19 @@ class ActiveNowTests(unittest.TestCase):
         def fail(*args): raise TimeoutError("upstream unavailable")
         with self.assertRaises(TimeoutError): build_snapshot(fail, [], {}, date(2026, 10, 2))
 
+    def test_new_player_without_bio_or_advanced_usage_keeps_season_box_scores(self):
+        row = dict(PLAYER_ID=99, PLAYER_NAME="New Rookie", TEAM_ID=1, TEAM_ABBREVIATION="BOS",
+                   GP=1, PTS=12, REB=4, AST=2, STL=1, BLK=0, FGA=7, FTA=2, TOV=1, MIN=20)
+        def fetch(season, measure):
+            if measure == "Advanced": raise TimeoutError()
+            return [row]
+        snapshot = build_snapshot(fetch, [{"id":99,"isActive":True,"currentTeam":"PHI"}],
+                                  {99:{"stats":None}}, date(2026,11,1))
+        self.assertEqual(snapshot["season"], "2026-27")
+        self.assertEqual(snapshot["players"][0]["stats"]["pointsPerGame"], 12)
+        self.assertIsNone(snapshot["players"][0]["stats"]["usagePct"])
+        self.assertEqual(snapshot["players"][0]["team"]["abbreviation"], "PHI")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,7 @@
 from datetime import date
 import math
 import time
+from requests.exceptions import RequestException
 
 
 FIELDS = {"PTS": "pointsPerGame", "REB": "reboundsPerGame", "AST": "assistsPerGame",
@@ -24,8 +25,13 @@ def build_snapshot(fetch_rows, pool, bios, today=None):
         year = int(current[:4]) - 1
         season = f"{year}-{str(year + 1)[-2:]}"
         rows = fetch_rows(season, "Base")
-    usage = {int(row["PLAYER_ID"]): float(row["USG_PCT"]) * 100
-             for row in fetch_rows(season, "Advanced")}
+    # Advanced tables can lag the base box scores early in a season. Missing
+    # usage is estimated by scoring from this same season, never career stats.
+    try:
+        usage = {int(row["PLAYER_ID"]): float(row["USG_PCT"]) * 100
+                 for row in fetch_rows(season, "Advanced") if row.get("USG_PCT") is not None}
+    except (TimeoutError, ConnectionError, RequestException):
+        usage = {}
     active = {int(p["id"]) for p in pool if p.get("isActive")}
     players = {}
     for row in rows:
@@ -33,16 +39,18 @@ def build_snapshot(fetch_rows, pool, bios, today=None):
         if pid not in active or float(row["GP"]) <= 0:
             continue
         stats = {field: float(row[key]) for key, field in FIELDS.items()}
-        stats.update(gamesPlayed=int(row["GP"]), usagePct=usage.get(pid))
+        stats.update(gamesPlayed=int(row["GP"]))
         if any(value is None or not math.isfinite(value) or value < 0 for value in stats.values()):
             continue
+        usg = usage.get(pid)
+        stats["usagePct"] = usg if usg is not None and math.isfinite(usg) and usg >= 0 else None
         stats.update(season=season, statsBasis="season", savedAt=time.time())
         # Copy identity only. Never copy career averages, honours or career teams.
-        bio = bios.get(pid, {}).get("stats", {})
+        bio = bios.get(pid, {}).get("stats") or {}
         stats["photoUrl"] = bio.get("photoUrl")
         player = {"id": pid, "nbaPlayerId": pid, "fullName": row["PLAYER_NAME"],
                   "position": bio.get("position"), "isActive": True,
-                  "team": {"abbreviation": row["TEAM_ABBREVIATION"]}, "stats": stats}
+                  "team": {"abbreviation": next((p.get("currentTeam") for p in pool if int(p["id"]) == pid), None) or row["TEAM_ABBREVIATION"]}, "stats": stats}
         # NBA aggregate rows (TEAM_ID=0) take precedence over trade stints.
         previous = players.get(pid)
         if previous is None or row.get("TEAM_ID") == 0:

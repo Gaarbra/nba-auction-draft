@@ -49,7 +49,10 @@ export async function computeDraftResults(room) {
     if (isSeason && slot.drafted && !validSeasonStats(slot.drafted.stats, room.activeNowSnapshot?.season)) {
       throw new Error("Missing season snapshot; refusing career-stat fallback");
     }
-    const rawStats = slot.drafted ? (isSeason ? slot.drafted.stats : await fetchFullPlayerStatsWithRetry(slot.drafted.id, mode)) : null;
+    // Freeze peak stats at nomination, just like Active Now. A refresh or
+    // temporary service outage must not change the roster's scoring basis.
+    const savedPeak = mode === "peak" && slot.drafted?.stats?.season ? slot.drafted.stats : null;
+    const rawStats = slot.drafted ? (isSeason ? slot.drafted.stats : savedPeak || await fetchFullPlayerStatsWithRetry(slot.drafted.id, mode)) : null;
     if (mode === "peak" && slot.drafted && !rawStats?.season) throw new Error("Missing peak-season stats; refusing career fallback");
     return { statLine: toPlayerStatLine(rawStats || { gamesPlayed: 0, usagePct: null }), photoUrl: rawStats?.photoUrl ?? null };
   });

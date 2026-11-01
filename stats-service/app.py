@@ -197,7 +197,11 @@ def resolve_player(req):
     id_param = (req.args.get("id") or "").strip()
     if id_param:
         try:
-            return players.find_player_by_id(int(id_param))
+            player_id = int(id_param)
+            roster = next((p for p in (_pool_cache.get("players") or []) if p["id"] == player_id), None)
+            if roster:
+                return {"id": player_id, "full_name": roster["fullName"], "is_active": roster.get("isActive", False)}
+            return players.find_player_by_id(player_id)
         except (ValueError, TypeError):
             return None
 
@@ -790,7 +794,8 @@ def _fetch_and_cache_stats(player_id):
                 return round(total / total_gp, 1) if total is not None else None
 
             identity = players.find_player_by_id(player_id)
-            is_active = bool(identity["is_active"]) if identity else False
+            roster = next((p for p in (_pool_cache.get("players") or []) if p["id"] == player_id), {})
+            is_active = roster.get("isActive", bool(identity["is_active"]) if identity else False)
             try:
                 saved = _cache.get(player_id, {}).get("stats") or {}
                 # Active players always re-fetch the bio so "team" below reflects
@@ -809,7 +814,7 @@ def _fetch_and_cache_stats(player_id):
 
             # Current roster team for active players (see fetch_player_bio);
             # the career last-season row for everyone else.
-            current_team = bio.get("currentTeam")
+            current_team = roster.get("currentTeam") or bio.get("currentTeam")
             display_team = current_team if (is_active and current_team) else last_real_team(df)
 
             history = team_history(df)
@@ -856,8 +861,8 @@ def _fetch_and_cache_stats(player_id):
             last_year = int(stats["lastSeason"].split("-")[0]) + 1 if stats.get("lastSeason") else None
             db.upsert_player_and_stats(
                 player_id,
-                identity["full_name"] if identity else str(player_id),
-                bool(identity["is_active"]) if identity else False,
+                roster.get("fullName") or (identity["full_name"] if identity else str(player_id)),
+                is_active,
                 first_year,
                 last_year,
                 stats,
@@ -1660,16 +1665,18 @@ def get_market_index():
     index = []
     for player_id, entry in _cache.items():
         stats = entry.get("stats") or {}
-        team = stats.get("mostPlayedTeam") or stats.get("team")
+        roster = roster_by_id.get(player_id, {})
+        team = roster.get("currentTeam") or stats.get("mostPlayedTeam") or stats.get("team")
         if not team:
             continue
-        identity = identities_by_id.get(player_id)
-        if not identity:
+        name = roster.get("fullName") or identities_by_id.get(player_id, {}).get("full_name")
+        if not name:
             continue
         index.append(
             {
                 "id": player_id,
-                "fullName": identity["full_name"],
+                "fullName": name,
+                "peakReady": bool((stats.get("peakSeason") or {}).get("season")),
                 "team": team,
                 "position": stats.get("position"),
                 "draftYear": stats.get("draftYear"),
@@ -1688,7 +1695,36 @@ def get_market_index():
             }
         )
 
+    known = {p["id"] for p in index}
+    # New roster additions are discoverable before their first career-cache fill.
+    for pid, roster in roster_by_id.items():
+        if pid not in known and roster.get("isActive") and roster.get("currentTeam"):
+            index.append({**roster, "team": roster["currentTeam"], "peakReady": False})
     return jsonify({"players": index, "count": len(index)})
+
+
+@app.get("/data-status")
+def data_status():
+    def saved(name):
+        try:
+            with open(os.path.join(DATA_DIR, name), encoding="utf-8") as source:
+                return json.load(source)
+        except (OSError, ValueError):
+            return {}
+    active = saved("activeNowCache.json")
+    refresh = saved("refreshStatus.json")
+    return jsonify(
+        playerCount=len(_pool_cache.get("players") or []),
+        statsCount=sum(bool(v.get("stats")) for v in _cache.values()),
+        peakCount=sum(bool(((v.get("stats") or {}).get("peakSeason") or {}).get("season")) for v in _cache.values()),
+        rosterUpdatedAt=_pool_cache.get("fetchedAt"),
+        statsUpdatedAt=max((v.get("fetchedAt", 0) for v in _cache.values()), default=None),
+        season=active.get("season"), seasonUpdatedAt=active.get("fetchedAt"),
+        seasonStale=time.time() - active.get("fetchedAt", 0) > 8 * 86400,
+        activeCount=len(active.get("players", [])), refreshState=refresh.get("state"),
+        seasonLeaders=[{"id": p["id"], "fullName": p["fullName"], "pointsPerGame": p["stats"]["pointsPerGame"]}
+                       for p in sorted(active.get("players", []), key=lambda p: p["stats"].get("pointsPerGame", 0), reverse=True)[:12]],
+    )
 
 
 @app.get("/usage-pct")

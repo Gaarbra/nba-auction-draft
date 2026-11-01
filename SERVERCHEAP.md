@@ -1,5 +1,53 @@
 # ServerCheap deployment
 
+## Current rosters, season modes and the market
+
+Deploy the fixes and install daily active-player updates (uses the existing proxy;
+Saturday's larger refresh and peak backfill remain on the existing timer):
+
+```bash
+cd /opt/hoop-bids
+git pull --ff-only origin main
+sudo docker compose build web server stats
+sudo docker compose up -d --no-deps --wait web server stats
+sudo bash install-daily-refresh.sh
+```
+
+Run deployment between games: restarting `server` ends in-memory rooms. The installer
+starts today's update in the background and schedules Sunday–Friday at 10:00 UTC
+with up to five minutes of jitter. All maintenance writers share one lock. If a
+weekly refresh or peak backfill is already running, today's update exits without
+overwriting it; start `hoop-bids-current.service` after that job finishes.
+
+```bash
+sudo journalctl -u hoop-bids-current.service -n 30 --no-pager
+sudo systemctl list-timers 'hoop-bids-*'
+curl -fsS https://girma.me/api/data-status
+```
+
+Daily updates publish the roster and one regular-season snapshot first, then spend
+up to 20 minutes updating active-player career/peak records, oldest first. New
+rookies are discoverable before career stats are available. Retired players are
+not repeatedly fetched by this job; the resumable peak backfill handles missing
+historical records. Saved data remains intact after an upstream outage.
+
+The homepage displays real catalogue/peak/season counts, the season update time,
+and saved season scoring leaders. It and the market check saved progress each
+minute while visible. Serving workers and Node caches refresh within 30 seconds
+each, so changes can take roughly two minutes to reach an already-open page.
+This is automatic saved-data updating, not live NBA play-by-play. Existing drafts
+keep their nomination-time season stats to prevent mid-game scoring changes.
+
+Active Now uses only the selected regular season; missing advanced usage is
+estimated from that season's box scores and flagged in scoring. It never falls
+back to career stats. Peak Season draws only from players with saved peak seasons,
+and reports insufficient coverage before starting a room. The market uses current
+roster teams by default and actual historical stints when a team filter is selected.
+
+The October 2026 `AttributeError` can occur when an active player's cached career
+entry has `stats: null`. The season builder now handles that case. Refresh errors
+log file/function/line locations without dumping credential-bearing exception text.
+
 The three app services are `web` (Vite build served by Caddy), `server` (Node/Socket.IO), and `stats` (Flask/Gunicorn). PostgreSQL is a fourth persistence container, already required by this deployment's history and stats features. Only Caddy publishes host ports. Named volumes preserve database, caches and certificates across rebuilds.
 
 ## Before running
