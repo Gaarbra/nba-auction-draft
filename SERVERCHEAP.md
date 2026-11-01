@@ -2,34 +2,33 @@
 
 ## Current rosters, season modes and the market
 
-Deploy the fixes and install daily active-player updates (uses the existing proxy;
-Saturday's larger refresh and peak backfill remain on the existing timer):
+Deploy the fixes and keep weekly Saturday updates through the existing proxy:
 
 ```bash
 cd /opt/hoop-bids
 git pull --ff-only origin main
 sudo docker compose build web server stats
 sudo docker compose up -d --no-deps --wait web server stats
-sudo bash install-daily-refresh.sh
+sudo bash install-refresh-schedule.sh
 ```
 
-Run deployment between games: restarting `server` ends in-memory rooms. The installer
-starts today's update in the background and schedules Sunday–Friday at 10:00 UTC
-with up to five minutes of jitter. All maintenance writers share one lock. If a
-weekly refresh or peak backfill is already running, today's update exits without
-overwriting it; start `hoop-bids-current.service` after that job finishes.
+Run deployment between games: restarting `server` ends in-memory rooms. The schedule
+installer disables the daily timer and enables the existing Saturday timer, around
+10:00 UTC with up to 15 minutes of jitter. Any currently running refresh may finish.
+The old `install-daily-refresh.sh` command forwards to this weekly-only installer,
+so rerunning previously shared deployment commands cannot re-enable daily updates.
 
 ```bash
-sudo journalctl -u hoop-bids-current.service -n 30 --no-pager
+sudo journalctl -u hoop-bids-refresh.service -n 30 --no-pager
 sudo systemctl list-timers 'hoop-bids-*'
 curl -fsS https://girma.me/api/data-status
 ```
 
-Daily updates publish the roster and one regular-season snapshot first, then spend
-up to 20 minutes updating active-player career/peak records, oldest first. New
-rookies are discoverable before career stats are available. Retired players are
-not repeatedly fetched by this job; the resumable peak backfill handles missing
-historical records. Saved data remains intact after an upstream outage.
+Weekly updates publish current rosters and the regular-season snapshot, then refresh
+active-player career/peak records and awards. New rookies are discoverable before
+career stats are available. The resumable peak backfill handles missing historical
+records. Maintenance writers share a lock, and saved data survives upstream outages.
+Daily scheduling is intentionally disabled until the owner chooses to enable it.
 
 The homepage displays real catalogue/peak/season counts, the season update time,
 and saved season scoring leaders. It and the market check saved progress each
