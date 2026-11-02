@@ -80,35 +80,24 @@ test("offenseScore: a player with zero FGA/FTA doesn't blow up (guarded TS%)", (
 
 // --- defensiveImpactRating ---------------------------------------------------
 
-test("defensiveImpactRating: tracked stats use STL*2.5 + BLK*2.0", () => {
+test("defensiveImpactRating: tracked stats use STL*2.0 + BLK*2.5 (blocks over steals)", () => {
   const result = defensiveImpactRating({ stl: 1.5, blk: 0.5 });
-  assert.strictEqual(result, 1.5 * 2.5 + 0.5 * 2.0);
+  assert.strictEqual(result, 1.5 * 2.0 + 0.5 * 2.5);
 });
 
-test("defensiveImpactRating: tracked stats also add a small REB term (REB*0.3)", () => {
-  const result = defensiveImpactRating({ stl: 1.5, blk: 0.5, reb: 10 });
-  assert.strictEqual(result, 1.5 * 2.5 + 0.5 * 2.0 + 10 * 0.3);
+test("defensiveImpactRating: rebounds are not counted as defense (any reb field is ignored)", () => {
+  // Rebounds track role and opportunity, not defense, so they no longer feed
+  // the tracked-era DIR. A reb value, however large, must change nothing.
+  const withReb = defensiveImpactRating({ stl: 1.5, blk: 0.5, reb: 15 });
+  const withoutReb = defensiveImpactRating({ stl: 1.5, blk: 0.5 });
+  assert.strictEqual(withReb, withoutReb);
+  assert.strictEqual(withReb, 1.5 * 2.0 + 0.5 * 2.5);
 });
 
-test("defensiveImpactRating: a dominant rebounder's REB term lands in the same rough range as a plus defender's STL/BLK terms, not swamping them", () => {
-  // ~15 REB/g -> 4.5, comparable to a good defender's STL/BLK contribution
-  // (roughly 1-6 for realistic per-game rates). This is meant to close the
-  // "rebounding counts for nothing" gap, not make DIR mostly about boards.
-  const dominantRebounder = defensiveImpactRating({ stl: 0.5, blk: 0.5, reb: 15 });
-  const plusDefenderNoReb = defensiveImpactRating({ stl: 1.5, blk: 1.5, reb: 0 });
-  assert.ok(dominantRebounder > 0 && dominantRebounder < plusDefenderNoReb * 2);
-});
-
-test("defensiveImpactRating: missing reb (undefined) contributes 0, same as before this term existed", () => {
-  const result = defensiveImpactRating({ stl: 1.5, blk: 0.5 });
-  assert.strictEqual(result, 1.5 * 2.5 + 0.5 * 2.0);
-});
-
-test("defensiveImpactRating: the untracked (DWS) branch never double-counts REB even if reb is present", () => {
+test("defensiveImpactRating: the untracked (DWS) branch ignores a raw REB field", () => {
   // The DWS estimate is itself derived from rebounds/game (see
   // statsAdapter.js's estimateSeasonDWS). This branch must ignore a raw
-  // `reb` field entirely, not add REB_WEIGHT on top of an already
-  // rebounding-derived DWS number.
+  // `reb` field entirely, so defense isn't counted from rebounds twice.
   const withReb = defensiveImpactRating({ stl: null, blk: null, reb: 15, seasonDWS: 3.5, gamesPlayed: 70 });
   const withoutReb = defensiveImpactRating({ stl: null, blk: null, seasonDWS: 3.5, gamesPlayed: 70 });
   assert.strictEqual(withReb, withoutReb);
@@ -211,7 +200,10 @@ test("teamScore: finalScore is sum(op+dir over 5 starters) * synergy multiplier"
 
   assert.strictEqual(result.sumUsagePct, expectedUsage);
   assert.strictEqual(result.synergyMultiplier, expectedMs);
-  assert.strictEqual(result.finalScore, expectedSumTotal * expectedMs);
+  // teamScore sums op+dir per player; this expected value groups the adds
+  // differently, so they differ by a floating-point ULP (same reason the
+  // partial-roster test below uses an epsilon). Compare within a tight bound.
+  assert.ok(Math.abs(result.finalScore - expectedSumTotal * expectedMs) < 1e-9);
   assert.strictEqual(result.playerScores.length, 5);
 });
 

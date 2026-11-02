@@ -10,7 +10,7 @@
  * The formulas:
  *   TS%  = PTS / (2 * (FGA + 0.44 * FTA))
  *   Op   = (PTS * TS%) + (AST * 1.5) - (TOV * 2.0)
- *   DIR  = (STL * 2.5) + (BLK * 2.0) + (REB * 0.3)      [stats tracked]
+ *   DIR  = (STL * 2.0) + (BLK * 2.5)                    [stats tracked]
  *        = (Season DWS / Games Played) * 100            [stats untracked, pre-1974]
  *   Pen  = 3.0 if the player's real position doesn't match their roster slot's group
  *        = 0   if it does, or if either the position or the slot is unknown
@@ -26,11 +26,18 @@
  * per-game assists is a single digit, and adding them together would be
  * meaningless. statsAdapter.js is the file that does that per-game
  * shaping. scoring.js itself never touches a season total.
+ *
+ * On defense: the box score barely measures it. Blocks and steals are rare
+ * events and steals in particular reward gambling, so they're a thin proxy,
+ * and total rebounds are worse (role and opportunity, not defense, and they
+ * include offensive boards). DIR therefore uses only STL and BLK, weighted
+ * toward blocks. See Basketball-Reference's BPM, which can only derive its
+ * defensive half indirectly for exactly this reason.
  */
 
 /** @typedef {{
  *   pts: number, fga: number, fta: number, ast: number, tov: number,
- *   stl: number | null, blk: number | null, reb?: number,
+ *   stl: number | null, blk: number | null,
  *   seasonDWS?: number | null, gamesPlayed?: number | null,
  *   usagePct?: number, position?: string | null, slot?: string | null
  * }} PlayerStatLine */
@@ -47,16 +54,6 @@ const SLOT_GROUP = { PG: "G", SG: "G", SF: "F", PF: "F", C: "C" };
 // (2 turnovers/game costs 4.0; this costs a flat 3.0). Meaningful without
 // being able to single-handedly flip a close matchup on its own.
 const POSITION_PENALTY = 3.0;
-
-// This weight is small on purpose. A dominant rebounder pulling down about
-// 15 boards a game only contributes around 4.5 points here, which keeps
-// rebounding in the same range as the STL/BLK terms instead of letting it
-// take over the whole defensive score. It also isn't applied in the
-// untracked (pre-1974) branch below, because that branch's DWS estimate is
-// already built from rebounds per game (see estimateSeasonDWS in
-// statsAdapter.js). Adding a second rebounding term there would just be
-// counting the same signal twice.
-const REB_WEIGHT = 0.3;
 
 /**
  * True Shooting %, guarded against division by zero. If a player has no
@@ -88,13 +85,15 @@ export function offenseScore({ pts, fga, fta, ast, tov }) {
  * completely different thing from "this stat wasn't tracked yet." So this
  * function checks for null specifically, instead of just checking whether
  * the value happens to equal 0.
- * @param {{ stl: number | null, blk: number | null, reb?: number, seasonDWS?: number | null, gamesPlayed?: number | null }} stats
+ * @param {{ stl: number | null, blk: number | null, seasonDWS?: number | null, gamesPlayed?: number | null }} stats
  * @returns {number}
  */
-export function defensiveImpactRating({ stl, blk, reb, seasonDWS, gamesPlayed }) {
+export function defensiveImpactRating({ stl, blk, seasonDWS, gamesPlayed }) {
   const tracked = stl != null && blk != null;
   if (tracked) {
-    return stl * 2.5 + blk * 2.0 + (reb ?? 0) * REB_WEIGHT;
+    // Rebounds are deliberately excluded (see the file header): they track
+    // role and opportunity, not defense. Blocks weigh over steals.
+    return stl * 2.0 + blk * 2.5;
   }
 
   if (!gamesPlayed) return 0;

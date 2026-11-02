@@ -92,11 +92,9 @@ export function toPlayerStatLine(rawStats) {
     tov: rawStats.tovPerGame ?? 0,
     stl: rawStats.stealsPerGame ?? null,
     blk: rawStats.blocksPerGame ?? null,
-    // Feeds the tracked-era DIR branch's small rebounding term (see
-    // REB_WEIGHT in scoring.js). This is a separate use from this same
-    // reboundsPerGame value just below, which seeds the pre-1974 DWS
-    // estimate instead.
-    reb: rawStats.reboundsPerGame ?? 0,
+    // reboundsPerGame still seeds the pre-1974 DWS estimate below; it is no
+    // longer carried as a `reb` field, since the tracked-era DIR dropped its
+    // rebounding term (rebounds track role, not defense; see scoring.js).
     seasonDWS: estimateSeasonDWS(rawStats),
     gamesPlayed: rawStats.gamesPlayed,
     usagePct,

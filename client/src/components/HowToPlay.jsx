@@ -46,7 +46,7 @@ const STEPS = [
   {
     n: "04",
     title: "See who wins",
-    body: "Once every roster is full, the app scores each team from real career stats (points, rebounds, assists, defense, and how well your five starters share the ball) and ranks the room.",
+    body: "Once every roster is full, the app scores each team from real career stats (points, assists, defense, and how well your five starters share the ball) and ranks the room.",
   },
 ];
 
@@ -225,7 +225,7 @@ function offenseScore(p) {
   return p.pts * trueShootingPct(p.pts, p.fga, p.fta) + p.ast * 1.5 - p.tov * 2.0;
 }
 function defensiveImpact(p) {
-  return p.stl * 2.5 + p.blk * 2.0 + p.reb * 0.3;
+  return p.stl * 2.0 + p.blk * 2.5;
 }
 function synergyMultiplier(sumUsage) {
   if (sumUsage <= 105) return 1.1;
@@ -430,7 +430,7 @@ export default function HowToPlay() {
             index={3}
             label="Defensive impact"
             lines={[
-              "DIR = (STL × 2.5) + (BLK × 2.0) + (REB × 0.3)",
+              "DIR = (STL × 2.0) + (BLK × 2.5)",
               "  or, pre-1973-74 (steals/blocks untracked):",
               "DIR = (season Defensive Win Shares ÷ games played) × 100",
             ]}
