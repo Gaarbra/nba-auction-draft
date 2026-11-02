@@ -126,6 +126,13 @@ flowchart TD
 Solid arrows are request and response. Dashed arrows are live socket traffic
 or an outbound call to the NBA.
 
+**Jump to source**
+
+- **Client**: [`App.jsx`](https://github.com/Gaarbra/nba-auction-draft/blob/main/client/src/App.jsx) · [`RoomView.jsx`](https://github.com/Gaarbra/nba-auction-draft/blob/main/client/src/components/RoomView.jsx) · [`DraftBoard.jsx`](https://github.com/Gaarbra/nba-auction-draft/blob/main/client/src/components/DraftBoard.jsx) · [`MarketTab.jsx`](https://github.com/Gaarbra/nba-auction-draft/blob/main/client/src/components/MarketTab.jsx) · [`useSocket.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/client/src/hooks/useSocket.js)
+- **Rooms and draft**: [`roomHandlers.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/sockets/roomHandlers.js) · [`roomStore.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/rooms/roomStore.js) · [`draftStore.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/rooms/draftStore.js) · [`computeResults.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/scoring/computeResults.js) · [`scoring.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/scoring/scoring.js) · [`socketSecurity.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/middleware/socketSecurity.js) · [`db.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/services/db.js)
+- **Player data**: [`playerCache.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/services/playerCache.js) · [`era.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/services/era.js) · [`statsClient.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/services/statsClient.js)
+- **Stats service**: [`app.py`](https://github.com/Gaarbra/nba-auction-draft/blob/main/stats-service/app.py) · [`ml.py`](https://github.com/Gaarbra/nba-auction-draft/blob/main/stats-service/ml.py)
+
 ## The stack
 
 - **Frontend** (`client/`): React 18 on Vite, Socket.IO client, GSAP and Motion for the animation, Lenis for scrolling. Styled like a dark, high-contrast scoreboard.
@@ -136,9 +143,11 @@ or an outbound call to the NBA.
 ## How scoring works
 
 When every roster is full, the server pulls full stats for all drafted players
-(`server/src/scoring/computeResults.js`) and scores each team with pure,
-unit-tested functions (`server/src/scoring/scoring.js`, runnable with
-`npm test --prefix server`). Each per-game stat comes straight from `nba_api`.
+([`computeResults.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/scoring/computeResults.js))
+and scores each team with pure, unit-tested functions
+([`scoring.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/scoring/scoring.js),
+runnable with `npm test --prefix server`). Each per-game stat comes straight
+from `nba_api`.
 
 **Offense (Op)** per player:
 
@@ -173,7 +182,7 @@ Ms = 0.85   if sum(USG%) > 125
 **Final Team Score** = `sum(Op + DIR over the 5 starters) * Ms`.
 
 Two stats do not exist in any free, official source, so they are estimated and
-flagged (`server/src/scoring/statsAdapter.js`): USG% before 1996-97 (from shot
+flagged ([`statsAdapter.js`](https://github.com/Gaarbra/nba-auction-draft/blob/main/server/src/scoring/statsAdapter.js)): USG% before 1996-97 (from shot
 volume per 36 minutes) and pre-1974 Defensive Win Shares (from rebounds per
 game). The results screen marks any estimated value.
 
@@ -188,7 +197,7 @@ played are never double-counted. Steals, blocks, and turnovers from before
 they were tracked come back as `N/A`, not a misleading `0.0`.
 
 The suggested-price model behind the market
-(`stats-service/scripts/train_price_model.py`) retrains weekly on the accumulated
+([`train_price_model.py`](https://github.com/Gaarbra/nba-auction-draft/blob/main/stats-service/scripts/train_price_model.py)) retrains weekly on the accumulated
 draft history and hot-reloads into the serving container with no restart. Solo
 picks are excluded from its training data, since a price nobody competed for is
 not a real market signal.
