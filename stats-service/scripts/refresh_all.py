@@ -35,7 +35,11 @@ def refresh_batch(candidates, fetch, publish, budget, clock=time.monotonic, slee
                 consecutive += 1
                 print(f"[refresh] id={player['id']} failed: {type(error).__name__}")
                 if consecutive >= 3:
-                    raise RuntimeError("Three consecutive failures; keeping saved data and stopping") from None
+                    # Stop THIS batch against a flaky/dead endpoint, but let the
+                    # later phases (usage, weekly retrain) still run. Raising here
+                    # used to abort the whole job on a few proxy timeouts.
+                    print(f"[refresh] stopping batch early after {consecutive} consecutive failures")
+                    break
                 sleep(10 * consecutive)
             if completed and completed % 25 == 0:
                 publish()
@@ -164,7 +168,9 @@ def main():
             status["pendingAwards"] = sum(service._awards_cache.get(p["id"], {}).get("fetchedAt", 0) < started for p in award_candidates)
             if status["pendingStats"] or status["pendingAwards"] or status["pendingUsageSeasons"]:
                 status["state"] = "partial"
-            return 1 if failed else 0
+            # A completed run (even with some per-player timeouts) is a success;
+            # only a real top-level error below exits non-zero for systemd.
+            return 0
         except Exception as error:
             status.update(state="failed", error=type(error).__name__)
             print(f"[refresh] Stopped: {type(error).__name__}; saved data retained.")

@@ -29,10 +29,15 @@ class RefreshTests(unittest.TestCase):
                               lambda: published.append(True), 20, sleep=lambda _: None)
         self.assertFalse(refresh.due_players(pool, cache, now))
         self.assertTrue(published)
+        attempts = []
         def fail(pid):
+            attempts.append(pid)
             raise TimeoutError("must not be printed")
-        with self.assertRaises(RuntimeError):
-            refresh.refresh_batch(pool, fail, lambda: published.append(True), 20, sleep=lambda _: None)
+        # 3 consecutive failures stop this batch early without raising, so the
+        # caller continues to later phases. pool has 5 players; only 3 are tried.
+        failed = refresh.refresh_batch(pool, fail, lambda: published.append(True), 20, sleep=lambda _: None)
+        self.assertEqual(failed, 3)
+        self.assertEqual(len(attempts), 3)
         self.assertEqual(len(published), 2)
         refresh.refresh_batch(pool, fetch, lambda: None, 1, clock=iter([0, 2]).__next__)
         self.assertEqual(fetched, [2, 3])
