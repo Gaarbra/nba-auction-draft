@@ -5,6 +5,14 @@ backups/
 *.dump
 graphify-out/
 
+# Playwright draft-walkthrough recorder output
+/e2e/recordings/
+/test-results/
+/playwright-report/
+
+# Remotion ad render output
+/ad/out/
+
 # Local AI tools and generated design reports
 /.agents/
 /.claude/

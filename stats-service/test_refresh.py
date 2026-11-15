@@ -50,6 +50,7 @@ class RefreshTests(unittest.TestCase):
             import app
             with tempfile.TemporaryDirectory() as directory, \
                  patch.object(app, "DATA_DIR", directory), \
+                 patch.object(app, "CACHE_ONLY", True), patch.object(app, "REFRESH_JOB", True), \
                  patch.object(app, "_snapshot_versions", {}), \
                  patch.object(app, "_snapshot_checked_at", 0), \
                  patch.object(app, "_cache", {}), patch.object(app, "_awards_cache", {}), \

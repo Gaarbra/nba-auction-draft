@@ -13,3 +13,5 @@ graphify-out
 backups
 *.dump
 *.log
+**/*.tmp-*
+**/*.bak*

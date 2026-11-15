@@ -1,0 +1,23 @@
+{
+  "name": "hoop-bids-ad",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion startup ad for Hoop Bids (landscape + vertical).",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:landscape": "remotion render src/index.ts AdLandscape out/hoop-bids-ad-landscape.mp4",
+    "render:vertical": "remotion render src/index.ts AdVertical out/hoop-bids-ad-vertical.mp4",
+    "render": "npm run render:landscape && npm run render:vertical"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.*",
+    "@remotion/google-fonts": "4.0.*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "typescript": "^5.4.0"
+  }
+}
